@@ -75,7 +75,7 @@ class KrakenDbNcbiFiles():
         
     """
     KRAKEN_TAX_ID_ASSIGNMENT_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
-    NCBI_ACC_REGEX = re.compile(r'NC_[0-9]+\.[0-9]')
+    NCBI_ACC_REGEX = re.compile(r'[A-Z]{2}_[0-9]{6,}\.[0-9]')
     
     def __init__( self, taxonomy_path: str, library_path: str, acc2tax_file_path: str = None ):
         self.taxonomy_path = taxonomy_path
@@ -406,7 +406,7 @@ class KrakenDbNcbiFiles():
             Throws exception if not present
         """
         try:
-            return self.NCBI_ACC_REGEX.search( in_str).group(0)
+            return self.NCBI_ACC_REGEX.search( in_str ).group(0)
         except AttributeError:
             raise ValueError(f"could not parse NCBI acc ID from '{in_str}'")
 
