@@ -5,7 +5,9 @@ The default way of handling such genomes in KRAKEN2 is one taxon per genome.
 
 ## Installation
 Install with pip. You will probably want to create a venv for this first.
-
+```shell
+    pip install kraken_flu@git+ssh://git@gitlab.internal.sanger.ac.uk/malariagen1/misc_utils/kraken_flu.git
+```
 
 ## Usage
 Once installed, run with the following command:
