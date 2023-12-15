@@ -3,9 +3,9 @@ import os.path
 import re
 from importlib_resources import files
 
-from kraken_db_maker.src.kraken_db_ncbi_files import KrakenDbNcbiFiles
+from kraken_flu.src.kraken_db_ncbi_files import KrakenDbNcbiFiles
 
-FIXTURE_DIR = files('kraken_db_maker.tests.fixtures')
+FIXTURE_DIR = files('kraken_flu.tests.fixtures')
 TAX_DIR = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','taxonomy'))
 LIB_DIR = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','library','viral'))
 
