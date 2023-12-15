@@ -87,7 +87,7 @@ def main():
 
     ncbif.write_modified_fasta_file( os.path.join( library_path, 'library.fna' ))
     ncbif.write_modified_names_files( os.path.join( taxonomy_path, 'names.dmp' ))
-    ncbif.write_modified_nodes_files( os.path.join( taxonomy_path, 'modes.dmp' ))
+    ncbif.write_modified_nodes_files( os.path.join( taxonomy_path, 'nodes.dmp' ))
 
     if args.acc2tax_path:
         shutil.copyfile( ncbif.acc2tax_file_path, os.path.join( path, 'taxonomy', 'nucl_gb.accession2taxid' ) )
