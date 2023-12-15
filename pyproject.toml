@@ -1,0 +1,15 @@
+[build-system]
+requires = [
+    "setuptools >= 48",
+    "setuptools_scm[toml] >= 4, <6",
+    "setuptools_scm_git_archive",
+    "wheel >= 0.29.0",
+]
+build-backend = 'setuptools.build_meta'
+
+[tool.setuptools_scm]
+# setuptools_scm obtains the package version number from Git tags so we don't
+# have to have a version number hardcoded in scripts in the package 
+# upon installation, the version is written (from git tag) to this file
+write_to = "kraken_flu/version.py"
+git_describe_command = "git describe --dirty --tags --long --match v* --first-parent"
