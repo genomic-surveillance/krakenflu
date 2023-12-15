@@ -81,7 +81,9 @@ def main():
     os.mkdir( path )
 
     library_path = os.path.join( path , 'library' )
+    os.mkdir( library_path )
     taxonomy_path = os.path.join( path, 'taxonomy' )
+    os.mkdir( taxonomy_path )
 
     ncbif.write_modified_fasta_file( os.path.join( library_path, 'library.fna' ))
     ncbif.write_modified_names_files( os.path.join( taxonomy_path, 'names.dmp' ))
