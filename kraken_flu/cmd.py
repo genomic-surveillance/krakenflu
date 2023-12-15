@@ -28,7 +28,7 @@ def args_parser():
     parser.add_argument(
         '--version', '-v',
         action='version', 
-        version='kraken_db_maker ' + __version__ )
+        version='kraken_flu ' + __version__ )
 
     parser.add_argument(
         '--taxonomy_path','-t',
