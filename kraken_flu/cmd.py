@@ -51,7 +51,7 @@ def args_parser():
         type = str,
         action = 'store',
         default = None,
-        metavar = 'FILE'
+        metavar = 'FILE',
         required = False,
         help ='path to the NCBI file nucl_gb.accession2taxid IF one was dowloaded which is not always the case')
 
