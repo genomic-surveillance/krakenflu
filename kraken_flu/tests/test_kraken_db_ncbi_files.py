@@ -18,6 +18,8 @@ def test_init():
     assert os.path.basename( ncbif.names_file_path ) == 'names.dmp', 'found the names file'
     assert os.path.basename( ncbif.nodes_file_path ) == 'nodes.dmp', 'found the nodes file'
     assert os.path.basename( ncbif.fasta_file_path ) == 'library.fna', 'found the fasta file library.fna'
+    assert ncbif.prelim_map_file_path is not None
+    assert os.path.basename( ncbif.prelim_map_file_path ) == 'prelim_map.txt'
         
 def test_flu_genomes_ncbi_to_new_tax_and_parent_ids():
     ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
@@ -111,7 +113,7 @@ def test_write_modified_names_files( tmp_path ):
     #       taxonomy files than are used in the FASTA because this often happens in kraken
     #       DB creation (the taxonomy files are for all of NCBI)
     assert len(mod_file_rows) == len(original_file_rows) + 4 * 8 , '4 flu viruses with 8 segments each were added'
-    known_name_pattern = '\t\|\tNC_002023\.1 Influenza A virus \(A\/Puerto Rico\/8\/1934\(H1N1\)\) segment 1, complete sequence'
+    known_name_pattern = r'\t\|\tNC_002023\.1 Influenza A virus \(A\/Puerto Rico\/8\/1934\(H1N1\)\) segment 1, complete sequence'
     assert [ r for r in mod_file_rows if re.search( known_name_pattern, r)] , 'we find a row with the exact name of one segment that we expect'
 
 
@@ -129,6 +131,6 @@ def test_write_modified_nodes_files( tmp_path ):
     # each flu genome adds 8 segments to the nodes file
     # NOTE: see note in test_write_modified_names_files
     assert len(mod_file_rows) == len(original_file_rows) + 4 * 8 , '4 flu viruses with 8 segments each were added'
-    first_tax_id_pattern = f'^{ncbif.min_new_tax_id}\t\|\t[0-9]+'
+    first_tax_id_pattern = rf'^{ncbif.min_new_tax_id}\t\|\t[0-9]+'
     assert [r for r in mod_file_rows if re.search( first_tax_id_pattern, r)] ,'we find a node with the expected pattern of the first new tax ID in col 1'
     

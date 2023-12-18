@@ -108,6 +108,12 @@ class KrakenDbNcbiFiles():
         if self.acc2tax_file_path and not os.path.isfile( self.acc2tax_file_path ):
             raise ValueError(f'file { self.acc2tax_file_path } does not exists')
         
+        prelim_path =  os.path.join( self.library_path, 'prelim_map.txt')
+        if os.path.exists( prelim_path ):
+            self.prelim_map_file_path = prelim_path
+        else:
+            self.prelim_map_file_path = None
+        
         self.min_new_tax_id = self._find_max_used_tax_id() + 1
         
     def _find_max_used_tax_id( self ):
