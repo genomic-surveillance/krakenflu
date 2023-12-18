@@ -392,6 +392,7 @@ class KrakenDbNcbiFiles():
                                 # this is a segmented flu genome
                                 new_kraken_tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_tax_id']
                                 fields[1] = f'kraken:taxid|{new_kraken_tax_id}|{ncbi_id}'
+                                fields[2] = str(new_kraken_tax_id)
                             
                             out_fh.write( "\t".join( fields ) + "\n" )
                 except (PermissionError, FileNotFoundError) as e:

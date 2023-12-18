@@ -64,7 +64,7 @@ def test_write_modified_fasta_file_kraken_build( tmp_path ):
     
     data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
     new_tax_id_NC_002023 = data['NC_002023.1']['new_tax_id']
-    assert [ x for x in header_rows if re.search( f'kraken:taxid|{new_tax_id_NC_002023}|NC_002023.1', x ) ], 'FASTA header was changed in file and shows new taxon ID'
+    assert [ x for x in header_rows if re.search( f'>kraken:taxid|{new_tax_id_NC_002023}|NC_002023.1', x ) ], 'FASTA header was changed in file and shows new taxon ID'
     
     covid_header = '>kraken:taxid|2697049|NC_045512.2 Severe acute respiratory syndrome coronavirus 2 isolate Wuhan-Hu-1, complete genome'
     assert covid_header in header_rows, 'the COVID FASTA header is unchanged in the file'
@@ -149,7 +149,7 @@ def test_write_prelim_map_file( tmp_path ):
     
     data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
     new_tax_id_NC_002023 = data['NC_002023.1']['new_tax_id']
-    prelim_map_pattern = rf'\tkraken:taxid|{new_tax_id_NC_002023}|NC_002023.1\t'
+    prelim_map_pattern = rf'\tkraken:taxid|{new_tax_id_NC_002023}|NC_002023.1\t{new_tax_id_NC_002023}'
     assert [ x for x in mod_file_rows if re.search( prelim_map_pattern, x ) ], 'the tax ID in the prelim mapping file was changed correctly for this influenza NCBI ID'
     
 
