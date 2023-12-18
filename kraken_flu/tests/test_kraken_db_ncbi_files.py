@@ -134,7 +134,24 @@ def test_write_modified_nodes_files( tmp_path ):
     first_tax_id_pattern = rf'^{ncbif.min_new_tax_id}\t\|\t[0-9]+'
     assert [r for r in mod_file_rows if re.search( first_tax_id_pattern, r)] ,'we find a node with the expected pattern of the first new tax ID in col 1'
     
+def test_write_prelim_map_file( tmp_path ):
+    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
+    out_file = tmp_path / "prelim_map.txt"
+    
+    assert not out_file.is_file(), 'before we start, the output file does not exist'
+    ncbif.write_prelim_map_file( out_file )
+    assert out_file.is_file(), 'after calling the method, the output file now exists'
 
+    original_file_rows = [line.rstrip() for line in open( ncbif.prelim_map_file_path ) ]
+    mod_file_rows  = [line.rstrip() for line in open( out_file ) ]
+        
+    assert len(mod_file_rows) == len(original_file_rows) , 'the prelim_map.txt file has the same number of entries before and after modification'
+    
+    data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
+    new_tax_id_NC_002023 = data['NC_002023.1']['new_tax_id']
+    prelim_map_pattern = rf'\tkraken:taxid|{new_tax_id_NC_002023}|NC_002023.1\t'
+    assert [ x for x in mod_file_rows if re.search( prelim_map_pattern, x ) ], 'the tax ID in the prelim mapping file was changed correctly for this influenza NCBI ID'
+    
 
 def test_create_db_ready_dir( tmp_path ):
     out_dir = tmp_path / 'out_dir'

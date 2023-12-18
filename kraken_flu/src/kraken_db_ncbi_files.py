@@ -323,6 +323,7 @@ class KrakenDbNcbiFiles():
 
         logging.info('finished writing modified names file')
         return True
+    
     def write_modified_nodes_files( self, path: str ):
         """
         Writes the nodes.dmp file with added new taxa from the segmented flu genomes.
@@ -358,11 +359,56 @@ class KrakenDbNcbiFiles():
         logging.info('finished writing modified nodes file')
         return True
     
+    def write_prelim_map_file( self, path: str ):
+        """
+        Writes the prelim_map.txt file (if one exists) with the new modified taxon IDs for 
+        the segmented virus but leaving other IDs unchanged.
+                
+        Parameters:
+            path: str
+                output file full path
+                
+        Returns:
+            True if success
+            
+        Side effects:
+            Writes to a file 'path'
+            
+        """
+        if not self.prelim_map_file_path:
+            logging.info(f'no prelim_map.txt file provided in inputs - nothing to do')
+            return True
+        
+        try: 
+            with open( path, 'w' ) as out_fh:
+                try:
+                    with open( self.prelim_map_file_path ) as in_fh:
+                        logging.info(f'writing modified prelim_map.txt file to { path }')
+                        for row in in_fh:
+                            row = row.rstrip()
+                            fields = row.split("\t")
+                            ncbi_id = self._parse_ncbi_accession_id( fields[1] )
+                            if ncbi_id in self.flu_genomes_ncbi_to_new_tax_and_parent_ids:
+                                # this is a segmented flu genome
+                                new_kraken_tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_tax_id']
+                                fields[1] = f'kraken:taxid|{new_kraken_tax_id}|{ncbi_id}'
+                            
+                            out_fh.write( "\t".join( fields ) + "\n" )
+                except (PermissionError, FileNotFoundError) as e:
+                    raise ValueError(f'cannot read from { self.fasta_file_path }')
+                
+        except (PermissionError, FileNotFoundError) as e:
+            raise ValueError(f'path { path } does not exist or is not writable, cannot create file')
+
+        logging.info('finished writing modified prelim_map.txt file')
+        return True
+    
     def create_db_ready_dir( self, path: str ):
         """
         Create a directory with all files needed to build a new kraken database. This includes the files that
         are copied unchanged as well as the files that are modified, which are:
             - fasta file
+            - prelim_map.txt (preliminary mapping of NCBI ID to taxon ID, not always present)
             - names.dmp
             - nodes.dmp
             
@@ -397,15 +443,13 @@ class KrakenDbNcbiFiles():
         os.mkdir( taxonomy_path )
     
         self.write_modified_fasta_file( os.path.join( library_path, 'library.fna' ))
+        self.write_prelim_map_file( os.path.join( library_path, 'prelim_map.txt' ))
         self.write_modified_names_files( os.path.join( taxonomy_path, 'names.dmp' ))
         self.write_modified_nodes_files( os.path.join( taxonomy_path, 'nodes.dmp' ))
 
         if self.acc2tax_file_path:
             shutil.copyfile( self.nodes_file_path, os.path.join( path, 'taxonomy', 'nucl_gb.accession2taxid' ) )
     
-        if self.prelim_map_file_path:
-            shutil.copyfile( self.prelim_map_file_path, os.path.join( library_path, 'prelim_map.txt' ) )
-        
     def _parse_ncbi_accession_id( self, in_str: str):
         """
         Parse the NCBI accession ID from a string (like FASTA header)
