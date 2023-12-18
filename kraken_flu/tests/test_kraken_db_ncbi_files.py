@@ -147,6 +147,8 @@ def test_write_prelim_map_file( tmp_path ):
         
     assert len(mod_file_rows) == len(original_file_rows) , 'the prelim_map.txt file has the same number of entries before and after modification'
     
+    # the modified file should have the new tax ID twice: once in col 2 as a kraken taxid tag
+    # and once on its own in col3 (tab delimited)
     data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
     new_tax_id_NC_002023 = data['NC_002023.1']['new_tax_id']
     prelim_map_pattern = rf'\tkraken:taxid|{new_tax_id_NC_002023}|NC_002023.1\t{new_tax_id_NC_002023}'
