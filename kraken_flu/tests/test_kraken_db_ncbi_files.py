@@ -134,3 +134,20 @@ def test_write_modified_nodes_files( tmp_path ):
     first_tax_id_pattern = rf'^{ncbif.min_new_tax_id}\t\|\t[0-9]+'
     assert [r for r in mod_file_rows if re.search( first_tax_id_pattern, r)] ,'we find a node with the expected pattern of the first new tax ID in col 1'
     
+
+
+def test_create_db_ready_dir( tmp_path ):
+    out_dir = tmp_path / 'out_dir'
+    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
+    
+    assert not out_dir.is_dir() , 'before we begin, the output dir does not exist'
+    ncbif.create_db_ready_dir( out_dir )
+    
+    assert out_dir.is_dir(), 'after the command, the out dir exists'
+    assert os.path.exists( os.path.join( out_dir, 'library' ) ), 'the library subdir created'
+    assert os.path.exists( os.path.join( out_dir, 'taxonomy' ) ), 'the taxonomy subdir created'
+    assert os.path.exists( os.path.join( out_dir, 'library', 'library.fna' ) ), 'the FASTA file was created'
+    assert os.path.exists( os.path.join( out_dir, 'library', 'prelim_map.txt' ) ), 'the preliminary acc2tax ID file was created'
+    assert os.path.exists( os.path.join( out_dir, 'taxonomy', 'names.dmp' ) ), 'the names file was created'
+    assert os.path.exists( os.path.join( out_dir, 'taxonomy', 'nodes.dmp' ) ), 'the nodes file was created'
+

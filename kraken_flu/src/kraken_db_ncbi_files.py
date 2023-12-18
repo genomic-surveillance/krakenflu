@@ -392,14 +392,20 @@ class KrakenDbNcbiFiles():
         
         library_path = os.path.join( path , 'library' )
         taxonomy_path = os.path.join( path, 'taxonomy' )
-        
+
+        os.mkdir( library_path )
+        os.mkdir( taxonomy_path )
+    
         self.write_modified_fasta_file( os.path.join( library_path, 'library.fna' ))
         self.write_modified_names_files( os.path.join( taxonomy_path, 'names.dmp' ))
-        self.write_modified_nodes_files( os.path.join( taxonomy_path, 'modes.dmp' ))
+        self.write_modified_nodes_files( os.path.join( taxonomy_path, 'nodes.dmp' ))
 
         if self.acc2tax_file_path:
             shutil.copyfile( self.nodes_file_path, os.path.join( path, 'taxonomy', 'nucl_gb.accession2taxid' ) )
     
+        if self.prelim_map_file_path:
+            shutil.copyfile( self.prelim_map_file_path, os.path.join( library_path, 'prelim_map.txt' ) )
+        
     def _parse_ncbi_accession_id( self, in_str: str):
         """
         Parse the NCBI accession ID from a string (like FASTA header)

@@ -75,22 +75,7 @@ def main():
         library_path= args.library_path,
         acc2tax_file_path= args.acc2tax_path)
 
-    path = args.out_dir
-    if os.path.exists( path ):
-        raise ValueError(f'directory { path } exists already. Will not write into existing directory')
-    os.mkdir( path )
-
-    library_path = os.path.join( path , 'library' )
-    os.mkdir( library_path )
-    taxonomy_path = os.path.join( path, 'taxonomy' )
-    os.mkdir( taxonomy_path )
-
-    ncbif.write_modified_fasta_file( os.path.join( library_path, 'library.fna' ))
-    ncbif.write_modified_names_files( os.path.join( taxonomy_path, 'names.dmp' ))
-    ncbif.write_modified_nodes_files( os.path.join( taxonomy_path, 'nodes.dmp' ))
-
-    if args.acc2tax_path:
-        shutil.copyfile( ncbif.acc2tax_file_path, os.path.join( path, 'taxonomy', 'nucl_gb.accession2taxid' ) )
+    ncbif.create_db_ready_dir( args.out_dir )
 
 if __name__ == "__main__":
     exit(main())
