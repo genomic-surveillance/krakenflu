@@ -188,13 +188,14 @@ class KrakenDbNcbiFiles():
                             raise ValueError(f'NCBI ID {ncbi_id} found more than once in FASTA file {self.fasta_file_path}' )
                         
                         # clean up the FASTA header to serve as a name for this segment
-                        mod_name = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( r'\1', record.description )
+                        mod_name = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( '', record.description )
                         
-                        new_tax_id_i += 1
                         data[ ncbi_id ] = {
                             'name': mod_name, 
                             'new_tax_id': new_tax_id_i,
                             'new_parent_id': parent_tax_id }
+                                                
+                        new_tax_id_i += 1
                         continue
         
         logging.info( f'done - found { flu_count } segment sequences in FASTA file')
