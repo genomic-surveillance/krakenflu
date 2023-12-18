@@ -274,13 +274,16 @@ class KrakenDbNcbiFiles():
                         logging.info(f'writing modified FASTA file to { path }')
                         for record in SeqIO.parse( in_fh, "fasta"):
                             ncbi_id = self._parse_ncbi_accession_id( record.description )
-                            existing_kraken_tax_id = self._parse_kraken_tax_id( record.description )
                             if ncbi_id in self.flu_genomes_ncbi_to_new_tax_and_parent_ids:
                                 # this is a segmented flu genome
                                 new_kraken_tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_tax_id']
                                 new_kraken_tax_str = f'kraken:taxid|{new_kraken_tax_id}|'
                                 new_desc = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.description )
                                 record.description = new_desc
+                                new_name = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.name )
+                                record.name = new_name
+                                new_id = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.id )
+                                record.id = new_id
                             SeqIO.write( record, out_fh, "fasta" )   
                 except (PermissionError, FileNotFoundError) as e:
                     raise ValueError(f'cannot read from { self.fasta_file_path }')
