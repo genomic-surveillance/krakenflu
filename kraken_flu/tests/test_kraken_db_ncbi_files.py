@@ -101,18 +101,19 @@ def test_write_modified_names_files( tmp_path ):
     ncbif.write_modified_names_files( out_file )
     assert out_file.is_file(), 'after calling the method, the output file now exists'
 
-    with open( ncbif.names_file_path, 'r' ) as fh:
-        original_file_rows = fh.readlines()
-    
-    with open( out_file, 'r' ) as fh:
-        mod_file_rows = fh.readlines()
+    original_file_rows = [line.rstrip() for line in open( ncbif.names_file_path ) ]
+    mod_file_rows  = [line.rstrip() for line in open( out_file ) ]
         
     # each flu genome adds 8 segment names to the names file
     # NOTE: the original whole genome names are not removed from the file, they 
-    #       are simply not used anymore by any sequences in the FASTA file, which
-    #       is ok, since the taxonomy files are expected to contain more nodes than
-    #       are being used by sequences in the FASTA
+    #       are simply not used anymore by any sequences in the FASTA file.
+    #       This is intended behaviour. It does not matter to have more entries in the
+    #       taxonomy files than are used in the FASTA because this often happens in kraken
+    #       DB creation (the taxonomy files are for all of NCBI)
     assert len(mod_file_rows) == len(original_file_rows) + 4 * 8 , '4 flu viruses with 8 segments each were added'
+    known_name_pattern = '\t\|\tNC_002023\.1 Influenza A virus \(A\/Puerto Rico\/8\/1934\(H1N1\)\) segment 1, complete sequence'
+    assert [ r for r in mod_file_rows if re.search( known_name_pattern, r)] , 'we find a row with the exact name of one segment that we expect'
+
 
 def test_write_modified_nodes_files( tmp_path ):
     ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
@@ -122,12 +123,12 @@ def test_write_modified_nodes_files( tmp_path ):
     ncbif.write_modified_nodes_files( out_file )
     assert out_file.is_file(), 'after calling the method, the output file now exists'
 
-    with open( ncbif.nodes_file_path, 'r' ) as fh:
-        original_file_rows = fh.readlines()
-    
-    with open( out_file, 'r' ) as fh:
-        mod_file_rows = fh.readlines()
+    original_file_rows = [line.rstrip() for line in open( ncbif.nodes_file_path ) ]
+    mod_file_rows  = [line.rstrip() for line in open( out_file ) ]
         
     # each flu genome adds 8 segments to the nodes file
     # NOTE: see note in test_write_modified_names_files
     assert len(mod_file_rows) == len(original_file_rows) + 4 * 8 , '4 flu viruses with 8 segments each were added'
+    first_tax_id_pattern = f'^{ncbif.min_new_tax_id}\t\|\t[0-9]+'
+    assert [r for r in mod_file_rows if re.search( first_tax_id_pattern, r)] ,'we find a node with the expected pattern of the first new tax ID in col 1'
+    
