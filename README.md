@@ -62,8 +62,9 @@ kraken2-build \
     --db SOME/OUTPUT/DIR
 ```
 
-## Using the filter tool to pre-=process large collections of flu genomes
-A filter command is provided, which was designed to filter the large files of all influenza genomes that can be obtained from the [NCBI influenza FTP site](https://ftp.ncbi.nih.gov/genomes/INFLUENZA/influenza.fna). 
+## Using the filter tool to pre-process large collections of flu genomes
+A filter command is provided, which was designed to filter the large files of all influenza genomes that can be obtained from the [NCBI influenza FTP site](https://ftp.ncbi.nih.gov/genomes/INFLUENZA/) (file "influenza.fna").  
+ 
 The filter produces a new FASTA file from the download, which only contains the genomes (identified by unique name) that have all 8 segments and at least 90% of the expected sequence length for each of them. In addition, the name of the sequence in the FASTA header must match the pattern ```Influenza [AB].+ segment [1-8]```.
 
 This command creates the filtered FASTA file
