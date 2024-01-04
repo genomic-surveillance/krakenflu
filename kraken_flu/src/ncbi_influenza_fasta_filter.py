@@ -14,8 +14,7 @@ class NcbiInfluenzaFastaFilter():
     
     Filters the file down the sequences tht fulfil the following criteria:
     
-        - H1N1, H3N2 and B only
-        - only complete genomes with all 8 segments
+        - genome has all 8 segments, each with at least 90% of the expected sequence length
         - segments must be named according to convention such as this example
             "Influenza A virus (A/ruddy turnstone/Delaware Bay/205/2017(H3N2)) segment 1"
     
