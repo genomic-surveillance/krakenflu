@@ -152,6 +152,7 @@ class NcbiInfluenzaFastaFilter():
         if not os.path.isdir( dir ):
             raise ValueError(f'directory "{dir}" does not exist, cannot create file "{out_path}"')
         
+        logging.info( f'starting to write filtered genomes to {out_path}')
         with open( out_path, 'w') as out_fh:
             with open( self.fasta_file_path ) as in_fh:
                 for record in SeqIO.parse(in_fh, "fasta"):
