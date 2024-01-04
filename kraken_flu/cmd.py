@@ -56,6 +56,12 @@ def args_parser():
         type = str,
         help='path to the output (filtered) FASTA file')
     
+    filter_parser.add_argument(
+        '--discard_duplicates',
+        required= False,
+        action= 'store_true',
+        help='if used, FASTA headers where the name and segment number is not unique are discarded')
+    
     build_parser = subparsers.add_parser(
         'build', 
         help='run the main "build" command of the tool, which creates the files for kraken-build')
@@ -83,7 +89,7 @@ def args_parser():
         default = None,
         metavar = 'FILE',
         required = False,
-        help ='path to the NCBI file nucl_gb.accession2taxid IF one was dowloaded which is not always the case')
+        help ='path to the NCBI file nucl_gb.accession2taxid IF one was downloaded which is not always the case')
 
     build_parser.add_argument(
         '--out_dir','-o',
@@ -100,7 +106,7 @@ def filter(args):
     """
     The filter command
     """
-    ncbi_filter = NcbiInfluenzaFastaFilter( fasta_file_path= args.in_fasta )
+    ncbi_filter = NcbiInfluenzaFastaFilter( fasta_file_path= args.in_fasta, discard_duplicates = args.discard_duplicates )
     ncbi_filter.write_filtered_file( out_path= args.out_fasta )
     
 def build(args):

@@ -21,6 +21,12 @@ class NcbiInfluenzaFastaFilter():
     Parameters:
         fasta_file_path: str, required
             path to the FASTA file that is to be filtered
+            
+        discard_duplicates: bool, optional, defaults to False
+            if True, discard FASTA headers where name and segment number is duplicated in the file.
+            This happens for partial sequences where separate sequence records are provided for the
+            different genes on the same segment. Such sequences are not of interest for us as they are
+            not complete genome segments anyway
         
     """
     
@@ -41,10 +47,11 @@ class NcbiInfluenzaFastaFilter():
     # minimum proportion of each of the segments that must be covered
     MIN_SEQ_LEN_PROPORTION = 0.9
     
-    def __init__( self, fasta_file_path: str ):
+    def __init__( self, fasta_file_path: str, discard_duplicates: bool = False ):
         if not os.path.isfile( fasta_file_path ):
             raise ValueError(f'file { fasta_file_path } does not exist or is not a file')
         self.fasta_file_path = fasta_file_path
+        self.discard_duplicates = discard_duplicates
         
     @cached_property
     def records_by_name( self ):
@@ -84,7 +91,10 @@ class NcbiInfluenzaFastaFilter():
                         seq_len = len(record.seq)
                         if name in data:
                             if segment_num in data[name]:
-                                raise ValueError(f"found a duplicate definition for name '{name}' segment {segment_num} in {self.fasta_file_path}")
+                                if self.discard_duplicates:
+                                    continue
+                                else:
+                                    raise ValueError(f"found a duplicate definition for name '{name}' segment {segment_num} in {self.fasta_file_path}")
                             else:
                                 data[name][segment_num] = {
                                     'fasta_head': record.description,
