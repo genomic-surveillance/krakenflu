@@ -43,9 +43,9 @@ class NcbiInfluenzaFastaFilter():
     MIN_SEQ_LEN_PROPORTION = 0.9
     
     def __init__( self, fasta_file_path: str ):
-        self.fasta_file_path = fasta_file_path
-        if not fasta_file_path.is_file():
+        if not os.path.isfile( fasta_file_path ):
             raise ValueError(f'file { fasta_file_path } does not exist or is not a file')
+        self.fasta_file_path = fasta_file_path
         
     @cached_property
     def records_by_name( self ):
@@ -103,7 +103,7 @@ class NcbiInfluenzaFastaFilter():
                         # care about, just ignore
                         pass
         
-        logging.info( f'found {len(data.keys())} genomes')
+        logging.info( f'found {len(data.keys())} genomes (unique names) before filtering')
         return data
         
     @cached_property
@@ -127,5 +127,26 @@ class NcbiInfluenzaFastaFilter():
                 if len( full_length_headers ) == 8:
                     to_keep.extend (full_length_headers)  
         
+        logging.info(f'{len(to_keep)} FASTA records pass the filters and will be written to output file')
+        
         return to_keep
         
+    def write_filtered_file( self, out_path: str ):
+        """
+        Writes the final, filtered, file to out_path
+        
+        Parameters:
+            out_path: str, required
+                path to the file which will be created
+        """
+        dir = str(os.path.dirname( out_path ))
+        if not os.path.isdir( dir ):
+            raise ValueError(f'directory "{dir}" does not exist, cannot create file "{out_path}"')
+        
+        records = []
+        with open( self.fasta_file_path ) as in_fh:
+            for record in SeqIO.parse(in_fh, "fasta"):
+                if record.description in self.filtered_fasta_headers:
+                    records.append(record)
+        SeqIO.write( records, out_path, 'fasta' )
+        logging.info( f'finished writing filtered genomes to {out_path}')

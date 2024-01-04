@@ -1,6 +1,5 @@
 import pytest
 import os.path
-import re
 from importlib_resources import files
 
 from kraken_flu.src.ncbi_influenza_fasta_filter import NcbiInfluenzaFastaFilter
@@ -31,4 +30,17 @@ def test_filtered_fasta_headers():
     data = filter.filtered_fasta_headers
     assert isinstance( data, list)
     assert len( data ) == 2 * 8, 'there are two complete genomes in the fixture file, 2*8 FASTA headers`'
+    
+def test_write_filtered_file( tmp_path ):
+    filter = NcbiInfluenzaFastaFilter( fasta_file_path=NCBI_TEST_FILE)
+    
+    out_path = tmp_path / 'filtered_out.fasta'
+    
+    assert not out_path.is_file(), 'before we start, the output file does not exist'
+    filter.write_filtered_file( out_path )
+    assert out_path.is_file(), 'after calling the method, the output file now exists'
+    
+    stream = os.popen(f'grep -c "^>" {out_path}')
+    output = stream.read()
+    assert output[0:2] == '16' ,'the filtered FASTA file contains 16 header lines (2 complete genomes)'
     

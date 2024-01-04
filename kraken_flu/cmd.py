@@ -3,6 +3,7 @@ import os
 import shutil
 import logging
 from kraken_flu.src.kraken_db_ncbi_files import KrakenDbNcbiFiles
+from kraken_flu.src.ncbi_influenza_fasta_filter import NcbiInfluenzaFastaFilter
 
 # get the version number from a file that is created by setuptools_scm 
 # when the package is installed. 
@@ -16,7 +17,7 @@ except ImportError:
 # NOTE about imports and using this script in develpoment and after production.
 # The script uses absolute imports that will only work after being installed by pip.
 # To run the script during development, run as follows from top level directory of the repo:
-# python -m kraken_db_maker.cmd { OPTIONS }
+# python -m kraken_flu.cmd { OPTIONS }
 
 def args_parser():
     """
@@ -26,11 +27,40 @@ def args_parser():
         description = "kraken_flu.py: tool to modify KRAKEN2 database build files to handle flu segments as individual genomes") 
 
     parser.add_argument(
-        '--version', '-v',
+        '-v', '--version', 
         action='version', 
         version='kraken_flu ' + __version__ )
 
-    parser.add_argument(
+    subparsers = parser.add_subparsers(help='commands')
+    subparsers.required = True
+    subparsers.dest = 'command'
+    
+    # filter command
+    filter_parser = subparsers.add_parser(
+        'filter', 
+        help='filter a large FASTA file of influenza genomes before building a library from it')
+    
+    # set the function to dispatch to
+    filter_parser.set_defaults( func = filter )
+    filter_parser.add_argument(
+        '--in_fasta',
+        required= True,
+        metavar= 'FILE',
+        type = str,
+        help='path to the input FASTA file')
+    
+    filter_parser.add_argument(
+        '--out_fasta',
+        required= True,
+        metavar= 'FILE',
+        type = str,
+        help='path to the output (filtered) FASTA file')
+    
+    build_parser = subparsers.add_parser(
+        'build', 
+        help='run the main "build" command of the tool, which creates the files for kraken-build')
+
+    build_parser.add_argument(
         '--taxonomy_path','-t',
         action = 'store',
         required = True,
@@ -38,7 +68,7 @@ def args_parser():
         type = str,
         help='path to the NCBI taxonomy directory that contains files nodes.dmp and names.dmp')
 
-    parser.add_argument(
+    build_parser.add_argument(
         '--library_path','-l',
         action = 'store',
         required = True,
@@ -46,7 +76,7 @@ def args_parser():
         type = str,
         help='path to the NCBI library director that contains the library.fna FASTA file')
 
-    parser.add_argument(
+    build_parser.add_argument(
         '--acc2tax_path','-a',
         type = str,
         action = 'store',
@@ -55,7 +85,7 @@ def args_parser():
         required = False,
         help ='path to the NCBI file nucl_gb.accession2taxid IF one was dowloaded which is not always the case')
 
-    parser.add_argument(
+    build_parser.add_argument(
         '--out_dir','-o',
         type = str,
         action = 'store',
@@ -66,16 +96,29 @@ def args_parser():
     
     return parser
     
-def main():
+def filter(args):
+    """
+    The filter command
+    """
+    ncbi_filter = NcbiInfluenzaFastaFilter( fasta_file_path= args.in_fasta )
+    ncbi_filter.write_filtered_file( out_path= args.out_fasta )
     
-    args = args_parser().parse_args()
-
+def build(args):
+    """
+    The build command
+    """  
+    
     ncbif = KrakenDbNcbiFiles( 
         taxonomy_path= args.taxonomy_path, 
         library_path= args.library_path,
         acc2tax_file_path= args.acc2tax_path)
 
     ncbif.create_db_ready_dir( args.out_dir )
+    
+def main():
+    
+    args = args_parser().parse_args()
+    return args.func(args)
 
 if __name__ == "__main__":
     exit(main())
