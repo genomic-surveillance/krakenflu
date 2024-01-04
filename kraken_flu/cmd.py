@@ -66,6 +66,8 @@ def args_parser():
         'build', 
         help='run the main "build" command of the tool, which creates the files for kraken-build')
 
+    build_parser.set_defaults( func = build )
+
     build_parser.add_argument(
         '--taxonomy_path','-t',
         action = 'store',
