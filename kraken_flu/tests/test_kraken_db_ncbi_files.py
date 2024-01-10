@@ -95,6 +95,20 @@ def test_write_modified_fasta_file_not_kraken_build( tmp_path ):
     covid_header = '>NC_045512.2 Severe acute respiratory syndrome coronavirus 2 isolate Wuhan-Hu-1, complete genome'
     assert covid_header in header_rows, 'the COVID FASTA header is unchanged in the file'
     
+def test_flu_genomes_ncbi_to_new_tax_and_parent_ids_all_ncbi_download():
+    """
+    tests lu_genomes_ncbi_to_new_tax_and_parent_ids against an extract from the download of all
+    influenza genomes from NCBI (https://ftp.ncbi.nih.gov/genomes/INFLUENZA/)
+    The main difference is that the FASTA headers do not have NC_xxxxx genbank IDs so the IDs have 
+    to be extracted from 
+    
+    """
+    lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
+    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir)
+    
+    data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
+    assert data    
+    
 def test_write_modified_names_files( tmp_path ):
     ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     out_file = tmp_path / "mod_names.dmp"

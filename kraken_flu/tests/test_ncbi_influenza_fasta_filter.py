@@ -5,7 +5,7 @@ from importlib_resources import files
 from kraken_flu.src.ncbi_influenza_fasta_filter import NcbiInfluenzaFastaFilter
 
 FIXTURE_DIR = files('kraken_flu.tests.fixtures')
-NCBI_TEST_FILE = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download','ncbi_flu.fna'))
+NCBI_TEST_FILE = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download','library.fna'))
 
 def test_init():
     filter = NcbiInfluenzaFastaFilter( fasta_file_path=NCBI_TEST_FILE)
