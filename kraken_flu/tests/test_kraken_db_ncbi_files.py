@@ -104,7 +104,8 @@ def test_flu_genomes_ncbi_to_new_tax_and_parent_ids_all_ncbi_download():
     
     """
     lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir)
+    acc2taxid_file = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download', 'nucl_gb.accession2taxid' ))
+    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
     
     data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
     assert data    

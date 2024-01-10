@@ -75,7 +75,7 @@ class KrakenDbNcbiFiles():
         
     """
     KRAKEN_TAX_ID_ASSIGNMENT_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
-    NCBI_ACC_REGEX = re.compile(r'[A-Z]{2}_[0-9]{6,}\.[0-9]')
+    NCBI_ACC_REGEX = re.compile(r'gb\|[A-Z]+_?[0-9]+|[A-Z]{2}_[0-9]{6,}\.[0-9]')
     
     def __init__( self, taxonomy_path: str, library_path: str, acc2tax_file_path: str = None ):
         self.taxonomy_path = taxonomy_path
