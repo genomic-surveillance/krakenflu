@@ -407,7 +407,7 @@ class KrakenDbNcbiFiles():
         logging.info('finished writing modified prelim_map.txt file')
         return True
     
-    def create_db_ready_dir( self, path: str ):
+    def create_db_ready_dir( self, path: str, force: bool = True ):
         """
         Create a directory with all files needed to build a new kraken database. This includes the files that
         are copied unchanged as well as the files that are modified, which are:
@@ -426,8 +426,11 @@ class KrakenDbNcbiFiles():
         Parameters:
             path: str
                 path to the directory into which the files will be written.
-                This directory must NOT exist yet. This is a precaution to ensure that the user does
-                not mix files for DB building which can result in an inconsistent built.
+                If force is not used, the DIR must not exist yet
+                
+            force: bool, optional, defaults to True
+                if true, force overwrite whatever is already in the output dir. If not, will fail
+                if directory already exists
                 
         Returns:
             True if success
@@ -436,7 +439,7 @@ class KrakenDbNcbiFiles():
             Writes files to path
             
         """
-        if os.path.exists( path ):
+        if os.path.exists( path ) and not force :
             raise ValueError(f'directory { path } exists already. Will not write into existing directory')
         os.mkdir( path )
         
