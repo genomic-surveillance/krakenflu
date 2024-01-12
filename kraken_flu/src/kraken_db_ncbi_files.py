@@ -439,8 +439,8 @@ class KrakenDbNcbiFiles():
             Writes files to path
             
         """
-        if os.path.exists( path ) 
-            if not force :
+        if os.path.exists( path ): 
+            if not force:
                 raise ValueError(f'directory { path } exists already. Will not write into existing directory')
         else:
             os.mkdir( path )
