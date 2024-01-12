@@ -441,7 +441,8 @@ class KrakenDbNcbiFiles():
         """
         if os.path.exists( path ) and not force :
             raise ValueError(f'directory { path } exists already. Will not write into existing directory')
-        os.mkdir( path )
+        else:
+            os.mkdir( path )
         
         library_path = os.path.join( path , 'library' )
         taxonomy_path = os.path.join( path, 'taxonomy' )
