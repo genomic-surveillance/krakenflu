@@ -108,7 +108,8 @@ def test_flu_genomes_ncbi_to_new_tax_and_parent_ids_all_ncbi_download():
     ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
     
     data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
-    assert data    
+    assert data
+    assert 'MT375832' in data, "a 'gb|xxxxx' formatted Genbank ID was parsed correctly"  
     
 def test_write_modified_names_files( tmp_path ):
     ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)

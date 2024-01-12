@@ -471,7 +471,9 @@ class KrakenDbNcbiFiles():
             Throws exception if not present
         """
         try:
-            return self.NCBI_ACC_REGEX.search( in_str ).group(0)
+            ncbi_id = self.NCBI_ACC_REGEX.search( in_str ).group(0)
+            ncbi_id = re.sub(r'^gb\|', '', ncbi_id)
+            return ncbi_id
         except AttributeError:
             raise ValueError(f"could not parse NCBI acc ID from '{in_str}'")
 
