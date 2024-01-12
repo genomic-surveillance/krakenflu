@@ -439,17 +439,16 @@ class KrakenDbNcbiFiles():
             Writes files to path
             
         """
+        library_path = os.path.join( path , 'library' )
+        taxonomy_path = os.path.join( path, 'taxonomy' )
+        
         if os.path.exists( path ): 
             if not force:
                 raise ValueError(f'directory { path } exists already. Will not write into existing directory')
         else:
             os.mkdir( path )
-        
-        library_path = os.path.join( path , 'library' )
-        taxonomy_path = os.path.join( path, 'taxonomy' )
-
-        os.mkdir( library_path )
-        os.mkdir( taxonomy_path )
+            os.mkdir( library_path )
+            os.mkdir( taxonomy_path )
     
         self.write_modified_fasta_file( os.path.join( library_path, 'library.fna' ))
         self.write_prelim_map_file( os.path.join( library_path, 'prelim_map.txt' ))
