@@ -95,9 +95,32 @@ def test_write_modified_fasta_file_not_kraken_build( tmp_path ):
     covid_header = '>NC_045512.2 Severe acute respiratory syndrome coronavirus 2 isolate Wuhan-Hu-1, complete genome'
     assert covid_header in header_rows, 'the COVID FASTA header is unchanged in the file'
     
+def test_write_modified_fasta_file_all_ncbi_download( tmp_path ):
+    """
+    tests write_modified_fasta_file with an extract of the "all influenza" NCBI FTP 
+    download. This file does not contain any taxonomy IDs in the FASTA headers but should have 
+    taxid added to the headers in the modified output file for the influenza sequences.
+    """
+    lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
+    acc2taxid_file = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download', 'nucl_gb.accession2taxid' ))
+    
+    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
+    out_file = tmp_path / "fasta_out.fna"
+    
+    assert not out_file.is_file(),  'before we start, the output file does not exist'
+    ncbif.write_modified_fasta_file( out_file )
+    assert out_file.is_file(), 'after calling the method, the output file now exists'    
+    
+    with open( out_file ) as f:
+        header_rows = [ x.strip() for x in f.readlines() if x[0] == '>' ]
+
+    assert len( header_rows ) == 20, 'correct number of FASTA headers in the file'
+    assert len([x for x in header_rows if 'taxid' in x]) == 20,'all FASTA headers have a taxid tag now'
+    
+    
 def test_flu_genomes_ncbi_to_new_tax_and_parent_ids_all_ncbi_download():
     """
-    tests lu_genomes_ncbi_to_new_tax_and_parent_ids against an extract from the download of all
+    tests flu_genomes_ncbi_to_new_tax_and_parent_ids against an extract from the download of all
     influenza genomes from NCBI (https://ftp.ncbi.nih.gov/genomes/INFLUENZA/)
     The main difference is that the FASTA headers do not have NC_xxxxx genbank IDs so the IDs have 
     to be extracted from 

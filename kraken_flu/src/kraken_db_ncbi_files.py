@@ -278,11 +278,21 @@ class KrakenDbNcbiFiles():
                                 # this is a segmented flu genome
                                 new_kraken_tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_tax_id']
                                 new_kraken_tax_str = f'kraken:taxid|{new_kraken_tax_id}|'
-                                new_desc = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.description )
+                                
+                                # a taxid tag is only present if the file is a pre-built kraken2 DB library, in which
+                                # case we need to remove the original taxid tag and replace with the new one.
+                                # If no taxid tag is currently present, just insert one at the beginning of the header
+                                if self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.search( record.description ):
+                                    new_desc = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.description )
+                                    new_name = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.name )
+                                    new_id = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.id )
+                                else:
+                                    new_desc = new_kraken_tax_str + record.description
+                                    new_name = new_kraken_tax_str + record.name
+                                    new_id = new_kraken_tax_str + record.id
+                                
                                 record.description = new_desc
-                                new_name = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.name )
                                 record.name = new_name
-                                new_id = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.id )
                                 record.id = new_id
                             SeqIO.write( record, out_fh, "fasta" )   
                 except (PermissionError, FileNotFoundError) as e:
