@@ -436,9 +436,6 @@ class KrakenDbNcbiFiles():
             - names.dmp
             - nodes.dmp
             
-        If a NCBI acc2taxid file was provided, it is also copied across. Beware that this is a large file (currently around
-        12GB) even if you are building a small database because it contains an entry for every record in NCBI.
-        
         The final directory can be used by kraken2 build as follows:
         
         kraken2-build --build --db PATH
@@ -474,9 +471,6 @@ class KrakenDbNcbiFiles():
         self.write_prelim_map_file( os.path.join( library_path, 'prelim_map.txt' ))
         self.write_modified_names_files( os.path.join( taxonomy_path, 'names.dmp' ))
         self.write_modified_nodes_files( os.path.join( taxonomy_path, 'nodes.dmp' ))
-
-        if self.acc2tax_file_path:
-            shutil.copyfile( self.nodes_file_path, os.path.join( path, 'taxonomy', 'nucl_gb.accession2taxid' ) )
     
     def _parse_ncbi_accession_id( self, in_str: str):
         """
