@@ -195,7 +195,6 @@ class KrakenDbNcbiFiles():
                         
                         # clean up the FASTA header to serve as a name for this segment
                         mod_name = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( '', record.description )
-                        
                         data[ ncbi_id ] = {
                             'name': mod_name, 
                             'new_tax_id': new_tax_id_i,
@@ -237,10 +236,21 @@ class KrakenDbNcbiFiles():
             # Skip the first row, which is the header
             next(tsv_reader)
             for row in tsv_reader:
-                ( _, acc_version, taxid, _ ) = row
+                ( acc_id, acc_version, taxid, _ ) = row
+                
+                # lookup on accession ID or accession ID version (.1, .2, etc)
+                # if one of them is present and matches the recorded NCBI IDs, this becomes the
+                # new parent ID
                 if acc_version in data:
-                    if data[ acc_version ]['new_parent_id'] is None:
-                        data[ acc_version ]['new_parent_id'] = taxid
+                    use_id = acc_version
+                elif acc_id in data:
+                    use_id = acc_id
+                else:
+                    use_id = None
+                
+                if use_id:
+                    if data[ use_id ]['new_parent_id'] is None:
+                        data[ use_id ]['new_parent_id'] = taxid
                         
         return data
     
@@ -364,7 +374,7 @@ class KrakenDbNcbiFiles():
             for ncbi_id in self.flu_genomes_ncbi_to_new_tax_and_parent_ids.keys():
                 tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_tax_id']
                 parent_tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_parent_id']
-
+                
                 # the hardcoded '9' in field 5 is for virus division of the NCBI taxonomy
                 out_fh.write(
                     "\t|\t".join( [ str( tax_id ), str( parent_tax_id ), 'no rank', '', '9', '1', '1', '1', '0', '1', '1', '', '' ]) + "\t|\n")

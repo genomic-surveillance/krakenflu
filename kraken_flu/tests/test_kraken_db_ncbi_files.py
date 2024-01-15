@@ -173,6 +173,28 @@ def test_write_modified_nodes_files( tmp_path ):
     first_tax_id_pattern = rf'^{ncbif.min_new_tax_id}\t\|\t[0-9]+'
     assert [r for r in mod_file_rows if re.search( first_tax_id_pattern, r)] ,'we find a node with the expected pattern of the first new tax ID in col 1'
     
+def test_write_modified_nodes_file_all_ncbi_download( tmp_path ):
+    """
+    Test write_modified_nodes_file with NCBI all influenza file (does not have pre-assigned taxon IDs)
+    """
+    lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
+    acc2taxid_file = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download', 'nucl_gb.accession2taxid' ))
+    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
+    out_file = tmp_path / "mod_nodes.dmp"
+    
+    assert not out_file.is_file(), 'before we start, the output file does not exist'
+    ncbif.write_modified_nodes_files( out_file )
+    assert out_file.is_file(), 'after calling the method, the output file now exists'
+    
+    # NCBI influenxa downloads have no taxonomy assigned in the FASTA file, so
+    # make sure the parent taxon IDs have been assigned correctly
+    original_file_rows = [line.rstrip() for line in open( ncbif.nodes_file_path ) ]
+    mod_file_rows  = [line.rstrip() for line in open( out_file ) ]
+    assert len(mod_file_rows) == len(original_file_rows) + 20, 'added 20 nodes to the file, 1 for ever segment sequence in the FASTA'
+    
+    assert len([ x for x in mod_file_rows if 'None' in x ]) == 0 ,'there are no rows containing the word None'
+    
+    
 def test_write_prelim_map_file( tmp_path ):
     ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     out_file = tmp_path / "prelim_map.txt"
