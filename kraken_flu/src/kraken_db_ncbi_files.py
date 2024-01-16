@@ -77,6 +77,16 @@ class KrakenDbNcbiFiles():
     KRAKEN_TAX_ID_ASSIGNMENT_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
     NCBI_ACC_REGEX = re.compile(r'gb\|[A-Z]+_?[0-9]+|[A-Z]{2}_[0-9]{6,}\.[0-9]')
     
+    # These regexes define which FASTA header patterns we treat as flu genomes that need to 
+    # be split into one taxon per segment
+    # Flu genomes that are not covered by this pattern will still be present in the final
+    # genomes but they will not be modified, so will not be split into segments in the kraken2 report
+    FLU_REGEXES = [ 
+        re.compile(r'Influenza A.*H1N1'), 
+        re.compile(r'Influenza A.*H3N2'),
+        re.compile(r'Influenza A.*H5N1'),
+        re.compile(r'Influenza B') ]
+    
     def __init__( self, taxonomy_path: str, library_path: str, acc2tax_file_path: str = None ):
         self.taxonomy_path = taxonomy_path
         self.library_path = library_path
@@ -169,10 +179,6 @@ class KrakenDbNcbiFiles():
                         new_parent_id: parent tax ID 1 }, ... }
         
         """
-        regexes = [ 
-            re.compile(r'Influenza A.*H1N1'), 
-            re.compile(r'Influenza A.*H3N2'),
-            re.compile(r'Influenza B') ]
         
         new_tax_id_i = self.min_new_tax_id
         data = {}
@@ -181,7 +187,7 @@ class KrakenDbNcbiFiles():
         flu_count = 0
         with open( self.fasta_file_path ) as fh:
             for record in SeqIO.parse(fh, "fasta"):
-                for regex in regexes:
+                for regex in self.FLU_REGEXES:
                     if regex.search( record.description ):
                         flu_count += 1
                         # the currently assigned tax ID becomes the new parent tax ID
