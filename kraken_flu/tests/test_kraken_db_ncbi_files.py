@@ -21,6 +21,31 @@ def test_init():
     assert ncbif.prelim_map_file_path is not None
     assert os.path.basename( ncbif.prelim_map_file_path ) == 'prelim_map.txt'
         
+def test__get_tax_ids_from_acc2taxid_map():
+    """
+    This method is only used for FASTA files that do not come with taxid in the header,
+    ie NCBI raw FASTA download.
+    It adds data to a dictionary where the new_parent_id == None
+    """
+    data = {
+        'CY000029': {'new_parent_id': None},
+        'MT375833.1': {'new_parent_id': None},
+        'MT375834.1': {'new_parent_id': 11520} }
+    
+    lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
+    acc2taxid_file = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download', 'nucl_gb.accession2taxid' ))
+    
+    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
+    
+    new_data = ncbif._get_tax_ids_from_acc2taxid_map( data )
+    assert new_data
+    assert isinstance( new_data, dict )
+    assert len(new_data.keys()) == len(data.keys())
+    
+    assert new_data['CY000029']['new_parent_id'] == 311610, 'correct parent ID parsed from acc2taxid map'
+    assert new_data['MT375833.1']['new_parent_id'] == 11520, 'correct parent ID parsed from acc2taxid map'
+    assert new_data['MT375833.1']['new_parent_id'] == data['MT375833.1']['new_parent_id'] , 'entry had a parent id already and is not changed'
+        
 def test_flu_genomes_ncbi_to_new_tax_and_parent_ids():
     ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     

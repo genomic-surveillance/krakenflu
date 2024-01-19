@@ -194,6 +194,8 @@ class KrakenDbNcbiFiles():
                         parent_tax_id = self._parse_kraken_tax_id( record.description )
                         if parent_tax_id is None:
                             need_acc2tax_scan = True
+                        else:
+                            parent_tax_id = int(parent_tax_id)
                         
                         ncbi_id = self._parse_ncbi_accession_id( record.description )
                         if ncbi_id in data:
@@ -256,7 +258,7 @@ class KrakenDbNcbiFiles():
                 
                 if use_id:
                     if data[ use_id ]['new_parent_id'] is None:
-                        data[ use_id ]['new_parent_id'] = taxid
+                        data[ use_id ]['new_parent_id'] = int(taxid)
                         
         return data
     
