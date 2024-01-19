@@ -3,6 +3,7 @@ from Bio.SeqRecord import SeqRecord
 import sys
 import re
 import argparse
+import random
 
 """
 From a fresh Kraken2 DB preparation directory, extract the H1N1, H3N2, RSV and COVID
@@ -27,6 +28,11 @@ grep -e 'H1N1 subtype' /lustre/scratch126/gsu/team112/personal/fs5/rvi_dev/krake
 alrefseq_replaced_flu_segments/taxonomy/names.dmp >> tests/fixtures/kraken_ncbi_data/taxonomy/names.dmp 
 (devenv) fs5@farm5-head1:kraken_db_maker$ grep -P '\tInfluenza B virus\t' /lustre/scratch126/gsu/team112/personal/fs5/rvi_dev/krakenDBs/customDB-viralrefseq_replaced_flu_segments/taxonomy/names.dmp >> tests/fixtures/kraken_ncbi_data/taxonomy/names.dmp
 
+
+It is also possible to downsample the input fasta.
+This command will keep ~10% of the sequences
+
+make_test_fasta.py --in_fasta in.fasrta --out_fasta out.fasta --downsample 0.1
 """
 
 REGEXES = [
@@ -57,6 +63,14 @@ def args_parser():
         type = str,
         help='output file for matching sequences')
     
+    parser.add_argument(
+        '--downsample',
+        action = 'store',
+        required = False,
+        type = float,
+        help = 'proportion (0-1) of the sequences to keep. Sequences will be chosen randomly'
+    )
+    
     return parser
 
 def main():
@@ -68,7 +82,8 @@ def main():
             for record in SeqIO.parse(in_handle, "fasta"):
                 for regex in REGEXES:
                     if regex.search( record.description):
-                        SeqIO.write(record, out_handle, "fasta")
+                        if not args.downsample or random.random() <= args.downsample: 
+                            SeqIO.write(record, out_handle, "fasta")
                       
 if __name__ == "__main__":
     exit(main())
