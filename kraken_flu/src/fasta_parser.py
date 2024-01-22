@@ -36,7 +36,7 @@ class FastaParser():
     # be split into one taxon per segment
     # Flu genomes that are not covered by this pattern will still be present in the final
     # genomes but they will not be modified, so will not be split into segments in the kraken2 report
-    FLU_REGEX = re.compile(r'Influenza [AB].+H[0-9]+N[0-9]+')
+    FLU_REGEX = re.compile(r'Influenza [AB].+\(.+\)')
     FLU_ISOLATE_NAME_REGEX = re.compile(r'Influenza [AB].*?\(([A-Za-z /[0-9]*?(\(H[0-9]+N[0-9]+\))?)\)')
     FLU_SEG_NUM_REGEX = re.compile(r'Influenza [AB].+ segment ([1-8])')
     KRAKEN_TAX_ID_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
@@ -56,6 +56,9 @@ class FastaParser():
             header: str, required
                 the FASTA header string
                 
+        Returns tuple of:
+            ncbi_acc (str), kraken_taxid (None or int), is_flu (bool), flu_isolate_name (str), flu_segment_number (None or int) 
+                
         """
         try:
             ncbi_acc = self.NCBI_ACC_REGEX.search( header ).group(0)
@@ -65,7 +68,7 @@ class FastaParser():
             raise ValueError(f"could not parse NCBI acc ID from FASTA header '{header}'")
 
         if (match := self.KRAKEN_TAX_ID_REGEX.search( header )) is not None:
-            kraken_taxid = match.group(1)
+            kraken_taxid = int(match.group(1))
         else:
             kraken_taxid = None
             
@@ -74,7 +77,7 @@ class FastaParser():
         if self.FLU_REGEX.search( header ):
             is_flu = True
             if (match := self.FLU_SEG_NUM_REGEX.search( header )) is not None:
-                flu_segment_number = match.group(1)
+                flu_segment_number = int(match.group(1))
             if (match := self.FLU_ISOLATE_NAME_REGEX.search( header )) is not None:
                 flu_isolate_name = match.group(1)
         else:
