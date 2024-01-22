@@ -49,6 +49,11 @@ def test_FLU_ISOLATE_NAME_REGEX():
     match = FastaParser.FLU_ISOLATE_NAME_REGEX.search(str)
     assert match.group(1) == 'B/Texas/24/2020', 'regex extracts the correct pattern'
     
+    str = '>gi|169731751|gb|CY030663|Influenza B virus (B/Tennessee/UR06-0431/2007) segment 1, complete sequence'
+    assert FastaParser.FLU_ISOLATE_NAME_REGEX.search(str), 'regex matches expected pattern'
+    match = FastaParser.FLU_ISOLATE_NAME_REGEX.search(str)
+    assert match.group(1) == 'B/Tennessee/UR06-0431/2007', 'regex extracts the correct pattern'
+    
     str = '>kraken:taxid|2697049|NC_045512.2 Severe acute respiratory syndrome coronavirus 2 isolate Wuhan-Hu-1, complete genome'
     assert FastaParser.FLU_ISOLATE_NAME_REGEX.search(str) is None, 'does not match'
     
@@ -95,5 +100,32 @@ def test__parse_header():
     assert kraken_taxid == 641809 ,'correctly parsed a kraken taxid from this header'
     assert flu_isolate_name == 'A/California/07/2009(H1N1)' ,'flu isolate name parsed correctly'
     assert flu_segment_number == 1 ,'correctly parsed flu segment number'
+    
+    
+    header = '>gi|169731751|gb|CY030663|Influenza B virus (B/Tennessee/UR06-0431/2007) segment 1, complete sequence'
+    ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = fp._parse_header(header)
+    assert ncbi_acc == 'CY030663', 'correctly parsed NCBI accession from gb|xxxxx format'
+    assert kraken_taxid is None ,'no tax ID in this header'
+    assert flu_isolate_name == 'B/Tennessee/UR06-0431/2007' ,'flu isolate name parsed correctly'
+    assert flu_segment_number == 1 ,'correctly parsed flu segment number'
+
+    
+def test_data():
+    fp = FastaParser( fasta_file_path=FASTA_FILE)
+    data = fp.data
+    assert data
+    assert isinstance(data, list), 'data is a list'
+    assert len(data)>0, 'there are elements in the list'
+    assert isinstance(data[0], dict), 'the first element is a dict'
+    expected_keys =  set([
+        'orig_head',
+        'mod_head',
+        'seqlen',
+        'ncbi_acc',
+        'is_flu',
+        'taxid',
+        'flu_name',
+        'flu_seg_num' ])
+    assert set(data[0].keys()) == expected_keys, 'the dict contains the expected keys'
     
     

@@ -32,13 +32,10 @@ class FastaParser():
         
     """
         
-    # These regexes define which FASTA header patterns we treat as flu genomes that need to 
-    # be split into one taxon per segment
-    # Flu genomes that are not covered by this pattern will still be present in the final
-    # genomes but they will not be modified, so will not be split into segments in the kraken2 report
-    FLU_REGEX = re.compile(r'Influenza [AB].+\(.+\)')
-    FLU_ISOLATE_NAME_REGEX = re.compile(r'Influenza [AB].*?\(([A-Za-z /[0-9]*?(\(H[0-9]+N[0-9]+\))?)\)')
-    FLU_SEG_NUM_REGEX = re.compile(r'Influenza [AB].+ segment ([1-8])')
+    # regular expressions for FASTA header parsing
+    FLU_REGEX = re.compile(r'Influenza[ _][AB].+\(.+\)')
+    FLU_ISOLATE_NAME_REGEX = re.compile(r'Influenza[ _][AB].*?\(([A-Za-z\-_ /[0-9]*?(\(H[0-9]+N[0-9]+\))?)\)')
+    FLU_SEG_NUM_REGEX = re.compile(r'Influenza[ _][AB].+ segment ([1-8])')
     KRAKEN_TAX_ID_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
     NCBI_ACC_REGEX = re.compile(r'gb\|[A-Z]+_?[0-9]+|[A-Z]{2}_[0-9]{6,}\.[0-9]')
 
@@ -85,64 +82,55 @@ class FastaParser():
             
         return ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number 
 
+    @cached_property
+    def data( self ):
+        """
+        Returns FASTA data as a list of dicts, each dict has the following keys:
+            - orig_head: the original un-modified FASTA header
+            - mod_head: modified header:
+                - any kraken tax ID removed
+                - NCBI accession ID preserved
+                - flu genomes renamed to: ISOLATE_NAME SEGMENT_NUMBER 
+            - ncbi_acc: NCBI accession ID
+            - taxid: kraken taxid if present
+            - seqlen: length of the sequence
+            The following are only applied to flu sequences (None otherwise):
+            - is_flu: True if this is a flu sequence
+            - flu_name: flu isolate name such as 'A/New York/32/2003(H3N2)' or 'B/Texas/24/2020'
+            - flu_seg_num: segment number 
         
+        Returns:
+            list of dicts, see above
         
-
-    # @cached_property
-    # def data( self ):
-    #     """
-    #     Returns a dictionary of data from FASTA headers 
-        
-        
-        
-    #     Returns:
-    #         dictionary with following data:
-    #             { 'name':
-    #                 { 'segment_number': 
-    #                     {
-    #                         'fasta_head': 'i|59896322|gb|CY000043|Influenza A......',
-    #                         'seq_len': 1234
-    #                     }
-    #                 }
-    #             }
+        """
+        logging.info( f'parsing FASTA headers from { self.fasta_file_path }')
+        data = []
+        n_all = 0
+        n_flu = 0
+        with open( self.fasta_file_path ) as fh:
+            for record in SeqIO.parse(fh, "fasta"):
+                orig_header = record.description
+                seqlen = len(record.seq)
+                ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = self._parse_header(orig_header)
                 
-    #         Example: if the FASTA header is 
-    #         >gi|59896322|gb|CY000043|Influenza A virus (A/New York/34/2003(H3N2)) segment 6, partial sequence
-    #         the 'name' of the genome will be: 'Influenza A virus (A/New York/34/2003(H3N2))'
+                n_all+=1
+                if is_flu:
+                    n_flu+=1
+                    mod_header = ' '.join( [ncbi_acc, flu_isolate_name, str(flu_segment_number)])
+                else:
+                    mod_header = self.KRAKEN_TAX_ID_REGEX.sub('', orig_header)
+
+                data.append({
+                    'orig_head': orig_header,
+                    'mod_head': mod_header,
+                    'seqlen': seqlen,
+                    'ncbi_acc': ncbi_acc,
+                    'is_flu': is_flu,
+                    'taxid': kraken_taxid,
+                    'flu_name': flu_isolate_name,
+                    'flu_seg_num': flu_segment_number })
+                
+                
         
-    #     """
-    #     logging.info( f'scanning file { self.fasta_file_path } for FASTA headers with accepted pattern')
-    #     data = {}
-    #     with open( self.fasta_file_path ) as fh:
-    #         for record in SeqIO.parse(fh, "fasta"):
-    #             if not re.search('partial', record.description):
-    #                 try:
-    #                     match = self.HEADER_REGEX.search( record.description)
-    #                     name = match.group(1)
-    #                     segment_num = match.group(2)
-    #                     seq_len = len(record.seq)
-    #                     if name in data:
-    #                         if segment_num in data[name]:
-    #                             if self.discard_duplicates:
-    #                                 continue
-    #                             else:
-    #                                 raise ValueError(f"found a duplicate definition for name '{name}' segment {segment_num} in {self.fasta_file_path}")
-    #                         else:
-    #                             data[name][segment_num] = {
-    #                                 'fasta_head': record.description,
-    #                                 'seq_len': seq_len
-    #                             }
-    #                     else:
-    #                         data[name] = {
-    #                             segment_num: {
-    #                                 'fasta_head': record.description,
-    #                                 'seq_len': seq_len
-    #                             }
-    #                         }
-    #                 except AttributeError:
-    #                     # can't parse the header but that is ok, obviously not one we
-    #                     # care about, just ignore
-    #                     pass
-        
-    #     logging.info( f'found {len(data.keys())} genomes (unique names) before filtering')
-    #     return data
+        logging.info( f'found {n_all} sequences, {n_flu} of which are influenza')
+        return data
