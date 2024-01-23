@@ -76,7 +76,7 @@ class FastaParser():
         return ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number 
 
     @cached_property
-    def data( self ):
+    def header_data( self ):
         """
         Returns FASTA data as a list of dicts, each dict has the following keys:
             - orig_head: the original un-modified FASTA header
@@ -132,3 +132,5 @@ class FastaParser():
         
         logging.info( f'found {n_all} sequences, {n_flu} of which are influenza')
         return data
+    
+    
