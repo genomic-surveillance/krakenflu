@@ -119,6 +119,7 @@ def test_data():
     assert isinstance(data[0], dict), 'the first element is a dict'
     expected_keys =  set([
         'orig_head',
+        'sequence',
         'mod_head',
         'seqlen',
         'ncbi_acc',

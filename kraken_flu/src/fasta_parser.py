@@ -110,7 +110,8 @@ class FastaParser():
         with open( self.fasta_file_path ) as fh:
             for record in SeqIO.parse(fh, "fasta"):
                 orig_header = record.description
-                seqlen = len(record.seq)
+                sequence = record.seq
+                seqlen = len(sequence)
                 ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = self._parse_header(orig_header)
                 
                 n_all+=1
@@ -127,6 +128,7 @@ class FastaParser():
 
                 data.append({
                     'orig_head': orig_header,
+                    'sequence': sequence,
                     'mod_head': mod_header,
                     'seqlen': seqlen,
                     'ncbi_acc': ncbi_acc,
