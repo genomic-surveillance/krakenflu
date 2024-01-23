@@ -16,15 +16,6 @@ class FastaParser():
             examples: A/New York/392/2004(H3N2), B/Houston/B850/2005
         - flu_segment: populated for influenza only
         - length of the sequence (the sequence itself is not stored)
-        
-    { genome_name: 
-        [
-            'NCBI_acc': NCBI accession ID,  
-        {
-            
-            
-            'kraken_taxid': taxon ID if present, otherwise None,
-        }
     
     Parameters:
         fasta_file_path: str, required
@@ -116,7 +107,12 @@ class FastaParser():
                 n_all+=1
                 if is_flu:
                     n_flu+=1
-                    mod_header = ' '.join( [ncbi_acc, flu_isolate_name, str(flu_segment_number)])
+                    mod_header = ' '.join( 
+                        ['gb|'+ ncbi_acc +'|', 
+                        'Influenza', 
+                        flu_isolate_name, 
+                        'segment', 
+                        str(flu_segment_number)])
                 else:
                     mod_header = self.KRAKEN_TAX_ID_REGEX.sub('', orig_header)
 

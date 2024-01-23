@@ -127,5 +127,24 @@ def test_data():
         'flu_name',
         'flu_seg_num' ])
     assert set(data[0].keys()) == expected_keys, 'the dict contains the expected keys'
+    assert len(data) == 5505 ,'number of extracted FASTA header data matches number of sequences in the file'
+    
+    data_CY030663 = [ x for x in data if x['ncbi_acc'] =='CY030663']
+    assert len(data_CY030663) == 1, 'one record with NCBI acc CY030663 in the data'
+    assert data_CY030663[0]['orig_head'] == 'gi|169731751|gb|CY030663|Influenza B virus (B/Tennessee/UR06-0431/2007) segment 1, complete sequence'
+    assert data_CY030663[0]['mod_head'] == 'gb|CY030663| Influenza B/Tennessee/UR06-0431/2007 segment 1'
+    assert data_CY030663[0]['is_flu'] == True
+    assert data_CY030663[0]['flu_seg_num'] == 1
+    assert data_CY030663[0]['taxid'] is None
+    assert data_CY030663[0]['flu_name'] == 'B/Tennessee/UR06-0431/2007'
+    
+    data_NC_002021 = [ x for x in data if x['ncbi_acc'] =='NC_002021.1']
+    assert len(data_NC_002021) == 1, 'one record with NCBI acc NC_002021.1 in the data'
+    assert data_NC_002021[0]['orig_head'] == 'kraken:taxid|211044|NC_002021.1 Influenza A virus (A/Puerto Rico/8/1934(H1N1)) segment 2, complete sequence'
+    assert data_NC_002021[0]['mod_head'] == 'gb|NC_002021.1| Influenza A/Puerto Rico/8/1934(H1N1) segment 2'
+    assert data_NC_002021[0]['is_flu'] == True
+    assert data_NC_002021[0]['flu_seg_num'] == 2
+    assert data_NC_002021[0]['taxid'] == 211044
+    assert data_NC_002021[0]['flu_name'] == 'A/Puerto Rico/8/1934(H1N1)'
     
     
