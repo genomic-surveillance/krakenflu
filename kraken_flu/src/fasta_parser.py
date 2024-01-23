@@ -28,9 +28,11 @@ class FastaParser():
     FLU_ISOLATE_NAME_REGEX = re.compile(r'Influenza[ _][AB].*?\(([A-Za-z\-_ /[0-9]*?(\(H[0-9]+N[0-9]+\))?)\)')
     FLU_SEG_NUM_REGEX = re.compile(r'Influenza[ _][AB].+ segment ([1-8])')
     KRAKEN_TAX_ID_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
+    # use GenBank (gb) number or RefSeq accession such as NC_xxxxxx (RefSeq chromosome)
+    # could potentially be stricter with the RefSeq IDs as we are only interested in NC_xxxxx(?)
     NCBI_ACC_REGEX = re.compile(r'gb\|[A-Z]+_?[0-9]+|[A-Z]{2}_[0-9]{6,}\.[0-9]')
 
-    
+
     def __init__( self, fasta_file_path: str ):
         if not os.path.isfile( fasta_file_path ):
             raise ValueError(f'file { fasta_file_path } does not exist or is not a file')
