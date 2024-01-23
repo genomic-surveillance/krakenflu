@@ -3,14 +3,14 @@ import os.path
 import re
 from importlib_resources import files
 
-from kraken_flu.src.kraken_db_ncbi_files import KrakenDbNcbiFiles
+from kraken_flu.src.kraken_db_builder import KrakenDbBuilder
 
 FIXTURE_DIR = files('kraken_flu.tests.fixtures')
 TAX_DIR = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','taxonomy'))
 LIB_DIR = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','library','viral'))
 
 def test_init():
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     assert ncbif
     
     assert ncbif.min_new_tax_id == 3053765, 'minimum new taonx ID correctly identified from names.dmp'
@@ -35,7 +35,7 @@ def test__get_tax_ids_from_acc2taxid_map():
     lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
     acc2taxid_file = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download', 'nucl_gb.accession2taxid' ))
     
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
     
     new_data = ncbif._get_tax_ids_from_acc2taxid_map( data )
     assert new_data
@@ -47,7 +47,7 @@ def test__get_tax_ids_from_acc2taxid_map():
     assert new_data['MT375833.1']['new_parent_id'] == data['MT375833.1']['new_parent_id'] , 'entry had a parent id already and is not changed'
         
 def test_flu_genomes_ncbi_to_new_tax_and_parent_ids():
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     
     data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
     assert data
@@ -75,7 +75,7 @@ def test_flu_genomes_ncbi_to_new_tax_and_parent_ids():
     assert len( data.keys() ) == 4 * 8 ,'there are 4 complete flu genomes in the data (each has 8 NCBI acc IDs)'
 
 def test_write_modified_fasta_file_kraken_build( tmp_path ):
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     out_file = tmp_path / "fasta_out.fna"
     
     assert not out_file.is_file(), 'before we start, the output file does not exist'
@@ -101,7 +101,7 @@ def test_write_modified_fasta_file_not_kraken_build( tmp_path ):
     lib_dir = FIXTURE_DIR.joinpath(os.path.join('ncbi_data_not_kraken','library','viral'))
     acc2tax_file = FIXTURE_DIR.joinpath(os.path.join('ncbi_data_not_kraken','nucl_gb.accession2taxid'))
     
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= tax_dir, library_path= lib_dir, acc2tax_file_path= acc2tax_file )
+    ncbif = KrakenDbBuilder( taxonomy_path= tax_dir, library_path= lib_dir, acc2tax_file_path= acc2tax_file )
     out_file = tmp_path / "fasta_out.fna"
     
     assert not out_file.is_file(),  'before we start, the output file does not exist'
@@ -129,7 +129,7 @@ def test_write_modified_fasta_file_all_ncbi_download( tmp_path ):
     lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
     acc2taxid_file = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download', 'nucl_gb.accession2taxid' ))
     
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
     out_file = tmp_path / "fasta_out.fna"
     
     assert not out_file.is_file(),  'before we start, the output file does not exist'
@@ -153,14 +153,14 @@ def test_flu_genomes_ncbi_to_new_tax_and_parent_ids_all_ncbi_download():
     """
     lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
     acc2taxid_file = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download', 'nucl_gb.accession2taxid' ))
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
     
     data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
     assert data
     assert 'MT375832' in data, "a 'gb|xxxxx' formatted Genbank ID was parsed correctly"  
     
 def test_write_modified_names_files( tmp_path ):
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     out_file = tmp_path / "mod_names.dmp"
     
     assert not out_file.is_file(), 'before we start, the output file does not exist'
@@ -182,7 +182,7 @@ def test_write_modified_names_files( tmp_path ):
 
 
 def test_write_modified_nodes_files( tmp_path ):
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     out_file = tmp_path / "mod_nodes.dmp"
     
     assert not out_file.is_file(), 'before we start, the output file does not exist'
@@ -204,7 +204,7 @@ def test_write_modified_nodes_file_all_ncbi_download( tmp_path ):
     """
     lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
     acc2taxid_file = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download', 'nucl_gb.accession2taxid' ))
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
     out_file = tmp_path / "mod_nodes.dmp"
     
     assert not out_file.is_file(), 'before we start, the output file does not exist'
@@ -221,7 +221,7 @@ def test_write_modified_nodes_file_all_ncbi_download( tmp_path ):
     
     
 def test_write_prelim_map_file( tmp_path ):
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     out_file = tmp_path / "prelim_map.txt"
     
     assert not out_file.is_file(), 'before we start, the output file does not exist'
@@ -243,7 +243,7 @@ def test_write_prelim_map_file( tmp_path ):
 
 def test_create_db_ready_dir( tmp_path ):
     out_dir = tmp_path / 'out_dir'
-    ncbif = KrakenDbNcbiFiles( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
+    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     
     assert not out_dir.is_dir() , 'before we begin, the output dir does not exist'
     ncbif.create_db_ready_dir( out_dir )

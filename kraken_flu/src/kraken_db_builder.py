@@ -8,7 +8,7 @@ import logging
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
 
-class KrakenDbNcbiFiles():   
+class KrakenDbBuilder():   
     """
     This class handles the file collection that is created from the kraken2 build process.
     The class provides methods for the replacement of all influenza whole genomes with individual

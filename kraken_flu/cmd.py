@@ -2,7 +2,7 @@ import argparse
 import os
 import shutil
 import logging
-from kraken_flu.src.kraken_db_ncbi_files import KrakenDbNcbiFiles
+from kraken_flu.src.kraken_db_builder import KrakenDbBuilder
 from kraken_flu.src.ncbi_influenza_fasta_filter import NcbiInfluenzaFastaFilter
 
 # get the version number from a file that is created by setuptools_scm 
@@ -116,7 +116,7 @@ def build(args):
     The build command
     """  
     
-    ncbif = KrakenDbNcbiFiles( 
+    ncbif = KrakenDbBuilder( 
         taxonomy_path= args.taxonomy_path, 
         library_path= args.library_path,
         acc2tax_file_path= args.acc2tax_path)
