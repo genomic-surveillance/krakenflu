@@ -76,10 +76,11 @@ class FastaParser():
         return ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number 
 
     @cached_property
-    def header_data( self ):
+    def data( self ):
         """
         Returns FASTA data as a list of dicts, each dict has the following keys:
             - orig_head: the original un-modified FASTA header
+            - sequence: the DNA sequence
             - mod_head: modified header:
                 - any kraken tax ID removed
                 - NCBI accession ID preserved
@@ -94,6 +95,12 @@ class FastaParser():
         
         Returns:
             list of dicts, see above
+            
+        TODO:
+        Reading the sequence data into RAM because it is easier to work with it this way and even 
+        the largest file we are currently working with (all influenza from NCBI) is only around 500MB, 
+        which can easily be handled on the farm. But this might become a problem if we need to work with 
+        larger files and might need to change.
         
         """
         logging.info( f'parsing FASTA headers from { self.fasta_file_path }')

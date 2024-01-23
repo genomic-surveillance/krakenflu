@@ -110,9 +110,9 @@ def test__parse_header():
     assert flu_segment_number == 1 ,'correctly parsed flu segment number'
 
     
-def test_header_data():
+def test_data():
     fp = FastaParser( fasta_file_path=FASTA_FILE)
-    data = fp.header_data
+    data = fp.data
     assert data
     assert isinstance(data, list), 'data is a list'
     assert len(data)>0, 'there are elements in the list'
