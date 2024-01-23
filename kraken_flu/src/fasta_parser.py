@@ -2,6 +2,7 @@ from Bio import SeqIO
 import re
 import os.path
 from cached_property import cached_property
+from dataclasses import dataclass
 import logging 
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
@@ -126,20 +127,35 @@ class FastaParser():
                 else:
                     mod_header = self.KRAKEN_TAX_ID_REGEX.sub('', orig_header)
 
-                data.append({
-                    'orig_head': orig_header,
-                    'sequence': sequence,
-                    'mod_head': mod_header,
-                    'seqlen': seqlen,
-                    'ncbi_acc': ncbi_acc,
-                    'is_flu': is_flu,
-                    'taxid': kraken_taxid,
-                    'flu_name': flu_isolate_name,
-                    'flu_seg_num': flu_segment_number })
-                
-                
+                data.append(
+                    FastaRecord(
+                        orig_head= orig_header,
+                        sequence= sequence,
+                        mod_head= mod_header,
+                        seqlen= seqlen,
+                        ncbi_acc= ncbi_acc,
+                        is_flu= is_flu,
+                        taxid= kraken_taxid,
+                        flu_name= flu_isolate_name,
+                        flu_seg_num = flu_segment_number ) )
         
         logging.info( f'found {n_all} sequences, {n_flu} of which are influenza')
         return data
+    
+@dataclass
+class FastaRecord():
+    """
+    A simple data class to hold the data for a single FASTA record    
+    """
+    orig_head: str
+    sequence: str
+    mod_head: str
+    seqlen: int
+    ncbi_acc: str
+    is_flu: bool
+    taxid: int
+    flu_name: str
+    flu_seg_num: int
+        
     
     
