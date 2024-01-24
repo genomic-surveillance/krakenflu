@@ -20,14 +20,14 @@ class FastaParser():
     
     Parameters:
         fasta_file_path: str, required
-            path to the FASTA file that is to be filtered
+            path to the FASTA file that is to be parsed
         
     """
         
     # regular expressions for FASTA header parsing
-    FLU_REGEX = re.compile(r'Influenza[ _][AB].+\(.+\)')
+    FLU_REGEX = re.compile(r'Influenza[ _][AB].+')
     FLU_ISOLATE_NAME_REGEX = re.compile(r'Influenza[ _][AB].*?\(([A-Za-z\-_ /[0-9]*?(\(H[0-9]+N[0-9]+\))?)\)')
-    FLU_SEG_NUM_REGEX = re.compile(r'Influenza[ _][AB].+ segment ([1-8])')
+    FLU_SEG_NUM_REGEX = re.compile(r'Influenza[ _][AB].+ (?:segment|RNA) ([1-8])')
     KRAKEN_TAX_ID_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
     # use GenBank (gb) number or RefSeq accession such as NC_xxxxxx (RefSeq chromosome)
     # could potentially be stricter with the RefSeq IDs as we are only interested in NC_xxxxx(?)
@@ -108,6 +108,8 @@ class FastaParser():
         data = []
         n_all = 0
         n_flu = 0
+        unnamed_flu = 0
+        flu_wo_seg_num = 0
         with open( self.fasta_file_path ) as fh:
             for record in SeqIO.parse(fh, "fasta"):
                 orig_header = record.description
@@ -126,11 +128,15 @@ class FastaParser():
                     
                 n_all+=1
                 if is_flu:
+                    if flu_isolate_name is None:
+                        unnamed_flu+=1
+                    if flu_segment_number is None:
+                        flu_wo_seg_num+=1
                     n_flu+=1
                     mod_header = ' '.join([
                         ncbi_acc_str +'|', 
                         'Influenza', 
-                        flu_isolate_name, 
+                        flu_isolate_name or 'unnamed', 
                         'segment', 
                         str(flu_segment_number)])
                 else:
@@ -149,6 +155,30 @@ class FastaParser():
                         flu_seg_num = flu_segment_number ) )
         
         logging.info( f'found {n_all} sequences, {n_flu} of which are influenza')
+        if flu_wo_seg_num > 0:
+            logging.info(f'found {flu_wo_seg_num} influenza sequences without a segment number')
+            
+        if unnamed_flu>0:
+            logging.info(f'found {unnamed_flu} influenza sequences without an isolate name - attempting to derive from taxid')
+            
+            # this fix attempts to fill in missing isolate names fromm other sequences that
+            # have the same tax id. This fixes the problem with the Influenza B RefSeq, which 
+            # has segment 1 annotated with a non-standard FASTA header that is missing the isolate name
+            taxid2isolate_name= {}
+            for d in data:
+                if d.flu_name is not None and d.taxid is not None:
+                    taxid2isolate_name[ d.taxid ] = d.flu_name 
+                
+            fixed_unnamed= 0
+            for d in data:
+                if d.is_flu and d.taxid is not None and d.flu_name is None and d.taxid in taxid2isolate_name:
+                    d.flu_name = taxid2isolate_name[ d.taxid ]
+                    d.mod_head = re.sub('unnamed', d.flu_name, d.mod_head)
+                    fixed_unnamed+=1
+                    
+            logging.info(f'fixed missing isolate name in {fixed_unnamed} sequences')
+        
+        
         return data
     
 @dataclass

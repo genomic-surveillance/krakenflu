@@ -108,6 +108,15 @@ def test__parse_header():
     assert kraken_taxid is None ,'no tax ID in this header'
     assert flu_isolate_name == 'B/Tennessee/UR06-0431/2007' ,'flu isolate name parsed correctly'
     assert flu_segment_number == 1 ,'correctly parsed flu segment number'
+    
+    # a real FASTA header for a Flu B RefSeq - uses the keyword RNA instead of segment
+    header = 'kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence'
+    ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = fp._parse_header(header)
+    assert is_flu == True , 'identified as flu'
+    assert ncbi_acc == 'NC_002204.1', 'correctly parsed NCBI accession from RefSeq ID format'
+    assert kraken_taxid == 518987 ,'correctly parsed existing kraken tax ID'
+    assert flu_isolate_name is None ,'there is no flu isolate name given in this header'
+    assert flu_segment_number == 1 ,'correctly parsed flu segment number'
 
     
 def test_data():
@@ -137,4 +146,15 @@ def test_data():
     assert data_NC_002021[0].taxid == 211044
     assert data_NC_002021[0].flu_name == 'A/Puerto Rico/8/1934(H1N1)'
     
-    
+    # this is an unusual case from RefSeq: the influenza B segment 1 is
+    # recorded with a non-standard header:
+    # >kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence
+    # the isolate name should be derived from other headers by looking up the taxid
+    data_NC_002204 = [ x for x in data if x.ncbi_acc == 'NC_002204.1']
+    assert len(data_NC_002204) == 1, 'one record with NCBI acc NC_002204.1 in the data'
+    assert data_NC_002204[0].orig_head == 'kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence'
+    assert data_NC_002204[0].mod_head == 'NC_002204.1| Influenza B/Lee/1940 segment 1'
+    assert data_NC_002204[0].is_flu == True
+    assert data_NC_002204[0].flu_seg_num == 1 ,'correctly parsed segment number given in non-standard form'
+    assert data_NC_002204[0].taxid == 518987
+    assert data_NC_002204[0].flu_name == 'B/Lee/1940', 'correctly inferred isolate name by looking up taxid in other records (isolate name missing from this header)'
