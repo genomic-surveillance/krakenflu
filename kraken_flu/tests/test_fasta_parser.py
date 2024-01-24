@@ -131,7 +131,7 @@ def test_data():
     data_NC_002021 = [ x for x in data if x.ncbi_acc =='NC_002021.1']
     assert len(data_NC_002021) == 1, 'one record with NCBI acc NC_002021.1 in the data'
     assert data_NC_002021[0].orig_head == 'kraken:taxid|211044|NC_002021.1 Influenza A virus (A/Puerto Rico/8/1934(H1N1)) segment 2, complete sequence'
-    assert data_NC_002021[0].mod_head == 'gb|NC_002021.1| Influenza A/Puerto Rico/8/1934(H1N1) segment 2'
+    assert data_NC_002021[0].mod_head == 'NC_002021.1| Influenza A/Puerto Rico/8/1934(H1N1) segment 2'
     assert data_NC_002021[0].is_flu == True
     assert data_NC_002021[0].flu_seg_num == 2
     assert data_NC_002021[0].taxid == 211044

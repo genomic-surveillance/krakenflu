@@ -115,11 +115,20 @@ class FastaParser():
                 seqlen = len(sequence)
                 ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = self._parse_header(orig_header)
                 
+                # TODO: not sure if this is needed for kraken2 to assign taxonomy ID later
+                # so just incase, putting the "gb|" back into the NCBI accession ID but only if
+                # it isn't a refseq accession. RefSeq IDs are NOT Genbank IDs, so should not prefix with gb|
+                # https://community.gep.wustl.edu/repository/course_materials_WU/annotation/Genbank_Accessions.pdf
+                if '_'in ncbi_acc:
+                    ncbi_acc_str = ncbi_acc
+                else:
+                    ncbi_acc_str = 'gb|'+ncbi_acc
+                    
                 n_all+=1
                 if is_flu:
                     n_flu+=1
-                    mod_header = ' '.join( 
-                        ['gb|'+ ncbi_acc +'|', 
+                    mod_header = ' '.join([
+                        ncbi_acc_str +'|', 
                         'Influenza', 
                         flu_isolate_name, 
                         'segment', 
