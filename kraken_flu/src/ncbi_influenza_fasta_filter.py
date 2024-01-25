@@ -3,6 +3,7 @@ import re
 import os.path
 from cached_property import cached_property
 import logging 
+from kraken_flu.src.fasta_parser import FastaParser
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
 
@@ -12,8 +13,9 @@ class NcbiInfluenzaFastaFilter():
     https://ftp.ncbi.nih.gov/genomes/INFLUENZA/influenza.fna
     which contains all influenza data from NCBI.
     
-    Filters the file down the sequences tht fulfil the following criteria:
+    Filters the file down the sequences that fulfil the following criteria:
     
+        - is a flu sequence
         - genome has all 8 segments, each with at least 90% of the expected sequence length
         - segments must be named according to convention such as this example
             "Influenza A virus (A/ruddy turnstone/Delaware Bay/205/2017(H3N2)) segment 1"
@@ -30,18 +32,16 @@ class NcbiInfluenzaFastaFilter():
         
     """
     
-    HEADER_REGEX = re.compile(r'(Influenza [AB].+) segment ([1-8])')
-    
     # influenza A/B segment lengths
     MIN_SEG_LENGTHS = {
-        '1': 2341,
-        '2': 2341,
-        '3': 2233,
-        '4': 1778,
-        '5': 1565,
-        '6': 1413,
-        '7': 1027,
-        '8': 890
+        1: 2341,
+        2: 2341,
+        3: 2233,
+        4: 1778,
+        5: 1565,
+        6: 1413,
+        7: 1027,
+        8: 890
     }
     
     # minimum proportion of each of the segments that must be covered
@@ -56,10 +56,19 @@ class NcbiInfluenzaFastaFilter():
     @cached_property
     def records_by_name( self ):
         """
-        Returns a dictionary of data from FASTA headers with the name of the virus used as the key, 
+        Returns a dictionary of data from FASTA headers with the name of the isolate used as the key, 
         thus grouping the sequences into genomes.
+        FASTA headers containing the keyword 'partial' are discarded at this step.
+        
         NOTE: this relies on unique names being given by source labs. This SHOULD be the case if the
         source lab adheres to the conventional influenza naming. 
+        
+        A known exception is the name of segment 1 of the influenza B (B/Lee/1940) RefSeq, which 
+        is given as "NC_002204.1 Influenza B virus RNA 1, complete sequence" in RefSeq.
+        If the RefSeq data is downloaded with kraken2-build, then the FastaParser class will be able
+        to automatically fix this issue using the kraken2 taxid tags in the FASTA header, which identifies
+        the genome without having to go back to the taxonomy maps.
+        
         If needed, a more robust approach would be to require the NCBI acc2taxid file, look up each gb ID
         in that file and use the tax ID to group sequences into genomes.
         
@@ -80,37 +89,43 @@ class NcbiInfluenzaFastaFilter():
         
         """
         logging.info( f'scanning file { self.fasta_file_path } for FASTA headers with accepted pattern')
+        fp = FastaParser( self.fasta_file_path )
+        
+        # TODO: FastaParser reads the whole FASTA file into RAM, including sequences. This 
+        # could become a problem but currently even the biggest files we work with are under 1GB
+        fasta_data = fp.data
         data = {}
-        with open( self.fasta_file_path ) as fh:
-            for record in SeqIO.parse(fh, "fasta"):
-                if not re.search('partial', record.description):
-                    try:
-                        match = self.HEADER_REGEX.search( record.description)
-                        name = match.group(1)
-                        segment_num = match.group(2)
-                        seq_len = len(record.seq)
-                        if name in data:
-                            if segment_num in data[name]:
-                                if self.discard_duplicates:
-                                    continue
-                                else:
-                                    raise ValueError(f"found a duplicate definition for name '{name}' segment {segment_num} in {self.fasta_file_path}")
+        
+        for record in fasta_data:
+            if record.is_flu and not re.search('partial', record.orig_head):
+                if record.flu_name in data:
+                    if record.flu_seg_num in data[ record.flu_name ]:
+                        # have seen this isolate/segment before, decide whether to keep
+                        if record.seqlen < data[ record.flu_name ][ record.flu_seg_num ]:
+                            # existing sequence for this isolate/segment is longer than this
+                            # new one, so ignore the new one
+                            continue
+                        elif record.seqlen == data[ record.flu_name ][ record.flu_seg_num ]:
+                            # same length indicates a true duplicate
+                            if self.discard_duplicates:
+                                continue
                             else:
-                                data[name][segment_num] = {
-                                    'fasta_head': record.description,
-                                    'seq_len': seq_len
-                                }
+                                raise ValueError(f"found a duplicate definition for name '{ record.flu_name}' segment {record.flu_seg_num} in {self.fasta_file_path}")
                         else:
-                            data[name] = {
-                                segment_num: {
-                                    'fasta_head': record.description,
-                                    'seq_len': seq_len
-                                }
-                            }
-                    except AttributeError:
-                        # can't parse the header but that is ok, obviously not one we
-                        # care about, just ignore
-                        pass
+                            # the new sequence is longer than the existing one, overwrite the existing one
+                            pass
+                        
+                    data[ record.flu_name ][ record.flu_seg_num ] = {
+                        'fasta_head': record.orig_head,
+                        'seq_len': record.seqlen
+                    }
+                else:
+                    data[ record.flu_name ] = {
+                        record.flu_seg_num: {
+                            'fasta_head': record.orig_head,
+                            'seq_len': record.seqlen
+                        }
+                    }
         
         logging.info( f'found {len(data.keys())} genomes (unique names) before filtering')
         return data
