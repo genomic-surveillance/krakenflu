@@ -1,10 +1,14 @@
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 import re
 import csv
 import shutil
 import os.path
 from cached_property import cached_property
 import logging
+
+from kraken_flu.src.fasta_parser import FastaParser
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
 
@@ -74,18 +78,6 @@ class KrakenDbBuilder():
             pre-built DB reference files)
         
     """
-    KRAKEN_TAX_ID_ASSIGNMENT_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
-    NCBI_ACC_REGEX = re.compile(r'gb\|[A-Z]+_?[0-9]+|[A-Z]{2}_[0-9]{6,}\.[0-9]')
-    
-    # These regexes define which FASTA header patterns we treat as flu genomes that need to 
-    # be split into one taxon per segment
-    # Flu genomes that are not covered by this pattern will still be present in the final
-    # genomes but they will not be modified, so will not be split into segments in the kraken2 report
-    FLU_REGEXES = [ 
-        re.compile(r'Influenza A.*H1N1'), 
-        re.compile(r'Influenza A.*H3N2'),
-        re.compile(r'Influenza A.*H5N1'),
-        re.compile(r'Influenza B') ]
     
     def __init__( self, taxonomy_path: str, library_path: str, acc2tax_file_path: str = None ):
         self.taxonomy_path = taxonomy_path
@@ -140,6 +132,14 @@ class KrakenDbBuilder():
         return max_id 
     
     @cached_property
+    def fasta_data(self):
+        """
+        The FASTA header and seq data, delegated to FastaParser
+        """
+        fp = FastaParser( self.fasta_file_path )
+        return fp.data
+    
+    @cached_property
     def flu_genomes_ncbi_to_new_tax_and_parent_ids( self ):
         """
         Builds a dictionary of NCBI IDs to new (created by this utility) taxonomy ID and a parent
@@ -184,34 +184,21 @@ class KrakenDbBuilder():
         data = {}
         need_acc2tax_scan = False
         logging.info( f'scanning file { self.fasta_file_path } for influenza viruses')
-        flu_count = 0
-        with open( self.fasta_file_path ) as fh:
-            for record in SeqIO.parse(fh, "fasta"):
-                for regex in self.FLU_REGEXES:
-                    if regex.search( record.description ):
-                        flu_count += 1
-                        # the currently assigned tax ID becomes the new parent tax ID
-                        parent_tax_id = self._parse_kraken_tax_id( record.description )
-                        if parent_tax_id is None:
-                            need_acc2tax_scan = True
-                        else:
-                            parent_tax_id = int(parent_tax_id)
-                        
-                        ncbi_id = self._parse_ncbi_accession_id( record.description )
-                        if ncbi_id in data:
-                            raise ValueError(f'NCBI ID {ncbi_id} found more than once in FASTA file {self.fasta_file_path}' )
-                        
-                        # clean up the FASTA header to serve as a name for this segment
-                        mod_name = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( '', record.description )
-                        data[ ncbi_id ] = {
-                            'name': mod_name, 
-                            'new_tax_id': new_tax_id_i,
-                            'new_parent_id': parent_tax_id }
-                                                
-                        new_tax_id_i += 1
-                        continue
         
-        logging.info( f'done - found { flu_count } segment sequences in FASTA file')
+        fasta_data = self.fasta_data
+        for record in fasta_data:
+            if record.is_flu:
+                parent_tax_id = record.taxid
+                if parent_tax_id is None:
+                    need_acc2tax_scan = True
+                
+                ncbi_id = record.ncbi_acc
+                data[ ncbi_id ] = {
+                    'new_tax_id': new_tax_id_i,
+                    'new_parent_id': parent_tax_id }
+                                        
+                new_tax_id_i += 1
+                continue
 
         if need_acc2tax_scan:
             logging.info('reading NCBI acc2taxid file to assign taxon IDs to NCBI IDs')
@@ -284,38 +271,28 @@ class KrakenDbBuilder():
             Writes to a file 'path'
             
         """
+        fasta_data = self.fasta_data
+        acc2tax_data = self.flu_genomes_ncbi_to_new_tax_and_parent_ids
         
         try: 
             with open( path, 'w' ) as out_fh:
-                try:
-                    with open( self.fasta_file_path ) as in_fh:
-                        logging.info(f'writing modified FASTA file to { path }')
-                        for record in SeqIO.parse( in_fh, "fasta"):
-                            ncbi_id = self._parse_ncbi_accession_id( record.description )
-                            if ncbi_id in self.flu_genomes_ncbi_to_new_tax_and_parent_ids:
-                                # this is a segmented flu genome
-                                new_kraken_tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_tax_id']
-                                new_kraken_tax_str = f'kraken:taxid|{new_kraken_tax_id}|'
-                                
-                                # a taxid tag is only present if the file is a pre-built kraken2 DB library, in which
-                                # case we need to remove the original taxid tag and replace with the new one.
-                                # If no taxid tag is currently present, just insert one at the beginning of the header
-                                if self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.search( record.description ):
-                                    new_desc = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.description )
-                                    new_name = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.name )
-                                    new_id = self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.sub( new_kraken_tax_str, record.id )
-                                else:
-                                    new_desc = new_kraken_tax_str + record.description
-                                    new_name = new_kraken_tax_str + record.name
-                                    new_id = new_kraken_tax_str + record.id
-                                
-                                record.description = new_desc
-                                record.name = new_name
-                                record.id = new_id
-                            SeqIO.write( record, out_fh, "fasta" )   
-                except (PermissionError, FileNotFoundError) as e:
-                    raise ValueError(f'cannot read from { self.fasta_file_path }')
-                
+                logging.info(f'writing modified FASTA file to { path }')
+                for record in fasta_data:
+                    final_head = record.mod_head
+                    if record.is_flu:
+                        if record.ncbi_acc in acc2tax_data:
+                            new_kraken_tax_id = acc2tax_data[record.ncbi_acc]['new_tax_id']
+                            new_kraken_tax_str =  f'kraken:taxid|{new_kraken_tax_id}|'
+                            final_head = new_kraken_tax_str + final_head
+                        else:
+                            raise ValueError(f'record {record.ncbi_acc} is marked as "flu" but has no data in accession2taxid map')
+                            
+                    sr = SeqRecord(
+                        Seq(record.sequence),
+                        id= final_head,
+                        description= ''
+                    )
+                    SeqIO.write( sr, out_fh, "fasta" )
         except (PermissionError, FileNotFoundError) as e:
             raise ValueError(f'path { path } does not exist or is not writable, cannot create file')
 
@@ -346,11 +323,17 @@ class KrakenDbBuilder():
         # now append the new segmented genome names
         logging.info(f'writing modified names file to { path }')
         with open( path, 'a' ) as out_fh:
-            for ncbi_id in self.flu_genomes_ncbi_to_new_tax_and_parent_ids.keys():
-                name = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['name']
-                tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_tax_id']
-                out_fh.write( 
-                    "\t|\t".join( [ str( tax_id ) , str( name ), '', 'scientific name'  ] )  + "\t|\n" )
+            for record in self.fasta_data:
+                if record.is_flu and record.ncbi_acc in self.flu_genomes_ncbi_to_new_tax_and_parent_ids:
+                    try:
+                        name = 'Influenza ' + record.flu_name + ' segment ' + str(record.flu_seg_num)
+                    except TypeError:
+                        raise ValueError(f'no flu isolate name or segment number recorded for {record.ncbi_acc}')
+                    tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[record.ncbi_acc]['new_tax_id']
+                    if not tax_id:
+                        raise ValueError(f'no taxid recorded for {record.ncbi_acc}')
+                    out_fh.write( 
+                        "\t|\t".join( [ str( tax_id ) , str( name ), '', 'scientific name'  ] )  + "\t|\n" )
 
         logging.info('finished writing modified names file')
         return True
@@ -379,74 +362,50 @@ class KrakenDbBuilder():
         # now append the new segmented genome names
         logging.info(f'writing modified nodes file to { path }')
         with open( path, 'a' ) as out_fh:
-            for ncbi_id in self.flu_genomes_ncbi_to_new_tax_and_parent_ids.keys():
-                tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_tax_id']
-                parent_tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_parent_id']
-                
-                # the hardcoded '9' in field 5 is for virus division of the NCBI taxonomy
-                out_fh.write(
-                    "\t|\t".join( [ str( tax_id ), str( parent_tax_id ), 'no rank', '', '9', '1', '1', '1', '0', '1', '1', '', '' ]) + "\t|\n")
+            for record in self.fasta_data:
+                if record.is_flu and record.ncbi_acc in self.flu_genomes_ncbi_to_new_tax_and_parent_ids:
+                    tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[record.ncbi_acc]['new_tax_id']
+                    parent_tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[record.ncbi_acc]['new_parent_id']
+                    if not tax_id:
+                        raise ValueError(f'no taxid recorded for {record.ncbi_acc}')
+                    if not parent_tax_id:
+                        raise ValueError(f'no parent taxid recorded for {record.ncbi_acc}')
+                    
+                    # the hardcoded '9' in field 5 is for virus division of the NCBI taxonomy
+                    out_fh.write(
+                        "\t|\t".join( [ str( tax_id ), str( parent_tax_id ), 'no rank', '', '9', '1', '1', '1', '0', '1', '1', '', '' ]) + "\t|\n")
 
         logging.info('finished writing modified nodes file')
-        return True
-    
-    def write_prelim_map_file( self, path: str ):
-        """
-        Writes the prelim_map.txt file (if one exists) with the new modified taxon IDs for 
-        the segmented virus but leaving other IDs unchanged.
-                
-        Parameters:
-            path: str
-                output file full path
-                
-        Returns:
-            True if success
-            
-        Side effects:
-            Writes to a file 'path'
-            
-        """
-        if not self.prelim_map_file_path:
-            logging.info(f'no prelim_map.txt file provided in inputs - nothing to do')
-            return True
-        
-        try: 
-            with open( path, 'w' ) as out_fh:
-                try:
-                    with open( self.prelim_map_file_path ) as in_fh:
-                        logging.info(f'writing modified prelim_map.txt file to { path }')
-                        for row in in_fh:
-                            row = row.rstrip()
-                            fields = row.split("\t")
-                            ncbi_id = self._parse_ncbi_accession_id( fields[1] )
-                            if ncbi_id in self.flu_genomes_ncbi_to_new_tax_and_parent_ids:
-                                # this is a segmented flu genome
-                                new_kraken_tax_id = self.flu_genomes_ncbi_to_new_tax_and_parent_ids[ ncbi_id ]['new_tax_id']
-                                fields[1] = f'kraken:taxid|{new_kraken_tax_id}|{ncbi_id}'
-                                fields[2] = str(new_kraken_tax_id)
-                            
-                            out_fh.write( "\t".join( fields ) + "\n" )
-                except (PermissionError, FileNotFoundError) as e:
-                    raise ValueError(f'cannot read from { self.fasta_file_path }')
-                
-        except (PermissionError, FileNotFoundError) as e:
-            raise ValueError(f'path { path } does not exist or is not writable, cannot create file')
-
-        logging.info('finished writing modified prelim_map.txt file')
         return True
     
     def create_db_ready_dir( self, path: str, force: bool = True ):
         """
         Create a directory with all files needed to build a new kraken database. This includes the files that
         are copied unchanged as well as the files that are modified, which are:
-            - fasta file
-            - prelim_map.txt (preliminary mapping of NCBI ID to taxon ID, not always present)
+            - fasta file (will ba saved as library.fna to comply with kraken2 convention)
             - names.dmp
             - nodes.dmp
             
-        The final directory can be used by kraken2 build as follows:
+        The final directory can be used by kraken2 build as follows.
+        Assuming the db-ready dir (path parameter) is /path/to/dbready_dir/
+        and the path to the DB we are building is /path/to/new_db/
         
-        kraken2-build --build --db PATH
+        1) add to DB taxonomy resources
+        this will overwrite the exiting names and nodes file in the DB taxonomy folder, which is ok
+        because the modified files contain only additional content
+        
+        $ cp /path/to/dbready_dir/*dmp /path/to/new_db/taxonomy
+        
+        2) add to sequence library
+        use kraken2-build to ad the sequence FASTA file to the DB resources
+        
+        $ kraken2-build \
+            --add-to-library /path/to/dbready_dir/library.fna \
+            --db  /path/to/new_db/
+        
+        3) build the DB
+        kraken2-build --build --db  /path/to/new_db/
+        
         
         Parameters:
             path: str
@@ -479,42 +438,5 @@ class KrakenDbBuilder():
             os.mkdir( taxonomy_path )
     
         self.write_modified_fasta_file( os.path.join( library_path, 'library.fna' ))
-        self.write_prelim_map_file( os.path.join( library_path, 'prelim_map.txt' ))
         self.write_modified_names_files( os.path.join( taxonomy_path, 'names.dmp' ))
         self.write_modified_nodes_files( os.path.join( taxonomy_path, 'nodes.dmp' ))
-    
-    def _parse_ncbi_accession_id( self, in_str: str):
-        """
-        Parse the NCBI accession ID from a string (like FASTA header)
-        
-        Parameters:
-            in_str: str, required
-                the string that will be parsed
-                
-        Returns:
-            NCBI accession ID (int)
-            Throws exception if not present
-        """
-        try:
-            ncbi_id = self.NCBI_ACC_REGEX.search( in_str ).group(0)
-            ncbi_id = re.sub(r'^gb\|', '', ncbi_id)
-            return ncbi_id
-        except AttributeError:
-            raise ValueError(f"could not parse NCBI acc ID from '{in_str}'")
-
-    def _parse_kraken_tax_id( self, in_str: str):
-        """
-        Attempts to parse a taxon ID from the input string, which is present in pre-processed 
-        kraken2 database build files. If it is not found, None is returned.
-                
-        Parameters:
-            in_str: str, required
-                the string that will be parsed
-                
-        Returns:
-            taxon ID if present (int), otherwise None
-        """
-        try:
-            return int( self.KRAKEN_TAX_ID_ASSIGNMENT_REGEX.search( in_str ).group( 1 ) ) 
-        except AttributeError:
-            return None

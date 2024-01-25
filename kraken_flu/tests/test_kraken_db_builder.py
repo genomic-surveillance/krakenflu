@@ -21,31 +21,6 @@ def test_init():
     assert ncbif.prelim_map_file_path is not None
     assert os.path.basename( ncbif.prelim_map_file_path ) == 'prelim_map.txt'
         
-def test__get_tax_ids_from_acc2taxid_map():
-    """
-    This method is only used for FASTA files that do not come with taxid in the header,
-    ie NCBI raw FASTA download.
-    It adds data to a dictionary where the new_parent_id == None
-    """
-    data = {
-        'CY000029': {'new_parent_id': None},
-        'MT375833.1': {'new_parent_id': None},
-        'MT375834.1': {'new_parent_id': 11520} }
-    
-    lib_dir = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download' ))
-    acc2taxid_file = FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download', 'nucl_gb.accession2taxid' ))
-    
-    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=lib_dir, acc2tax_file_path= acc2taxid_file)
-    
-    new_data = ncbif._get_tax_ids_from_acc2taxid_map( data )
-    assert new_data
-    assert isinstance( new_data, dict )
-    assert len(new_data.keys()) == len(data.keys())
-    
-    assert new_data['CY000029']['new_parent_id'] == 311610, 'correct parent ID parsed from acc2taxid map'
-    assert new_data['MT375833.1']['new_parent_id'] == 11520, 'correct parent ID parsed from acc2taxid map'
-    assert new_data['MT375833.1']['new_parent_id'] == data['MT375833.1']['new_parent_id'] , 'entry had a parent id already and is not changed'
-        
 def test_flu_genomes_ncbi_to_new_tax_and_parent_ids():
     ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
     
@@ -177,7 +152,7 @@ def test_write_modified_names_files( tmp_path ):
     #       taxonomy files than are used in the FASTA because this often happens in kraken
     #       DB creation (the taxonomy files are for all of NCBI)
     assert len(mod_file_rows) == len(original_file_rows) + 4 * 8 , '4 flu viruses with 8 segments each were added'
-    known_name_pattern = r'\t\|\tNC_002023\.1 Influenza A virus \(A\/Puerto Rico\/8\/1934\(H1N1\)\) segment 1, complete sequence'
+    known_name_pattern = r'\t\|\tInfluenza A\/Puerto Rico\/8\/1934\(H1N1\) segment 1'
     assert [ r for r in mod_file_rows if re.search( known_name_pattern, r)] , 'we find a row with the exact name of one segment that we expect'
 
 
@@ -218,28 +193,6 @@ def test_write_modified_nodes_file_all_ncbi_download( tmp_path ):
     assert len(mod_file_rows) == len(original_file_rows) + 20, 'added 20 nodes to the file, 1 for ever segment sequence in the FASTA'
     
     assert len([ x for x in mod_file_rows if 'None' in x ]) == 0 ,'there are no rows containing the word None'
-    
-    
-def test_write_prelim_map_file( tmp_path ):
-    ncbif = KrakenDbBuilder( taxonomy_path= TAX_DIR, library_path=LIB_DIR)
-    out_file = tmp_path / "prelim_map.txt"
-    
-    assert not out_file.is_file(), 'before we start, the output file does not exist'
-    ncbif.write_prelim_map_file( out_file )
-    assert out_file.is_file(), 'after calling the method, the output file now exists'
-
-    original_file_rows = [line.rstrip() for line in open( ncbif.prelim_map_file_path ) ]
-    mod_file_rows  = [line.rstrip() for line in open( out_file ) ]
-        
-    assert len(mod_file_rows) == len(original_file_rows) , 'the prelim_map.txt file has the same number of entries before and after modification'
-    
-    # the modified file should have the new tax ID twice: once in col 2 as a kraken taxid tag
-    # and once on its own in col3 (tab delimited)
-    data = ncbif.flu_genomes_ncbi_to_new_tax_and_parent_ids
-    new_tax_id_NC_002023 = data['NC_002023.1']['new_tax_id']
-    prelim_map_pattern = rf'\tkraken:taxid|{new_tax_id_NC_002023}|NC_002023.1\t{new_tax_id_NC_002023}'
-    assert [ x for x in mod_file_rows if re.search( prelim_map_pattern, x ) ], 'the tax ID in the prelim mapping file was changed correctly for this influenza NCBI ID'
-    
 
 def test_create_db_ready_dir( tmp_path ):
     out_dir = tmp_path / 'out_dir'
@@ -252,7 +205,6 @@ def test_create_db_ready_dir( tmp_path ):
     assert os.path.exists( os.path.join( out_dir, 'library' ) ), 'the library subdir created'
     assert os.path.exists( os.path.join( out_dir, 'taxonomy' ) ), 'the taxonomy subdir created'
     assert os.path.exists( os.path.join( out_dir, 'library', 'library.fna' ) ), 'the FASTA file was created'
-    assert os.path.exists( os.path.join( out_dir, 'library', 'prelim_map.txt' ) ), 'the preliminary acc2tax ID file was created'
     assert os.path.exists( os.path.join( out_dir, 'taxonomy', 'names.dmp' ) ), 'the names file was created'
     assert os.path.exists( os.path.join( out_dir, 'taxonomy', 'nodes.dmp' ) ), 'the nodes file was created'
 
