@@ -140,7 +140,7 @@ class FastaParser():
                         'segment', 
                         str(flu_segment_number)])
                 else:
-                    mod_header = self.KRAKEN_TAX_ID_REGEX.sub('', orig_header)
+                    mod_header = orig_header
 
                 data.append(
                     FastaRecord(
