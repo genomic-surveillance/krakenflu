@@ -17,13 +17,13 @@ def test_matching_names():
     assert isinstance( data, dict)
     assert len( data.keys()) == 4, 'FASTA fixture files contains data for 20 genomes (distinct virus names)'
     
-    name='Influenza B virus (B/Texas/24/2020)'
+    name='B/Texas/24/2020'
     assert name in data ,'an expected genome name is found in the data'
     assert isinstance( data[name], dict), '...the dictionary has a 2nd level'
-    assert '2' in data[name], '...segment 1 is a 2nd level dict key for this genome'
-    assert isinstance( data[name]['2'], dict),'the dict has a 3rd level'
-    assert data[name]['2']['fasta_head'] == 'gi|1834444346|gb|MT375832|Influenza B virus (B/Texas/24/2020) segment 2 polymerase PB2 (PB2) gene, complete cds' ,'...header name correct'
-    assert  data[name]['2']['seq_len'] == 2367, '...sequence length is correctly extracted'
+    assert 2 in data[name], '...segment 2 is a 2nd level dict key for this genome'
+    assert isinstance( data[name][2], dict),'the dict has a 3rd level'
+    assert data[name][2]['fasta_head'] == 'gi|1834444346|gb|MT375832|Influenza B virus (B/Texas/24/2020) segment 2 polymerase PB2 (PB2) gene, complete cds' ,'...header name correct'
+    assert  data[name][2]['seq_len'] == 2367, '...sequence length is correctly extracted'
     
 def test_filtered_fasta_headers():
     filter = NcbiInfluenzaFastaFilter( fasta_file_path=NCBI_TEST_FILE)
