@@ -27,12 +27,12 @@ class TaxonomyHandler():
         if os.path.exists( names_file_path ):
             self.names_file_path = names_file_path
         else:
-            raise ValueError(f'missing file { names_file_path }')
+            raise ValueError(f'missing file { names_file_path } in taxonomy path {self.taxonomy_path}')
 
         nodes_file_path = os.path.join(self.taxonomy_path, 'nodes.dmp')
         if os.path.exists( nodes_file_path ):
             self.nodes_file_path = nodes_file_path
         else:
-            raise ValueError(f'missing file { nodes_file_path }')
+            raise ValueError(f'missing file { nodes_file_path } in taxonomy path {self.taxonomy_path}')
         
         
