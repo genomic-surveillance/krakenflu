@@ -190,6 +190,55 @@ class TaxonomyHandler():
         
         return True
     
+    def write_nodes_file( self, path ):
+        """
+        Write the nodes data to a new file in the NCBI nodes.dmp format.
+        
+        Parameters:
+            path: str, required
+                path to the file that is to be written
+                
+        Returns:
+            True on success
+            
+        Side-effects:
+            Writes to file
+            
+        """
+        with open( path, 'w', encoding="utf-8" ) as out_fh:
+            for tax_id, node in self.nodes.items():
+                out_fh.write(
+                    self._format_tax_data_file_output_row(
+                        [ tax_id, node['parent_id'] ] + node['data']
+                    ) +"\n"
+                )
+        return True
+        
+    def write_names_file( self, path ):
+        """
+        Write the names data to a new file in the NCBI nodes.dmp format.
+        
+        Parameters:
+            path: str, required
+                path to the file that is to be written
+                
+        Returns:
+            True on success
+            
+        Side-effects:
+            Writes to file
+            
+        """
+        with open( path, 'w', encoding="utf-8" ) as out_fh:
+            for tax_id, names in self.names.items():
+                for name in names:
+                    out_fh.write(
+                        self._format_tax_data_file_output_row(
+                            [ tax_id, name['name'], name['uname'], name['nclass'] ]
+                        ) +"\n"
+                    )
+        return True
+    
     def _read_tax_data_file_row( self, row ):
         """
         Parses one row of data from names and nodes dmp file and returns as list
@@ -198,3 +247,17 @@ class TaxonomyHandler():
         data = row.rstrip().split("\t|\t")
         data[-1] = data[-1].rstrip("\t|")
         return data
+    
+    def _format_tax_data_file_output_row( self, data:list ):
+        """
+        Formats a list of data into the NCBI dmp file format. Integers are converted to string.
+        
+        Parameters:
+            data: list, required
+                list of data
+                
+        Returns:
+            string - formatted data
+        """
+        return "\t|\t".join([ str(x) for x in data ]) + "\t|"
+    

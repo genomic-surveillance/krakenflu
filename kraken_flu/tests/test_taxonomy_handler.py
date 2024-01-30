@@ -84,4 +84,51 @@ def test_add_taxon():
 
     assert th.nodes[new_tax_id]['parent_id'] == existing_parent_id, 'the new taxon has correct parent taxon ID'
     assert len(th.names[new_tax_id]) == 1, 'only one name associated with the new taxon ID'
-    assert th.names[new_tax_id][0]['name'] == 'a brand new taxon', 'correct name recorded for new taxon'
+    assert th.names[new_tax_id][0]['name'] == 'a brand new taxon', 'correct name recorded for new taxon`'
+    
+def test__format_tax_data_file_output_row():
+    th = TaxonomyHandler( taxonomy_path= TAX_DIR)
+    assert th._format_tax_data_file_output_row( data = [ 1,'test','','abc']) == "1\t|\ttest\t|\t\t|\tabc\t|"
+    
+def test_write_names_file(tmp_path):
+    th = TaxonomyHandler( taxonomy_path= TAX_DIR)
+    out_file = tmp_path / "names.dmp"
+    
+    assert not out_file.is_file(),  'before we start, the output file does not exist'
+    th.write_names_file( path= out_file )
+    assert out_file.is_file(), '...after calling write_names_file(), the file exists'
+    
+    original_file_rows = [line.rstrip() for line in open( th.names_file_path) ]
+    new_file_rows  = [line.rstrip() for line in open( out_file ) ]
+    
+    assert len(original_file_rows) == len(new_file_rows), 'input and output file have same number of rows'
+
+    fluB_row_infile = [x for x in original_file_rows if 'Influenza B virus' in x and '11520' in x ]
+    assert len(fluB_row_infile) == 1, 'a single row found in input file'
+    assert fluB_row_infile[0] == "11520\t|\tInfluenza B virus\t|\t\t|\tscientific name\t|"
+    
+    fluB_row_outfile = [x for x in new_file_rows if 'Influenza B virus' in x and '11520' in x]
+    assert len(fluB_row_outfile) == 1, 'a single row found in output file'
+    assert fluB_row_outfile == fluB_row_infile, 'the input and output rows are identical'
+    
+def test_write_nodes_file(tmp_path):
+    th = TaxonomyHandler( taxonomy_path= TAX_DIR)
+    out_file = tmp_path / "nodes.dmp"
+    
+    assert not out_file.is_file(),  'before we start, the output file does not exist'
+    th.write_nodes_file( path= out_file )
+    assert out_file.is_file(), '...after calling write_nodes_file(), the file exists'
+    
+    original_file_rows = [line.rstrip() for line in open( th.nodes_file_path) ]
+    new_file_rows  = [line.rstrip() for line in open( out_file ) ]
+    
+    assert len(original_file_rows) == len(new_file_rows), 'input and output file have same number of rows'
+    
+    row_infile_11250 = [x for x in original_file_rows if re.search('^11250',x) ]
+    assert len(row_infile_11250) == 1, 'a single row found in input file'
+    assert row_infile_11250[0] == "11250\t|\t3049954\t|\tno rank\t|\t\t|\t9\t|\t1\t|\t1\t|\t1\t|\t0\t|\t1\t|\t1\t|\t0\t|\tcode compliant; specified\t|"
+    
+    row_outfile_11250 = [x for x in new_file_rows if re.search('^11250',x) ]
+    assert len(row_outfile_11250) == 1, 'a single row found in input file'
+    assert row_outfile_11250 == row_infile_11250, 'the input and output rows are identical'
+    
