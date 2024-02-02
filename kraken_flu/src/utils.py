@@ -3,7 +3,7 @@ import re
 # regular expressions for FASTA header and taxonomy names parsing
 FLU_REGEX = re.compile(r'Influenza[ _][AB].+')
 FLU_ISOLATE_NAME_REGEX = re.compile(r'Influenza[ _][AB].*?\(([A-Za-z\-_ /[0-9]*?(\(H[0-9]+N[0-9]+\))?)\)')
-FLU_A_ISOLATE_NAME_REGEX = re.compile(r'Influenza[ _]A.*?\(A\/([A-Za-z\-_ /[0-9]*?(\(H[0-9]+N[0-9]+\))?)\)')
+FLU_A_ISOLATE_NAME_REGEX = re.compile(r'Influenza[ _]A.*?\((A\/[A-Za-z\-_ /[0-9]*?(\(H[0-9]+N[0-9]+\))?)\)')
 FLU_SEG_NUM_REGEX = re.compile(r'Influenza[ _][AB].+ (?:segment|RNA) ([1-8])')
 KRAKEN_TAX_ID_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
 # use GenBank (gb) number or RefSeq accession such as NC_xxxxxx (RefSeq chromosome)

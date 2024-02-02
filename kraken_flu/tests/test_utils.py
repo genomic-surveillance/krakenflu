@@ -70,4 +70,6 @@ def test_FLU_A_SUBTYPE_REGEX():
     
 def test_FLU_A_ISOLATE_NAME_REGEX():
     assert FLU_A_ISOLATE_NAME_REGEX.search('Influenza A virus (A/PR 8/34(H1N1))')
+    match = FLU_A_ISOLATE_NAME_REGEX.search('Influenza A virus (A/PR 8/34(H1N1))')
+    assert match.group(1) == 'A/PR 8/34(H1N1)'
     assert not FLU_A_ISOLATE_NAME_REGEX.search('Influenza B virus (STRAIN B/LEE/40)')
