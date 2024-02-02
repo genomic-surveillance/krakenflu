@@ -62,3 +62,8 @@ def test_KRAKEN_TAX_ID_REGEX():
     assert KRAKEN_TAX_ID_REGEX.search(str), 'regex matches expected pattern'
     match = KRAKEN_TAX_ID_REGEX.search(str)
     assert match.group(1) == '2697049', 'regex extracts the correct pattern'
+
+def test_FLU_A_SUBTYPE_REGEX():
+    assert FLU_A_SUBTYPE_REGEX.search('H10N10')
+    assert FLU_A_SUBTYPE_REGEX.search('H18N10').group(1) == '18'
+    assert FLU_A_SUBTYPE_REGEX.search('H18N10').group(2) == '10'
