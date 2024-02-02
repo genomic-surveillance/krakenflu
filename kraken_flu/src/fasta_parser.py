@@ -5,6 +5,8 @@ from cached_property import cached_property
 from dataclasses import dataclass
 import logging 
 
+from kraken_flu.src.utils import FLU_REGEX,FLU_ISOLATE_NAME_REGEX, FLU_SEG_NUM_REGEX, KRAKEN_TAX_ID_REGEX, NCBI_ACC_REGEX
+
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
 
 class FastaParser():   
@@ -23,16 +25,6 @@ class FastaParser():
             path to the FASTA file that is to be parsed
         
     """
-        
-    # regular expressions for FASTA header parsing
-    FLU_REGEX = re.compile(r'Influenza[ _][AB].+')
-    FLU_ISOLATE_NAME_REGEX = re.compile(r'Influenza[ _][AB].*?\(([A-Za-z\-_ /[0-9]*?(\(H[0-9]+N[0-9]+\))?)\)')
-    FLU_SEG_NUM_REGEX = re.compile(r'Influenza[ _][AB].+ (?:segment|RNA) ([1-8])')
-    KRAKEN_TAX_ID_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
-    # use GenBank (gb) number or RefSeq accession such as NC_xxxxxx (RefSeq chromosome)
-    # could potentially be stricter with the RefSeq IDs as we are only interested in NC_xxxxx(?)
-    NCBI_ACC_REGEX = re.compile(r'gb\|[A-Z]+_?[0-9]+|[A-Z]{2}_[0-9]{6,}\.[0-9]')
-
 
     def __init__( self, fasta_file_path: str ):
         if not os.path.isfile( fasta_file_path ):
@@ -52,24 +44,24 @@ class FastaParser():
                 
         """
         try:
-            ncbi_acc = self.NCBI_ACC_REGEX.search( header ).group(0)
+            ncbi_acc = NCBI_ACC_REGEX.search( header ).group(0)
             ncbi_acc = re.sub(r'^gb\|', '', ncbi_acc)
         except AttributeError:
             # an NCBI accession ID is required
             raise ValueError(f"could not parse NCBI acc ID from FASTA header '{header}'")
 
-        if (match := self.KRAKEN_TAX_ID_REGEX.search( header )) is not None:
+        if (match := KRAKEN_TAX_ID_REGEX.search( header )) is not None:
             kraken_taxid = int(match.group(1))
         else:
             kraken_taxid = None
             
         flu_isolate_name = None
         flu_segment_number = None
-        if self.FLU_REGEX.search( header ):
+        if FLU_REGEX.search( header ):
             is_flu = True
-            if (match := self.FLU_SEG_NUM_REGEX.search( header )) is not None:
+            if (match := FLU_SEG_NUM_REGEX.search( header )) is not None:
                 flu_segment_number = int(match.group(1))
-            if (match := self.FLU_ISOLATE_NAME_REGEX.search( header )) is not None:
+            if (match := FLU_ISOLATE_NAME_REGEX.search( header )) is not None:
                 flu_isolate_name = match.group(1)
         else:
             is_flu = False
