@@ -67,3 +67,7 @@ def test_FLU_A_SUBTYPE_REGEX():
     assert FLU_A_SUBTYPE_PARTS_REGEX.search('H10N10')
     assert FLU_A_SUBTYPE_PARTS_REGEX.search('H18N10').group(1) == 'H18'
     assert FLU_A_SUBTYPE_PARTS_REGEX.search('H18N10').group(2) == 'N10'
+    
+def test_FLU_A_ISOLATE_NAME_REGEX():
+    assert FLU_A_ISOLATE_NAME_REGEX.search('Influenza A virus (A/PR 8/34(H1N1))')
+    assert not FLU_A_ISOLATE_NAME_REGEX.search('Influenza B virus (STRAIN B/LEE/40)')
