@@ -2,6 +2,7 @@ import re
 import os.path
 from cached_property import cached_property
 import logging
+from kraken_flu.src.utils import FLU_REGEX,FLU_ISOLATE_NAME_REGEX, FLU_SEG_NUM_REGEX, KRAKEN_TAX_ID_REGEX, NCBI_ACC_REGEX, FLU_A_SUBTYPE_PARTS_REGEX, FLU_A_ISOLATE_NAME_REGEX
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
 
@@ -35,11 +36,40 @@ class TaxonomyHandler():
         else:
             raise ValueError(f'missing file { nodes_file_path } in taxonomy path {self.taxonomy_path}')
         
+        self._nodes = self._read_nodes()
+        self._names = self._read_names()
         
-    @cached_property
+        # These will be created if/when influenza/segment taxa are added to the taxonomy
+        # Once populated, they return dicts of dicts to map influenza type/subtype/isolate + 
+        # segment number to the newly created taxon IDs 
+        self._influenza_type_segment_tax_ids = None
+        self._influenza_subtype_segment_tax_ids = None
+        self._influenza_isolate_segment_tax_ids = None
+        
+    def _read_nodes(self):
+        """
+        Populates the "nodes" property by reading the taxonomy file.
+        See "nodes" for explanation
+        """ 
+        data = {}
+        with open( self.nodes_file_path, 'r' ) as fh:
+            for row in fh:
+                d = self._read_tax_data_file_row( row )
+                tax_id = int(d[0])
+                parent_tax_id = int(d[1])
+                if tax_id in data:
+                    raise ValueError(f'a taxon ID ({tax_id}) was found more than once in file {self.nodes_file_path}, which should not be possible')
+                data[ tax_id ] = {
+                    'parent_id': parent_tax_id,
+                    'data': d[2:]
+                }
+            
+        return data
+    
+    @property
     def nodes(self):
         """
-        Reads the nodes.dmp file into memory as a dictionary with taxon ID as key.
+        An in-memory representation of the contents of the nodes.dmp file as a dictionary with taxon ID as key.
         
         The NCBI nodes.dmp file contains the following data (according to NCBI README):
         tax_id                                  -- node id in GenBank taxonomy database
@@ -71,25 +101,12 @@ class TaxonomyHandler():
                     }
                 }
         """
-        data = {}
-        with open( self.nodes_file_path, 'r' ) as fh:
-            for row in fh:
-                d = self._read_tax_data_file_row( row )
-                tax_id = int(d[0])
-                parent_tax_id = int(d[1])
-                if tax_id in data:
-                    raise ValueError(f'a taxon ID ({tax_id}) was found more than once in file {self.nodes_file_path}, which should not be possible')
-                data[ tax_id ] = {
-                    'parent_id': parent_tax_id,
-                    'data': d[2:]
-                }
-            
-        return data
+        return self._nodes
     
-    @cached_property
+    @property
     def names(self):
         """
-        Reads the names.dmp file into memory as a dictionary with taxon ID as key. In the case of the names
+        An in-memory representation of the contents of the names.dmp file as a dictionary with taxon ID as key. In the case of the names
         file, the taxon ID is not unique across the file. Each taxon ID can have more than one name.
         
         The NCBI names.dmp file contains the following data (according to NCBI README):
@@ -113,6 +130,13 @@ class TaxonomyHandler():
                     ]
                 }
         """
+        return self._names
+    
+    def _read_names(self):
+        """
+        Populates the "names" property by reading the taxonomy file.
+        See "names" for explanation
+        """    
         data = {}
         with open( self.names_file_path, 'r' ) as fh:
             for row in fh:
@@ -133,6 +157,7 @@ class TaxonomyHandler():
     def max_tax_id(self):
         """
         Identifies the maximum (numeric sort) taxon ID in the data.
+        This can change as we add more taxa to the taxonomy.
         
         Returns:
             highest tax ID (int)
@@ -239,6 +264,256 @@ class TaxonomyHandler():
                     )
         return True
     
+    def create_influenza_type_segment_taxa(self):
+        """
+        For each of the influenza types for which we want to split genomes into segments (currently 
+        only type A), one new node is created in the taxonomy.
+        A datastructure is returned that maps type/segment to the new taxid.
+        
+        NOTE: This is currently hardcoded to just insert the influenza A segment 1, 2, 3 etc nodes. 
+        It can be easily changed to add nodes for more (or all) influenza genomes by either hardcoding 
+        other types into the 'types' list or by querying the names for all Influenza type records.
+        
+        Returns:
+            sets and returns self.influenza_type_segment_tax_ids
+        
+        """
+        # check if we have already done this and, if so, just return the existing data
+        if self.influenza_type_segment_tax_ids is not None:
+            return self.influenza_type_segment_tax_ids
+        
+        flu_a_tax_id, _ = self._tax_id_and_parent_id_by_name( 'Influenza A virus')
+        if flu_a_tax_id is None:
+            raise ValueError('could not find Influenza A in names file')
+        
+        # add more types here if needed (e.g. 'B')
+        types = ['A']
+        data = {}
+        new_tax_id_i = self.max_tax_id()
+        for type in types:
+            for seg_num in range(1,9):
+                new_tax_id_i += 1
+                self.add_taxon( tax_id= new_tax_id_i, parent_tax_id= flu_a_tax_id, name=f'Influenza A segment {seg_num}' )
+                try:
+                    data[type][seg_num] = new_tax_id_i
+                except KeyError:
+                    data[type] = { seg_num: new_tax_id_i}
+            
+        self._influenza_type_segment_tax_ids = data
+        return data
+    
+    @property
+    def influenza_type_segment_tax_ids(self):
+        """
+        Datastructure of taxon IDs for influenza type + segment. Populated when running 
+        self.create_influenza_type_segment_taxa
+        
+        Returns:
+            Dict of dicts with the following structure:
+            
+                {
+                    TYPE: {
+                        SEGMENT_NUMBER: tax_id
+                    }
+                }
+                
+        """
+        return self._influenza_type_segment_tax_ids
+            
+    
+    def create_influenza_subtype_segment_taxa(self):
+        """
+        Similar to "create_influenza_type_segment_taxa". Inserts new tax into the taxonomy for 
+        Influenza subtype/segment number.
+        
+        In this current implementation, we only insert this level of the taxonomy for segments 4 and 6.
+        For segment 4, we create one taxon for each H subtype (segment 4 encodes the HA gene). For
+        segment 6, one taxon is added for each N subtype (6 encodes NA gene).
+        
+        NOTE: in the current implementation, the 'segment' level in the resulting data structure is
+        redundant because every H subtype only has segment 4 entries and every N subtype only has segment 6.
+        Currently keeping that level in the data structure simply because it might be used in the future.
+        
+        There are 18 known H subtypes and 11 known N subtypes. We create all 18 "Hx segment 4" nodes as well
+        as all 11 "Nx segment 6" nodes.
+        
+        The new nodes are child nodes to the type/segment nodes. If create_influenza_type_segment_taxa 
+        has not been run, it is run here.
+        
+        Returns:
+            sets and returns self.influenza_subtype_segment_tax_ids
+        
+        """
+        # check if we have already done this and, if so, just return the existing data
+        if self.influenza_subtype_segment_tax_ids is not None:
+            return self.influenza_subtype_segment_tax_ids
+        
+        if not self.influenza_type_segment_tax_ids:
+            self.create_influenza_type_segment_taxa()
+        
+        data={}
+            
+        # create the Hx segment 4 nodes as children of Influenza A segment 4 node
+        parent_tax_id = self.influenza_type_segment_tax_ids['A'][4]
+        if not parent_tax_id:
+            raise ValueError('cannot retrieve taxon ID for Influenza A segment 4')
+        
+        new_tax_id_i = self.max_tax_id()
+        for subtype_num in range(1,19):
+            new_tax_id_i+=1
+            subtype = 'H'+str(subtype_num)
+            self.add_taxon( tax_id=new_tax_id_i, parent_tax_id=parent_tax_id, name=f'Influenza A {subtype} segment 4')
+            try:
+                data[subtype][4] = new_tax_id_i
+            except KeyError:
+                data[subtype] = { 4: new_tax_id_i}
+            
+        # create the Nx segment 4 nodes as children of Influenza A segment 6 node
+        parent_tax_id = self.influenza_type_segment_tax_ids['A'][6]
+        if not parent_tax_id:
+            raise ValueError('cannot retrieve taxon ID for Influenza A segment 6')
+        
+        for subtype_num in range(1,12):
+            new_tax_id_i+=1
+            subtype = 'N'+str(subtype_num)
+            self.add_taxon( tax_id=new_tax_id_i, parent_tax_id=parent_tax_id, name=f'Influenza A {subtype} segment 6')
+            try:
+                data[subtype][6] = new_tax_id_i
+            except KeyError:
+                data[subtype] = { 6: new_tax_id_i}
+
+        self._influenza_subtype_segment_tax_ids = data
+        return data
+    
+    @property
+    def influenza_subtype_segment_tax_ids(self):
+        """
+        Datastructure of taxon IDs for influenza subtype + segment. Populated when running 
+        self.create_influenza_subtype_segment_taxa       
+        
+        Returns:
+            Dict of dicts with the following structure:
+            
+                {
+                    SUBTYPE: {
+                        SEGMENT_NUMBER: tax_id
+                    }
+                }
+        """
+        return self._influenza_subtype_segment_tax_ids
+    
+
+    def create_influenza_isolate_segment_taxa(self):
+        """
+        Like self.create_influenza_type_segment_taxa and self.create_influenza_subtype_segment_taxa,
+        this method creates new nodes in the taxonomy for Influenza A viruses only.
+        
+        This method identifies all influenza A isolates by a valid isolate name such as:
+        
+        A/California/07/2009(H1N1)
+        
+        For each such isolates, 8 new nodes are created in the taxonomy, one for each of the possible 
+        segments of the isolate. This class does not look at the available sequence data, thus is does 
+        not matter whether or not genome sequence exists for this isolate for all 8 segments. The same 
+        applies to all nodes of the taxonomy. They exist whether or not we have a sequence.
+        
+        As detailed in self.create_influenza_subtype_segment_taxa, we currently have a different taxonomy 
+        organisation for the subtype-defining segments 4 and 6 and for all other segments.
+        Segments 4 and 6 are created as children of nodes such as
+        "H1 segment 4", "N5 segment 6" etc
+        whereas other segments are children of "Influenza A segment 1" etc
+        
+        We are also currently only doing this for influenza A. Influenza B genomes are not split into 
+        segments at the moment.
+        
+        THIS MAY CHANGE in future versions.
+        
+        Returns:
+            sets and returns self.influenza_isolate_segment_tax_ids
+        """
+        # check if we have already done this and, if so, just return the existing data
+        if self.influenza_isolate_segment_tax_ids is not None:
+            return self.influenza_isolate_segment_tax_ids
+        
+        # we need type/segment and subtype/segment nodes already done, make sure this is the case
+        # or trigger that cascade now
+        if not self.influenza_subtype_segment_tax_ids:
+            self.create_influenza_subtype_segment_taxa()
+        
+        data = {}
+        new_tax_id_i = self.max_tax_id() + 1
+        # identify the isolates of interest
+        # which is currently defined by nodes with a name of a flu A isolate
+        # take a snapshot of keys before we start inserting new ones otherwise we would be
+        # iterating over a dict with changing size as we are adding new nodes
+        existing_tax_ids = [x for x in self.names.keys()]
+        for tax_id in existing_tax_ids:
+            for name_record in self.names[ tax_id ]:
+                name = name_record['name']
+                nclass = name_record['nclass']
+                flu_a_match = FLU_A_ISOLATE_NAME_REGEX.search( name)
+                if nclass == 'scientific name' and flu_a_match:
+                    # this is a flu A isolate, generate 8 nodes in the taxonomy,
+                    # one for each segment. For segments 4 and 6 we need to know the
+                    # H and N subtype, respectively
+                    isolate_name = flu_a_match.group(1)
+                    if (subtype_regex_match := FLU_A_SUBTYPE_PARTS_REGEX.search(isolate_name)):
+                        # TODO: should consolidate the various regexes into a single one
+                        h_subtype = subtype_regex_match.group(1)
+                        n_subtype = subtype_regex_match.group(2)
+                    else:
+                        raise ValueError(f'could not parse H/N subtypes from isolate name {isolate_name}')
+                    
+                    try:
+                        seg4_parent_id = self.influenza_subtype_segment_tax_ids[h_subtype][4]
+                    except KeyError:
+                        raise ValueError(f'no parent tax id for H subtype {h_subtype} segment 4')
+                    try:
+                        seg6_parent_id = self.influenza_subtype_segment_tax_ids[n_subtype][6]
+                    except KeyError:
+                        raise ValueError(f'no parent tax id for N subtype {n_subtype} segment 6')
+                    
+                    for seg_num in range(1,9):
+                        new_tax_name = isolate_name + ' segment ' + str(seg_num)
+                        if seg_num == 4:
+                            parent_tax_id = seg4_parent_id
+                        elif seg_num == 6:
+                            parent_tax_id = seg6_parent_id
+                        else:
+                            try:
+                                parent_tax_id = self.influenza_type_segment_tax_ids['A'][seg_num]
+                            except KeyError:
+                                raise ValueError(f'no parent tax id for flu A segment {seg_num}')
+                        self.add_taxon(tax_id= new_tax_id_i, parent_tax_id= parent_tax_id, name= new_tax_name)
+                        try:
+                            data[isolate_name][seg_num] = new_tax_id_i
+                        except KeyError:
+                            data[isolate_name] = { seg_num: new_tax_id_i }
+                        
+                        new_tax_id_i += 1
+
+        self._influenza_isolate_segment_tax_ids = data
+        return data
+    
+    @property
+    def influenza_isolate_segment_tax_ids(self):
+        """
+        Datastructure of taxon IDs for influenza subtype + segment. Populated when running 
+        self.create_influenza_isolate_segment_taxa
+
+        Dict of dicts with the following structure:
+            
+                {
+                    NAME: {
+                        SEGMENT_NUMBER: tax_id
+                    }
+                }
+                
+                where NAME is an isolate name such as 'A/California/07/2009(H1N1)'
+        """
+        return self._influenza_isolate_segment_tax_ids
+    
+    
     def _read_tax_data_file_row( self, row ):
         """
         Parses one row of data from names and nodes dmp file and returns as list
@@ -261,3 +536,38 @@ class TaxonomyHandler():
         """
         return "\t|\t".join([ str(x) for x in data ]) + "\t|"
     
+    def _tax_id_and_parent_id_by_name(self, name:str, nclass:str='scientific name'):
+        """
+        Finds a node in the "names" by name and name-class. Returns taxon and parent IDs
+        
+        Parameters:
+            name: str, required
+                name to search for
+                
+            nclass: str, optional
+                name class, defaults to 'scientific name'
+                
+        Returns:
+            taxon ID, parent taxon ID 
+        """
+        if name=='':
+            return None
+        
+        found = False
+        tax_id_final = None
+        parent_id_final = None
+        for tax_id, name_records in self.names.items():
+            for name_record in name_records:
+                if name_record['name'] == name and name_record['nclass'] == nclass:
+                    parent_id = self.nodes[tax_id]['parent_id']
+                    if not parent_id:
+                        raise ValueError(f'could not find a taxon ID in nodes that should be there:{tax_id}')
+                    else:
+                        if found:
+                            raise ValueError(f'found more than one match to name:"{name }" name-class:"{nclass}')
+                        else:
+                            found = True
+                            tax_id_final = tax_id
+                            parent_id_final = parent_id       
+        return tax_id_final, parent_id_final
+
