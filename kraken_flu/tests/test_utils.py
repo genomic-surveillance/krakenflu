@@ -73,3 +73,48 @@ def test_FLU_A_ISOLATE_NAME_REGEX():
     match = FLU_A_ISOLATE_NAME_REGEX.search('Influenza A virus (A/PR 8/34(H1N1))')
     assert match.group(1) == 'A/PR 8/34(H1N1)'
     assert not FLU_A_ISOLATE_NAME_REGEX.search('Influenza B virus (STRAIN B/LEE/40)')
+    
+def test_FLU_DATA_REGEX():
+    match = FLU_DATA_REGEX.search('Influenza A virus (A/PR 8/34(H1N1)) segment 2')
+    assert match
+    assert match.group(1) == 'A', 'type'
+    assert match.group(2) == 'A/PR 8/34(H1N1)', 'isolate name'
+    assert match.group(3) == 'H1', 'H subtype'
+    assert match.group(4) == 'N1', 'N subtype'
+    assert match.group(5) == '2', 'segment number'
+    
+    match = FLU_DATA_REGEX.search('Influenza A virus (A/Puerto_Rico/8/34(H10N11))')
+    assert match
+    assert match.group(1) == 'A', 'type'
+    assert match.group(2) == 'A/Puerto_Rico/8/34(H10N11)', 'isolate name'
+    assert match.group(3) == 'H10', 'H subtype'
+    assert match.group(4) == 'N11', 'N subtype'
+    assert match.group(5) == None, 'segment number'
+    
+    match = FLU_DATA_REGEX.search('Influenza B virus (STRAIN B/LEE/40) RNA 1')
+    assert match
+    assert match.group(1) == 'B', 'type'
+    assert match.group(2) == 'STRAIN B/LEE/40', 'isolate name'
+    assert match.group(3) == None, 'H subtype'
+    assert match.group(4) == None, 'N subtype'
+    assert match.group(5) == '1', 'segment number'
+    
+    match = FLU_DATA_REGEX.search('some segment virus')
+    assert not match
+    
+def test_parse_flu():
+    name = 'Influenza A virus (A/Puerto_Rico/8/34(H10N11))'
+    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert flu_type == 'A' ,'type'
+    assert isolate_name == 'A/Puerto_Rico/8/34(H10N11)', 'isolate name'
+    assert h_subtype == 'H10' , 'H subtype'
+    assert n_subtype == 'N11' , 'N subtype'
+    assert segment_number is None , 'segment number'
+    
+    name = 'Influenza B virus (STRAIN B/LEE/40) RNA 1'
+    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert flu_type == 'B' ,'type'
+    assert isolate_name == 'STRAIN B/LEE/40', 'isolate name'
+    assert h_subtype is None , 'H subtype'
+    assert n_subtype is None , 'N subtype'
+    assert segment_number == 1 , 'segment number'
