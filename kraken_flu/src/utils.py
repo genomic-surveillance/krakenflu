@@ -14,9 +14,9 @@ FLU_A_SUBTYPE_PARTS_REGEX = re.compile(r'(H[0-9]+)(N[0-9]+)')
 # TODO: this Regex should eventually replace all of the above FLU regexes (combines all in one)
 FLU_DATA_REGEX = re.compile(
     # example: Influenza A virus (A/Puerto Rico/8/1934(H1N1)) segment 1
-    r'Influenza[ _]([A-D])'+ # influenza type, capture group 1: A
+    r'.*?Influenza[ _]([A-D])'+ # influenza type, capture group 1: A
     r'.*?\('+ # most likely "virus ("
-        r'([A-Za-z\-_ /[0-9]*?'+ # isolate name, capture group 2: A/Puerto Rico/8/1934(H1N1)
+        r'([A-Za-z0-9\-_ /]*?'+ # isolate name, capture group 2: A/Puerto Rico/8/1934(H1N1)
             r'(?:'+ # optional non capturing group for HxNx subtype (only present in flu A)
                 r'\((H[0-9]+)'+ # H subtype, capture group 3: H1
                 r'(N[0-9]+)\)'+ # N subtype, capture group 4: N1

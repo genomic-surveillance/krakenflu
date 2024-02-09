@@ -118,3 +118,12 @@ def test_parse_flu():
     assert h_subtype is None , 'H subtype'
     assert n_subtype is None , 'N subtype'
     assert segment_number == 1 , 'segment number'
+    
+    # should work with any input, including a full FASTA header like this
+    name = '>gi|1834444346|gb|MT375832|Influenza B virus (B/Texas/24/2020) segment 2 polymerase PB2 (PB2) gene, complete cds'
+    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert flu_type == 'B' ,'type'
+    assert isolate_name == 'B/Texas/24/2020', 'isolate name'
+    assert h_subtype is None , 'H subtype'
+    assert n_subtype is None , 'N subtype'
+    assert segment_number == 2 , 'segment number'
