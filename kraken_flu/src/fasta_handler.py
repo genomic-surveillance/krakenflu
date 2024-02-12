@@ -6,19 +6,14 @@ from dataclasses import dataclass
 import logging 
 
 from kraken_flu.src.utils import FLU_REGEX,FLU_ISOLATE_NAME_REGEX, FLU_SEG_NUM_REGEX, KRAKEN_TAX_ID_REGEX, NCBI_ACC_REGEX
+from kraken_flu.src.utils import parse_flu
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
 
-class FastaParser():   
+class FastaHandler():   
     """
-    This class parses FASTA and extracts the following information from the headers:
-        - pre-assigned kraken2 taxid, if present
-        - NCBI accession (Genbank unique ID)
-        - boolean: is_flu: True if the header indicates an influenza sequence
-        - flu_name: populated in case it is an influenza name
-            examples: A/New York/392/2004(H3N2), B/Houston/B850/2005
-        - flu_segment: populated for influenza only
-        - length of the sequence (the sequence itself is not stored)
+    This class handles the genome FASTA files.    
+    It can also write the data back to a FASTA file again.
     
     Parameters:
         fasta_file_path: str, required
@@ -31,7 +26,7 @@ class FastaParser():
             raise ValueError(f'file { fasta_file_path } does not exist or is not a file')
         self.fasta_file_path = fasta_file_path
 
-    def _parse_header( self, header):
+    def _parse_header( self, header:str):
         """
         Parse a FASTA header
         
@@ -40,7 +35,14 @@ class FastaParser():
                 the FASTA header string
                 
         Returns tuple of:
-            ncbi_acc (str), kraken_taxid (None or int), is_flu (bool), flu_isolate_name (str), flu_segment_number (None or int) 
+            ncbi_acc (str), 
+            kraken_taxid (None or int), 
+            is_flu (bool),
+            is_fluA (bool),
+            flu_isolate_name (str), 
+            flu_segment_number (None or int),
+            fluA_H_subtype
+            fluA_N_subtype
                 
         """
         try:
@@ -55,25 +57,22 @@ class FastaParser():
         else:
             kraken_taxid = None
             
-        flu_isolate_name = None
-        flu_segment_number = None
-        if FLU_REGEX.search( header ):
+        flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( header )
+        is_fluA = False
+        if flu_type:
             is_flu = True
-            if (match := FLU_SEG_NUM_REGEX.search( header )) is not None:
-                flu_segment_number = int(match.group(1))
-            if (match := FLU_ISOLATE_NAME_REGEX.search( header )) is not None:
-                flu_isolate_name = match.group(1)
+            if flu_type == 'A':
+                is_fluA = True
         else:
             is_flu = False
             
-        return ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number 
+        return ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype
 
     @cached_property
     def data( self ):
         """
         Returns FASTA data as a list of dicts, each dict has the following keys:
             - orig_head: the original un-modified FASTA header
-            - sequence: the DNA sequence
             - mod_head: modified header:
                 - any kraken tax ID removed
                 - NCBI accession ID preserved
@@ -84,16 +83,13 @@ class FastaParser():
             The following are only applied to flu sequences (None otherwise):
             - is_flu: True if this is a flu sequence
             - flu_name: flu isolate name such as 'A/New York/32/2003(H3N2)' or 'B/Texas/24/2020'
-            - flu_seg_num: segment number 
+            - flu_seg_num: segment number
+            - is_fluA: True if this is an influenza A isolate
+            - fluA_H_subtype: H subtype if this is an influenza A isolate, value 'H1', 'H2', etc
+            - fluA_N_subtype: N subtype if influenza A, value 'N1', N2', etc.
         
         Returns:
             list of dicts, see above
-            
-        TODO:
-        Reading the sequence data into RAM because it is easier to work with it this way and even 
-        the largest file we are currently working with (all influenza from NCBI) is only around 500MB, 
-        which can easily be handled on the farm. But this might become a problem if we need to work with 
-        larger files and might need to change.
         
         """
         logging.info( f'parsing FASTA headers from { self.fasta_file_path }')
@@ -105,9 +101,8 @@ class FastaParser():
         with open( self.fasta_file_path ) as fh:
             for record in SeqIO.parse(fh, "fasta"):
                 orig_header = record.description
-                sequence = record.seq
-                seqlen = len(sequence)
-                ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = self._parse_header(orig_header)
+                seqlen = len( record.seq )
+                ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype = self._parse_header(orig_header)
                 
                 # TODO: not sure if this is needed for kraken2 to assign taxonomy ID later
                 # so just incase, putting the "gb|" back into the NCBI accession ID but only if
@@ -120,31 +115,33 @@ class FastaParser():
                     
                 n_all+=1
                 if is_flu:
-                    if flu_isolate_name is None:
+                    if isolate_name is None:
                         unnamed_flu+=1
-                    if flu_segment_number is None:
+                    if isolate_name is None:
                         flu_wo_seg_num+=1
                     n_flu+=1
                     mod_header = ' '.join([
                         ncbi_acc_str +'|', 
                         'Influenza', 
-                        flu_isolate_name or 'unnamed', 
+                        isolate_name or 'unnamed', 
                         'segment', 
-                        str(flu_segment_number)])
+                        str(segment_number)])
                 else:
                     mod_header = orig_header
 
                 data.append(
                     FastaRecord(
                         orig_head= orig_header,
-                        sequence= sequence,
                         mod_head= mod_header,
                         seqlen= seqlen,
                         ncbi_acc= ncbi_acc,
                         is_flu= is_flu,
                         taxid= kraken_taxid,
-                        flu_name= flu_isolate_name,
-                        flu_seg_num = flu_segment_number ) )
+                        flu_name= isolate_name,
+                        flu_seg_num = segment_number,
+                        is_fluA= is_fluA,
+                        fluA_H_subtype= h_subtype,
+                        fluA_N_subtype= n_subtype) )
         
         logging.info( f'found {n_all} sequences, {n_flu} of which are influenza')
         if flu_wo_seg_num > 0:
@@ -179,7 +176,6 @@ class FastaRecord():
     A simple data class to hold the data for a single FASTA record    
     """
     orig_head: str
-    sequence: str
     mod_head: str
     seqlen: int
     ncbi_acc: str
@@ -187,6 +183,6 @@ class FastaRecord():
     taxid: int
     flu_name: str
     flu_seg_num: int
-        
-    
-    
+    is_fluA: bool
+    fluA_H_subtype: str
+    fluA_N_subtype: str

@@ -2,7 +2,7 @@ import pytest
 import os.path
 from importlib_resources import files
 
-from kraken_flu.src.fasta_parser import FastaParser, FastaRecord
+from kraken_flu.src.fasta_handler import FastaHandler, FastaRecord
 
 """
 The fixture data was created by the following commands
@@ -17,47 +17,64 @@ FIXTURE_DIR = files('kraken_flu.tests.fixtures')
 FASTA_FILE = FIXTURE_DIR.joinpath(os.path.join('downsampled_ncbi_all_flu','all_influenza_1pcerent_plus_refseq_plus_completeflu.fasta'))
 
 def test_init():
-    fp = FastaParser( fasta_file_path=FASTA_FILE)
+    fp = FastaHandler( fasta_file_path=FASTA_FILE)
     assert fp
 
 def test__parse_header():
-    fp = FastaParser( fasta_file_path=FASTA_FILE)
+    fp = FastaHandler( fasta_file_path=FASTA_FILE)
     
     header = '>gi|1834444346|gb|MT375832|Influenza B virus (B/Texas/24/2020) segment 2 polymerase PB2 (PB2) gene, complete cds'
-    ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = fp._parse_header(header)
+    ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
+
     assert ncbi_acc == 'MT375832', 'correctly parsed NCBI accession from gb|xxxxx format'
     assert kraken_taxid is None ,'no tax ID in this header'
+    assert is_flu == True ,'this is a flu genome'
+    assert is_fluA == False , 'not a flu type A'
+    assert h_subtype == None, 'no flu A so no H subtype'
+    assert n_subtype == None , 'no flu A so no N subtype'
     assert flu_isolate_name == 'B/Texas/24/2020' ,'flu isolate name parsed correctly'
     assert flu_segment_number == 2 ,'correctly parsed flu segment number'
     
     # this time without the leading ">", which is not required for the regexes to work
     header = 'kraken:taxid|641809|NC_026438.1 Influenza A virus (A/California/07/2009(H1N1)) segment 1 polymerase PB2 (PB2) gene, complete cds'
-    ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = fp._parse_header(header)
+    ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
     assert ncbi_acc == 'NC_026438.1', 'correctly parsed NCBI accession from non-gb|xxxxx format'
     assert kraken_taxid == 641809 ,'correctly parsed a kraken taxid from this header'
+    assert is_flu == True ,'this is a flu genome'
+    assert is_fluA == True , 'a flu type A'
+    assert h_subtype == 'H1', 'H1 subtype'
+    assert n_subtype == 'N1' , 'N1 subtype'
     assert flu_isolate_name == 'A/California/07/2009(H1N1)' ,'flu isolate name parsed correctly'
     assert flu_segment_number == 1 ,'correctly parsed flu segment number'
     
     
     header = '>gi|169731751|gb|CY030663|Influenza B virus (B/Tennessee/UR06-0431/2007) segment 1, complete sequence'
-    ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = fp._parse_header(header)
+    ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
     assert ncbi_acc == 'CY030663', 'correctly parsed NCBI accession from gb|xxxxx format'
     assert kraken_taxid is None ,'no tax ID in this header'
+    assert is_flu == True ,'this is a flu genome'
+    assert is_fluA == False , 'not a flu type A'
+    assert h_subtype == None, 'no flu A so no H subtype'
+    assert n_subtype == None , 'no flu A so no H subtype'
     assert flu_isolate_name == 'B/Tennessee/UR06-0431/2007' ,'flu isolate name parsed correctly'
     assert flu_segment_number == 1 ,'correctly parsed flu segment number'
     
     # a real FASTA header for a Flu B RefSeq - uses the keyword RNA instead of segment
     header = 'kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence'
-    ncbi_acc, kraken_taxid, is_flu, flu_isolate_name, flu_segment_number = fp._parse_header(header)
+    ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
     assert is_flu == True , 'identified as flu'
     assert ncbi_acc == 'NC_002204.1', 'correctly parsed NCBI accession from RefSeq ID format'
     assert kraken_taxid == 518987 ,'correctly parsed existing kraken tax ID'
+    assert is_flu == True ,'this is a flu genome'
+    assert is_fluA == False , 'not a flu type A'
+    assert h_subtype == None, 'no flu A so no H subtype'
+    assert n_subtype == None , 'no flu A so no H subtype'
     assert flu_isolate_name is None ,'there is no flu isolate name given in this header'
     assert flu_segment_number == 1 ,'correctly parsed flu segment number'
 
     
 def test_data():
-    fp = FastaParser( fasta_file_path=FASTA_FILE)
+    fp = FastaHandler( fasta_file_path=FASTA_FILE)
     data = fp.data
     assert data
     assert isinstance(data, list), 'data is a list'
