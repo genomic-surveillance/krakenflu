@@ -127,3 +127,14 @@ def test_parse_flu():
     assert h_subtype is None , 'H subtype'
     assert n_subtype is None , 'N subtype'
     assert segment_number == 2 , 'segment number'
+    
+    # THis is a rare case but it does happen: influenza without an isolate name
+    # We do need to allow this so that we can perform an additional step later to try and fix this
+    name = '>kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence'
+    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert flu_type == 'B' ,'type'
+    assert isolate_name == None, 'no isolate name'
+    assert h_subtype is None , 'H subtype'
+    assert n_subtype is None , 'N subtype'
+    assert segment_number == 1 , 'segment number'
+    
