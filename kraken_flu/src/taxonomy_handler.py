@@ -2,7 +2,7 @@ import re
 import os.path
 from cached_property import cached_property
 import logging
-from kraken_flu.src.utils import FLU_REGEX,FLU_ISOLATE_NAME_REGEX, FLU_SEG_NUM_REGEX, KRAKEN_TAX_ID_REGEX, NCBI_ACC_REGEX, FLU_A_SUBTYPE_PARTS_REGEX, FLU_A_ISOLATE_NAME_REGEX
+from kraken_flu.src.utils import parse_flu
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
 
@@ -451,17 +451,14 @@ class TaxonomyHandler():
             for name_record in self.names[ tax_id ]:
                 name = name_record['name']
                 nclass = name_record['nclass']
-                flu_a_match = FLU_A_ISOLATE_NAME_REGEX.search( name)
-                if nclass == 'scientific name' and flu_a_match:
+                
+                flu_type, isolate_name, h_subtype, n_subtype, _ = parse_flu( name )
+
+                if nclass == 'scientific name' and isolate_name is not None and flu_type == 'A':
                     # this is a flu A isolate, generate 8 nodes in the taxonomy,
                     # one for each segment. For segments 4 and 6 we need to know the
                     # H and N subtype, respectively
-                    isolate_name = flu_a_match.group(1)
-                    if (subtype_regex_match := FLU_A_SUBTYPE_PARTS_REGEX.search(isolate_name)):
-                        # TODO: should consolidate the various regexes into a single one
-                        h_subtype = subtype_regex_match.group(1)
-                        n_subtype = subtype_regex_match.group(2)
-                    else:
+                    if h_subtype is None or n_subtype is None:
                         raise ValueError(f'could not parse H/N subtypes from isolate name {isolate_name}')
                     
                     try:
