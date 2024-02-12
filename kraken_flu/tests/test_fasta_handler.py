@@ -24,11 +24,12 @@ def test__parse_header():
     fp = FastaHandler( fasta_file_path=FASTA_FILE)
     
     header = '>gi|1834444346|gb|MT375832|Influenza B virus (B/Texas/24/2020) segment 2 polymerase PB2 (PB2) gene, complete cds'
-    ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
+    flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
 
     assert ncbi_acc == 'MT375832', 'correctly parsed NCBI accession from gb|xxxxx format'
     assert kraken_taxid is None ,'no tax ID in this header'
     assert is_flu == True ,'this is a flu genome'
+    assert flu_type == 'B', 'flu B'
     assert is_fluA == False , 'not a flu type A'
     assert h_subtype == None, 'no flu A so no H subtype'
     assert n_subtype == None , 'no flu A so no N subtype'
@@ -37,10 +38,11 @@ def test__parse_header():
     
     # this time without the leading ">", which is not required for the regexes to work
     header = 'kraken:taxid|641809|NC_026438.1 Influenza A virus (A/California/07/2009(H1N1)) segment 1 polymerase PB2 (PB2) gene, complete cds'
-    ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
+    flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
     assert ncbi_acc == 'NC_026438.1', 'correctly parsed NCBI accession from non-gb|xxxxx format'
     assert kraken_taxid == 641809 ,'correctly parsed a kraken taxid from this header'
     assert is_flu == True ,'this is a flu genome'
+    assert flu_type == 'A', 'flu A'
     assert is_fluA == True , 'a flu type A'
     assert h_subtype == 'H1', 'H1 subtype'
     assert n_subtype == 'N1' , 'N1 subtype'
@@ -49,10 +51,11 @@ def test__parse_header():
     
     
     header = '>gi|169731751|gb|CY030663|Influenza B virus (B/Tennessee/UR06-0431/2007) segment 1, complete sequence'
-    ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
+    flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
     assert ncbi_acc == 'CY030663', 'correctly parsed NCBI accession from gb|xxxxx format'
     assert kraken_taxid is None ,'no tax ID in this header'
     assert is_flu == True ,'this is a flu genome'
+    assert flu_type == 'B' ,'flu B'
     assert is_fluA == False , 'not a flu type A'
     assert h_subtype == None, 'no flu A so no H subtype'
     assert n_subtype == None , 'no flu A so no H subtype'
@@ -61,12 +64,13 @@ def test__parse_header():
     
     # a real FASTA header for a Flu B RefSeq - uses the keyword RNA instead of segment
     header = 'kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence'
-    ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
+    flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, flu_isolate_name, flu_segment_number, h_subtype, n_subtype = fp._parse_header(header)
     assert is_flu == True , 'identified as flu'
     assert ncbi_acc == 'NC_002204.1', 'correctly parsed NCBI accession from RefSeq ID format'
     assert kraken_taxid == 518987 ,'correctly parsed existing kraken tax ID'
     assert is_flu == True ,'this is a flu genome'
     assert is_fluA == False , 'not a flu type A'
+    assert flu_type == 'B' , 'flu B'
     assert h_subtype == None, 'no flu A so no H subtype'
     assert n_subtype == None , 'no flu A so no H subtype'
     assert flu_isolate_name is None ,'there is no flu isolate name given in this header'
@@ -85,7 +89,6 @@ def test_data():
     data_CY030663 = [ x for x in data if x.ncbi_acc =='CY030663']
     assert len(data_CY030663) == 1, 'one record with NCBI acc CY030663 in the data'
     assert data_CY030663[0].orig_head == 'gi|169731751|gb|CY030663|Influenza B virus (B/Tennessee/UR06-0431/2007) segment 1, complete sequence'
-    assert data_CY030663[0].mod_head == 'gb|CY030663| Influenza B/Tennessee/UR06-0431/2007 segment 1'
     assert data_CY030663[0].is_flu == True
     assert data_CY030663[0].flu_seg_num == 1
     assert data_CY030663[0].taxid is None
@@ -94,7 +97,6 @@ def test_data():
     data_NC_002021 = [ x for x in data if x.ncbi_acc =='NC_002021.1']
     assert len(data_NC_002021) == 1, 'one record with NCBI acc NC_002021.1 in the data'
     assert data_NC_002021[0].orig_head == 'kraken:taxid|211044|NC_002021.1 Influenza A virus (A/Puerto Rico/8/1934(H1N1)) segment 2, complete sequence'
-    assert data_NC_002021[0].mod_head == 'NC_002021.1| Influenza A/Puerto Rico/8/1934(H1N1) segment 2'
     assert data_NC_002021[0].is_flu == True
     assert data_NC_002021[0].flu_seg_num == 2
     assert data_NC_002021[0].taxid == 211044
@@ -107,8 +109,19 @@ def test_data():
     data_NC_002204 = [ x for x in data if x.ncbi_acc == 'NC_002204.1']
     assert len(data_NC_002204) == 1, 'one record with NCBI acc NC_002204.1 in the data'
     assert data_NC_002204[0].orig_head == 'kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence'
-    assert data_NC_002204[0].mod_head == 'NC_002204.1| Influenza B/Lee/1940 segment 1'
     assert data_NC_002204[0].is_flu == True
     assert data_NC_002204[0].flu_seg_num == 1 ,'correctly parsed segment number given in non-standard form'
     assert data_NC_002204[0].taxid == 518987
     assert data_NC_002204[0].flu_name == 'B/Lee/1940', 'correctly inferred isolate name by looking up taxid in other records (isolate name missing from this header)'
+
+def test_write_fasta( tmp_path ):
+    fp = FastaHandler( fasta_file_path=FASTA_FILE)
+    out_file = tmp_path / "out.fna"
+    
+    assert not out_file.is_file(), 'before we start, the output file does not exist'
+    fp.write_fasta( out_file )
+    assert out_file.is_file(), 'after calling the method, the output file now exists'
+    
+    out_file_rows  = [line.rstrip() for line in open( out_file ) ]
+    assert len([ x for x in out_file_rows if '>' in x ]) == 5505, 'there are 5505 sequence in the output file (=number of seq in input file)'
+    

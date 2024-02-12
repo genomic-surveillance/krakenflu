@@ -1,11 +1,13 @@
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 import re
 import os.path
 from cached_property import cached_property
 from dataclasses import dataclass
 import logging 
 
-from kraken_flu.src.utils import FLU_REGEX,FLU_ISOLATE_NAME_REGEX, FLU_SEG_NUM_REGEX, KRAKEN_TAX_ID_REGEX, NCBI_ACC_REGEX
+from kraken_flu.src.utils import KRAKEN_TAX_ID_REGEX, NCBI_ACC_REGEX
 from kraken_flu.src.utils import parse_flu
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
@@ -66,7 +68,7 @@ class FastaHandler():
         else:
             is_flu = False
             
-        return ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype
+        return flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype
 
     @cached_property
     def data( self ):
@@ -80,6 +82,7 @@ class FastaHandler():
             - ncbi_acc: NCBI accession ID
             - taxid: kraken taxid if present
             - seqlen: length of the sequence
+            - sequence: DNA sequence
             The following are only applied to flu sequences (None otherwise):
             - is_flu: True if this is a flu sequence
             - flu_name: flu isolate name such as 'A/New York/32/2003(H3N2)' or 'B/Texas/24/2020'
@@ -101,18 +104,10 @@ class FastaHandler():
         with open( self.fasta_file_path ) as fh:
             for record in SeqIO.parse(fh, "fasta"):
                 orig_header = record.description
-                seqlen = len( record.seq )
-                ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype = self._parse_header(orig_header)
+                sequence = record.seq
+                seqlen = len( sequence )
+                flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype = self._parse_header(orig_header)
                 
-                # TODO: not sure if this is needed for kraken2 to assign taxonomy ID later
-                # so just incase, putting the "gb|" back into the NCBI accession ID but only if
-                # it isn't a refseq accession. RefSeq IDs are NOT Genbank IDs, so should not prefix with gb|
-                # https://community.gep.wustl.edu/repository/course_materials_WU/annotation/Genbank_Accessions.pdf
-                if '_'in ncbi_acc:
-                    ncbi_acc_str = ncbi_acc
-                else:
-                    ncbi_acc_str = 'gb|'+ncbi_acc
-                    
                 n_all+=1
                 if is_flu:
                     if isolate_name is None:
@@ -120,26 +115,19 @@ class FastaHandler():
                     if isolate_name is None:
                         flu_wo_seg_num+=1
                     n_flu+=1
-                    mod_header = ' '.join([
-                        ncbi_acc_str +'|', 
-                        'Influenza', 
-                        isolate_name or 'unnamed', 
-                        'segment', 
-                        str(segment_number)])
-                else:
-                    mod_header = orig_header
 
                 data.append(
                     FastaRecord(
                         orig_head= orig_header,
-                        mod_head= mod_header,
                         seqlen= seqlen,
+                        sequence = sequence,
                         ncbi_acc= ncbi_acc,
                         is_flu= is_flu,
                         taxid= kraken_taxid,
                         flu_name= isolate_name,
                         flu_seg_num = segment_number,
                         is_fluA= is_fluA,
+                        flu_type = flu_type,
                         fluA_H_subtype= h_subtype,
                         fluA_N_subtype= n_subtype) )
         
@@ -162,7 +150,6 @@ class FastaHandler():
             for d in data:
                 if d.is_flu and d.taxid is not None and d.flu_name is None and d.taxid in taxid2isolate_name:
                     d.flu_name = taxid2isolate_name[ d.taxid ]
-                    d.mod_head = re.sub('unnamed', d.flu_name, d.mod_head)
                     fixed_unnamed+=1
                     
             logging.info(f'fixed missing isolate name in {fixed_unnamed} sequences')
@@ -170,19 +157,69 @@ class FastaHandler():
         
         return data
     
+    def write_fasta( self, path:str ):
+        """
+        Writes FASTA to a new file.
+        The output header is identical to the original one, except for influenza sequences, which are written with a 
+        modified FASTA header with the format:
+        >kraken:taxid|INT|NCBIACC Influenza TYPE (ISOLATE NAME) SEGMENT_NUMBER
+        
+        Paremeters:
+            path: str, required
+                Path to the file we are creating
+                
+        Returns:
+            True on success
+            
+        Side-effects:
+            Writes to file
+            
+        """
+        with open( path, 'w' ) as out_fh:
+            for record in self.data:
+                if record.is_flu:
+                    header = ''
+                    if record.taxid:
+                        header = header + 'kraken:taxid|' + str( record.taxid ) + '|'
+                    if record.ncbi_acc:
+                        # TODO: not sure if this is needed for kraken2 to assign taxonomy ID later
+                        # so just incase, putting the "gb|" back into the NCBI accession ID but only if
+                        # it isn't a refseq accession. RefSeq IDs are NOT Genbank IDs, so should not prefix with gb|
+                        # https://community.gep.wustl.edu/repository/course_materials_WU/annotation/Genbank_Accessions.pdf
+                        if '_'in record.ncbi_acc:
+                            ncbi_acc_str = record.ncbi_acc
+                        else:
+                            ncbi_acc_str = 'gb|' + record.ncbi_acc
+                        header = header + ncbi_acc_str
+                    header = header + 'Influenza ' + record.flu_type
+                    if record.flu_name:
+                        header = header + ' (' + record.flu_name + ')'
+                    if record.flu_seg_num:
+                        header = header + ' segment ' + str( record.flu_seg_num )
+                else:
+                    header = record.orig_head
+                sr = SeqRecord(
+                    Seq(record.sequence),
+                    id= header,
+                    description= ''
+                )
+                SeqIO.write( sr, out_fh, "fasta" )
+        return True
+    
 @dataclass
 class FastaRecord():
     """
     A simple data class to hold the data for a single FASTA record    
     """
     orig_head: str
-    mod_head: str
     seqlen: int
+    sequence: str
     ncbi_acc: str
     is_flu: bool
     taxid: int
     flu_name: str
     flu_seg_num: int
     is_fluA: bool
+    flu_type: str
     fluA_H_subtype: str
     fluA_N_subtype: str
