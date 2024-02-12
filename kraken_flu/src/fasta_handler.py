@@ -191,7 +191,7 @@ class FastaHandler():
                         else:
                             ncbi_acc_str = 'gb|' + record.ncbi_acc
                         header = header + ncbi_acc_str
-                    header = header + 'Influenza ' + record.flu_type
+                    header = header + ' Influenza ' + record.flu_type
                     if record.flu_name:
                         header = header + ' (' + record.flu_name + ')'
                     if record.flu_seg_num:

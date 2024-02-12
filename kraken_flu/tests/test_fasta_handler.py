@@ -1,5 +1,6 @@
 import pytest
 import os.path
+import re
 from importlib_resources import files
 
 from kraken_flu.src.fasta_handler import FastaHandler, FastaRecord
@@ -125,3 +126,10 @@ def test_write_fasta( tmp_path ):
     out_file_rows  = [line.rstrip() for line in open( out_file ) ]
     assert len([ x for x in out_file_rows if '>' in x ]) == 5505, 'there are 5505 sequence in the output file (=number of seq in input file)'
     
+    expected_header = '>kraken:taxid|2697049|NC_045512.2 Severe acute respiratory syndrome coronavirus 2 isolate Wuhan-Hu-1, complete genome'
+    assert expected_header in out_file_rows, 'header for SARS-CoV2 should be unmodified in the output file'
+
+    expected_header_regex = re.compile(r'>kraken:taxid\|[0-9]+\|NC_026435.1 Influenza A \(A/California/07/2009\(H1N1\)\) segment 2')
+    matching_rows = [ x for x in out_file_rows if expected_header_regex.search( x )]
+    print( matching_rows)
+    assert len(matching_rows) == 1, 'there is a row in the output that is the expected reformatted header for (A/California/07/2009(H1N1) segment 2'
