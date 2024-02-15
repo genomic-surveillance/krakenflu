@@ -240,6 +240,8 @@ class FastaHandler():
         """
         with open( path, 'w' ) as out_fh:
             for record in self.data:
+                if not record.include_in_output:
+                    continue
                 if record.is_flu:
                     header = ''
                     if record.taxid:
