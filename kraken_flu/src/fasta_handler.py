@@ -157,6 +157,69 @@ class FastaHandler():
         
         return data
     
+    def remove_incomplete_flu( self, discard_duplicates:bool = True ):
+        """
+        Inspects the FASTA data to filter out flu genomes that do not have full-length sequences 
+        for all 8 segments.
+        This updates the cached "data" and removes entries that are not part of a complete influenza 
+        genome. 
+        
+        """
+        # influenza A/B segment lengths
+        MIN_SEG_LENGTHS = {
+            1: 2341,
+            2: 2341,
+            3: 2233,
+            4: 1778,
+            5: 1565,
+            6: 1413,
+            7: 1027,
+            8: 890
+        }
+        
+        # minimum proportion of each of the segments that must be covered
+        MIN_SEQ_LEN_PROPORTION = 0.9
+        
+        logging.info( f'starting filter to remove incomplete flu genomes')
+    
+        # first pass: 
+        # collect the longest available sequence for each flu isolate and segment number
+        # and filter out records that are below the minimum length
+        seqlengths = {}
+        for record in self.data:
+            if record.is_flu:
+                # filter out if no segment number or sequence is incomplete
+                if (not record.flu_seg_num or
+                    re.search('partial', record.orig_head) or
+                    record.seqlen < MIN_SEG_LENGTHS[ record.flu_seg_num ] * MIN_SEQ_LEN_PROPORTION ):
+                    record.include_in_output = False
+                    continue
+                if record.flu_name in seqlengths:
+                    if record.flu_seg_num not in seqlengths[ record.flu_name ] or record.seqlen > seqlengths[ record.flu_name ][ record.flu_seg_num ]:
+                        seqlengths[ record.flu_name ][ record.flu_seg_num ] = record.seqlen
+                else:
+                    seqlengths[ record.flu_name ] = { record.flu_seg_num: record.seqlen }
+                
+        # identify complete genomes
+        complete_genome_isolates= {}
+        for isolate_name, segment_data in seqlengths.items():
+            if sorted(segment_data.keys()) == list(range(1,9)):
+                complete_genome_isolates[ isolate_name ] = True
+                
+        # second pass, apply the filter
+        n_kept = 0
+        n_filtered = 0 
+        for record in self.data:
+            if record.is_flu and record.flu_name:
+                if record.flu_name in complete_genome_isolates:
+                    n_kept += 1
+                else:
+                    n_filtered += 1
+                    record.include_in_output = False
+        
+        logging.info( f'kept {n_kept} influenza genomes, removed {n_filtered}')
+        return True
+    
     def write_fasta( self, path:str ):
         """
         Writes FASTA to a new file.
@@ -209,17 +272,18 @@ class FastaHandler():
 @dataclass
 class FastaRecord():
     """
-    A simple data class to hold the data for a single FASTA record    
+    A simple data class to hold the data for a single FASTA record
     """
-    orig_head: str
-    seqlen: int
-    sequence: str
-    ncbi_acc: str
-    is_flu: bool
-    taxid: int
-    flu_name: str
-    flu_seg_num: int
-    is_fluA: bool
-    flu_type: str
-    fluA_H_subtype: str
-    fluA_N_subtype: str
+    orig_head: str                  # complete original header of the FASTA record
+    seqlen: int                     # length of the sequence   
+    sequence: str                   # DNA sequence
+    ncbi_acc: str                   # NCBI accession number (if provided)
+    is_flu: bool                    # is it flu?
+    taxid: int                      # NCBI taxonomy ID, if provided in a kraken taxid tag
+    flu_name: str                   # name of a flu isolate if this is flu
+    flu_seg_num: int                # flu segment number, if flu
+    is_fluA: bool                   # is it flu A?
+    flu_type: str                   # flu type (A,B)
+    fluA_H_subtype: str             # flu A subtype for HA gene (H1, H2, etc), if applicable
+    fluA_N_subtype: str             # flu A subtype for NA gene (N1, N2, etc), if applicable
+    include_in_output: bool = True  # should this be included in output to new FASTA file?

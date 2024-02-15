@@ -94,6 +94,7 @@ def test_data():
     assert data_CY030663[0].flu_seg_num == 1
     assert data_CY030663[0].taxid is None
     assert data_CY030663[0].flu_name == 'B/Tennessee/UR06-0431/2007'
+    assert data_CY030663[0].include_in_output == True ,'filter set to True'
     
     data_NC_002021 = [ x for x in data if x.ncbi_acc =='NC_002021.1']
     assert len(data_NC_002021) == 1, 'one record with NCBI acc NC_002021.1 in the data'
@@ -114,6 +115,19 @@ def test_data():
     assert data_NC_002204[0].flu_seg_num == 1 ,'correctly parsed segment number given in non-standard form'
     assert data_NC_002204[0].taxid == 518987
     assert data_NC_002204[0].flu_name == 'B/Lee/1940', 'correctly inferred isolate name by looking up taxid in other records (isolate name missing from this header)'
+
+def test_remove_incomplete_flu():
+    # using a different (smaller) dataset for testing this method
+    fp = FastaHandler( fasta_file_path= FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download','library.fna') ) )
+    
+    assert len( fp.data ) == 20, 'there are 20 records in the FASTA file in total'
+    assert len( [ x for x in fp.data if not x.include_in_output ] ) == 0 , 'there are no filtered records before applying the filter'
+    
+    assert fp.remove_incomplete_flu() == True , 'method returns True'
+    
+    assert len( [ x for x in fp.data if not x.include_in_output ] ) == 4 ,'after applying the filter, there are 4 filtered records (incomplete flu)'
+    assert len( [ x for x in fp.data if x.include_in_output ] ) == 16 ,'after applying the filter, there are 16 complete flu records (not filtered)'
+
 
 def test_write_fasta( tmp_path ):
     fp = FastaHandler( fasta_file_path=FASTA_FILE)
