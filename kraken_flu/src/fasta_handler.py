@@ -220,6 +220,24 @@ class FastaHandler():
         logging.info( f'kept {n_kept} influenza genomes, removed {n_filtered}')
         return True
     
+    def n_seq_total( self ):
+        """
+        Returns the total number of sequence records in data
+        """
+        return len( self.data )
+    
+    def n_seq_flu( self ):
+        """
+        Returns number of flu sequences in data
+        """
+        return len( [ x for x in self.data if x.is_flu])
+    
+    def n_seq_filtered( self ):
+        """
+        Returns the number of sequences in data that are marked to be filtered out (incomplete genomes)
+        """
+        return len( [ x for x in self.data if not x.include_in_output ] )
+    
     def write_fasta( self, path:str ):
         """
         Writes FASTA to a new file.

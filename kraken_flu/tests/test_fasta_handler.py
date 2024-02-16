@@ -18,8 +18,8 @@ FIXTURE_DIR = files('kraken_flu.tests.fixtures')
 FASTA_FILE = FIXTURE_DIR.joinpath(os.path.join('downsampled_ncbi_all_flu','all_influenza_1pcerent_plus_refseq_plus_completeflu.fasta'))
 
 def test_init():
-    fp = FastaHandler( fasta_file_path=FASTA_FILE)
-    assert fp
+    fh = FastaHandler( fasta_file_path=FASTA_FILE)
+    assert fh
 
 def test__parse_header():
     fp = FastaHandler( fasta_file_path=FASTA_FILE)
@@ -79,8 +79,8 @@ def test__parse_header():
 
     
 def test_data():
-    fp = FastaHandler( fasta_file_path=FASTA_FILE)
-    data = fp.data
+    fh = FastaHandler( fasta_file_path=FASTA_FILE)
+    data = fh.data
     assert data
     assert isinstance(data, list), 'data is a list'
     assert len(data)>0, 'there are elements in the list'
@@ -116,25 +116,58 @@ def test_data():
     assert data_NC_002204[0].taxid == 518987
     assert data_NC_002204[0].flu_name == 'B/Lee/1940', 'correctly inferred isolate name by looking up taxid in other records (isolate name missing from this header)'
 
+    # make sure that non-flu records are also included in the data
+    data_covid = [ x for x in data if x.ncbi_acc == 'NC_045512.2']
+    assert len(data_covid) == 1, 'one record with NCBI acc for the covid ref genome is in the data'
+    assert data_covid[0].orig_head == 'kraken:taxid|2697049|NC_045512.2 Severe acute respiratory syndrome coronavirus 2 isolate Wuhan-Hu-1, complete genome'
+    assert data_covid[0].is_flu == False, 'this is covid, not flu'
+    assert data_covid[0].flu_seg_num is None ,"no flu segment number because it isn't flu'"
+    assert data_covid[0].taxid == 2697049
+
+
+
 def test_remove_incomplete_flu():
     # using a different (smaller) dataset for testing this method
-    fp = FastaHandler( fasta_file_path= FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download','library.fna') ) )
+    fh = FastaHandler( fasta_file_path= FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download','library.fna') ) )
     
-    assert len( fp.data ) == 20, 'there are 20 records in the FASTA file in total'
-    assert len( [ x for x in fp.data if not x.include_in_output ] ) == 0 , 'there are no filtered records before applying the filter'
+    assert len( fh.data ) == 20, 'there are 20 records in the FASTA file in total'
+    assert len( [ x for x in fh.data if not x.include_in_output ] ) == 0 , 'there are no filtered records before applying the filter'
     
-    assert fp.remove_incomplete_flu() == True , 'method returns True'
+    assert fh.remove_incomplete_flu() == True , 'method returns True'
     
-    assert len( [ x for x in fp.data if not x.include_in_output ] ) == 4 ,'after applying the filter, there are 4 filtered records (incomplete flu)'
-    assert len( [ x for x in fp.data if x.include_in_output ] ) == 16 ,'after applying the filter, there are 16 complete flu records (not filtered)'
+    assert len( [ x for x in fh.data if not x.include_in_output ] ) == 4 ,'after applying the filter, there are 4 filtered records (incomplete flu)'
+    assert len( [ x for x in fh.data if x.include_in_output ] ) == 16 ,'after applying the filter, there are 16 complete flu records (not filtered)'
+
+    # check with the bigger dataset
+    fh = FastaHandler( fasta_file_path=FASTA_FILE)
+    assert len( fh.data ) == 5505, 'there are 5505 records in the FASTA file in total'
+    assert len( [ x for x in fh.data if not x.include_in_output ] ) == 0 , 'there are no filtered records before applying the filter'
+    
+    assert fh.remove_incomplete_flu() == True , 'method returns True'
+    assert len( fh.data ) == 5505, 'there are still 5505 records in the FASTA file after filtering (the filter does not remove anything, just marks records)'
+
+
+def test_n_seq_total():
+    fh = FastaHandler( fasta_file_path=FASTA_FILE)
+    assert fh.n_seq_total() == 5505 ,'returns correct number of total sequence records'
+
+def test_n_seq_flu():
+    fh = FastaHandler( fasta_file_path=FASTA_FILE)
+    assert fh.n_seq_flu() == 5502, 'correct number of flu sequences'
+    
+def test_n_seq_filtered():
+    fh = FastaHandler( fasta_file_path= FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download','library.fna') ) )
+    assert fh.n_seq_filtered() == 0 ,'before applying filter, n_seq_filtered returns 0'
+    assert fh.remove_incomplete_flu(), 'apply flu complete filter'
+    assert fh.n_seq_filtered() == 4 ,'correct number of filtered records after applying the filter'
 
 
 def test_write_fasta( tmp_path ):
-    fp = FastaHandler( fasta_file_path=FASTA_FILE)
+    fh = FastaHandler( fasta_file_path=FASTA_FILE)
     out_file = tmp_path / "out.fna"
     
     assert not out_file.is_file(), 'before we start, the output file does not exist'
-    fp.write_fasta( out_file )
+    fh.write_fasta( out_file )
     assert out_file.is_file(), 'after calling the method, the output file now exists'
     
     out_file_rows  = [line.rstrip() for line in open( out_file ) ]
