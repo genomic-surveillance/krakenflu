@@ -256,6 +256,8 @@ class FastaHandler():
             Writes to file
             
         """
+        logging.info( f'writing FASTA file to { path }')
+
         with open( path, 'w' ) as out_fh:
             for record in self.data:
                 if not record.include_in_output:
@@ -287,6 +289,9 @@ class FastaHandler():
                     description= ''
                 )
                 SeqIO.write( sr, out_fh, "fasta" )
+
+        logging.info( f'finished writing FASTA file to { path }')
+
         return True
     
 @dataclass

@@ -51,7 +51,9 @@ class TaxonomyHandler():
         Populates the "nodes" property by reading the taxonomy file.
         See "nodes" for explanation
         """ 
+        logging.info( f'reading NCBI nodes file{ self.nodes_file_path }')
         data = {}
+        n = 0
         with open( self.nodes_file_path, 'r' ) as fh:
             for row in fh:
                 d = self._read_tax_data_file_row( row )
@@ -63,7 +65,8 @@ class TaxonomyHandler():
                     'parent_id': parent_tax_id,
                     'data': d[2:]
                 }
-            
+                n +=1
+        logging.info( f'found { n } nodes in { self.nodes_file_path }')
         return data
     
     @property
@@ -136,12 +139,16 @@ class TaxonomyHandler():
         """
         Populates the "names" property by reading the taxonomy file.
         See "names" for explanation
-        """    
+        """
+        logging.info( f'reading NCBI names file{ self.names_file_path }')
+
         data = {}
+        n = 0
         with open( self.names_file_path, 'r' ) as fh:
             for row in fh:
                 d = self._read_tax_data_file_row( row )
                 tax_id = int(d[0])
+                n += 1
                 this_name = {
                     'name': d[1],
                     'uname': d[2],
@@ -151,7 +158,8 @@ class TaxonomyHandler():
                     data[ tax_id ].append( this_name )
                 else:
                     data[ tax_id ] = [ this_name ]
-            
+        
+        logging.info( f'found { n } names in { self.names_file_path }')
         return data
     
     def max_tax_id(self):
@@ -213,6 +221,8 @@ class TaxonomyHandler():
             'data': [ 'no rank', '', '9', '1', '1', '1', '0', '1', '1', '', '']
         }
         
+        logging.info( f'added taxon to taxonomy:  { name }; tax_id: { tax_id }; parent tax_id: { parent_tax_id}')
+        
         return True
     
     def write_nodes_file( self, path ):
@@ -230,6 +240,8 @@ class TaxonomyHandler():
             Writes to file
             
         """
+        logging.info( f'writing nodes file to { path }')
+
         with open( path, 'w', encoding="utf-8" ) as out_fh:
             for tax_id, node in self.nodes.items():
                 out_fh.write(
@@ -237,6 +249,8 @@ class TaxonomyHandler():
                         [ tax_id, node['parent_id'] ] + node['data']
                     ) +"\n"
                 )
+        logging.info( f'finished writing nodes file to { path }')
+
         return True
         
     def write_names_file( self, path ):
@@ -254,6 +268,8 @@ class TaxonomyHandler():
             Writes to file
             
         """
+        logging.info( f'writing names file to { path }')
+
         with open( path, 'w', encoding="utf-8" ) as out_fh:
             for tax_id, names in self.names.items():
                 for name in names:
@@ -262,6 +278,8 @@ class TaxonomyHandler():
                             [ tax_id, name['name'], name['uname'], name['nclass'] ]
                         ) +"\n"
                     )
+        logging.info( f'finished writing names file to { path }')
+
         return True
     
     def create_influenza_type_segment_taxa(self):
