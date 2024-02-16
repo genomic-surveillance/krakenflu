@@ -207,6 +207,3 @@ def test_create_influenza_isolate_segment_taxa():
     assert tax_id, 'a node with isolate name and segment number exists in the taxonomy now'
 
     
-    
-    
-    
