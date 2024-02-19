@@ -126,7 +126,7 @@ class KrakenDbBuilder():
         self.tax_ids_updated = True
         return True
 
-    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna' ):
+    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna', filter_incomplete_flu:bool = True ):
         """
         Create a directory with all files needed to build a new kraken database. 
         This method triggers the data acquisition from the FastaHandler and TaxonomyHandler, then runs the
@@ -144,6 +144,9 @@ class KrakenDbBuilder():
             force: bool, optional, defaults to True
                 if true, force overwrite whatever is already in the output dir. If not, will fail
                 if directory already exists
+                
+            filter_incomplete_flu: bool, optional, defaults to True
+                If True, runs the filter that removes incomplete influenza genomes. See FastaHandler for details
                 
         Returns:
             True if success
@@ -172,8 +175,11 @@ class KrakenDbBuilder():
         
         logging.info( f'found { self._fasta_handler.n_seq_total} sequence records in {self.fasta_file_path}')
         logging.info( f'{ self._fasta_handler.n_seq_flu} sequence records identified as influenza')
-        self._fasta_handler.remove_incomplete_flu()
-        logging.info( f'{ self._fasta_handler.n_seq_filtered} sequence records have been removed as incomplete flu genomes')
+        
+        if filter_incomplete_flu:
+            logging.info( f'starting to filter incomplete influenza genomes')
+            self._fasta_handler.remove_incomplete_flu()
+            logging.info( f'{ self._fasta_handler.n_seq_filtered} sequence records have been removed as incomplete flu genomes')
         
         if not self.tax_ids_updated:
             self.update_fasta_tax_ids()
