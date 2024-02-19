@@ -179,7 +179,7 @@ class KrakenDbBuilder():
         if filter_incomplete_flu:
             logging.info( f'starting to filter incomplete influenza genomes')
             self._fasta_handler.remove_incomplete_flu()
-            logging.info( f'{ self._fasta_handler.n_seq_filtered} sequence records have been removed as incomplete flu genomes')
+            logging.info( f'{ self._fasta_handler.n_seq_filtered()} sequence records have been removed as incomplete flu genomes')
         
         if not self.tax_ids_updated:
             self.update_fasta_tax_ids()
