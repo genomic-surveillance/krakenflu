@@ -39,12 +39,12 @@ def args_parser():
         help='path to the NCBI taxonomy directory that contains files nodes.dmp and names.dmp')
 
     parser.add_argument(
-        '--library_path','-l',
+        '--fasta_path','-l',
         action = 'store',
         required = True,
         metavar = 'DIR', 
         type = str,
-        help='path to the NCBI library director that contains the library.fna FASTA file')
+        help='path to the sequences FASTA path')
 
     parser.add_argument(
         '--out_dir','-o',
@@ -68,7 +68,7 @@ def main():
     args = args_parser().parse_args()
     kdb = KrakenDbBuilder(
         taxonomy_path= args.taxonomy_path, 
-        library_path= args.library_path,
+        fasta_file_path= args.fasta_path,
     )    
     kdb.create_db_ready_dir( 
         path = args.out_dir,
