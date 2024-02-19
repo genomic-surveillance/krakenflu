@@ -477,8 +477,11 @@ class TaxonomyHandler():
                     # one for each segment. For segments 4 and 6 we need to know the
                     # H and N subtype, respectively
                     if h_subtype is None or n_subtype is None:
-                        raise ValueError(f'could not parse H/N subtypes from isolate name {isolate_name}')
-                    
+                        # There are some A types that are not subtyped. Skip them
+                        # TODO: should we do this differently? Could still assign them to the
+                        # Influenza A segment x nodes but not the HxNx nodes?
+                        logging.info( f'could not parse H/N subtypes from isolate name {isolate_name}')
+                        continue                    
                     try:
                         seg4_parent_id = self.influenza_subtype_segment_tax_ids[h_subtype][4]
                     except KeyError:
