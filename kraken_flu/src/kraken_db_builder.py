@@ -126,7 +126,7 @@ class KrakenDbBuilder():
         self.tax_ids_updated = True
         return True
 
-    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna', filter_incomplete_flu:bool = True ):
+    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna', filter_incomplete_flu:bool = True,  filter_except_patterns: list= [] ):
         """
         Create a directory with all files needed to build a new kraken database. 
         This method triggers the data acquisition from the FastaHandler and TaxonomyHandler, then runs the
@@ -147,7 +147,13 @@ class KrakenDbBuilder():
                 
             filter_incomplete_flu: bool, optional, defaults to True
                 If True, runs the filter that removes incomplete influenza genomes. See FastaHandler for details
-                
+                            
+            filter_except_patterns: list(str), optional
+                A list of strings that are used to exclude genomes from the Influenza "complete genome" filter.
+                Any genome where the FASTA header contains one of the strings in this list will not be subjected to 
+                the filter. This was required to ensure that the Goose Guandong H5N1 reference genome (which does not
+                have sequences for all 8 segments) is not filtered out.
+            
         Returns:
             True if success
             
@@ -178,7 +184,7 @@ class KrakenDbBuilder():
         
         if filter_incomplete_flu:
             logging.info( f'starting to filter incomplete influenza genomes')
-            self._fasta_handler.remove_incomplete_flu()
+            self._fasta_handler.remove_incomplete_flu( filter_except_patterns= filter_except_patterns )
             logging.info( f'{ self._fasta_handler.n_seq_filtered()} sequence records have been removed as incomplete flu genomes')
         
         if not self.tax_ids_updated:

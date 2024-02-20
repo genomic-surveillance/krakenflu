@@ -61,6 +61,15 @@ def args_parser():
         help = 'when used, the FASTA file will be filtered to remove incomplete influenza genomes'        
     )
     
+    parser.add_argument(
+        '--filter_except',
+        action= 'append',
+        metavar= 'PATTERN',
+        required= False,
+        type= str,
+        help = 'one or more strings/patterns that are used to exclude genomes from the Influenza "complete genome" filter (if used)'
+    )
+    
     return parser
 
 def main():
@@ -74,7 +83,8 @@ def main():
         path = args.out_dir,
         force= True, 
         fasta_file_name= 'library.fna', 
-        filter_incomplete_flu= args.filter)
+        filter_incomplete_flu= args.filter,
+        filter_except_patterns = args.filter_except )
 
 if __name__ == "__main__":
     exit(main())

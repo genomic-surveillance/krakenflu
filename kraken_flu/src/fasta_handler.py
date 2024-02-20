@@ -157,12 +157,20 @@ class FastaHandler():
         
         return data
     
-    def remove_incomplete_flu( self, discard_duplicates:bool = True ):
+    def remove_incomplete_flu( self, filter_except_patterns:list = [] ):
         """
         Inspects the FASTA data to filter out flu genomes that do not have full-length sequences 
         for all 8 segments.
         This updates the cached "data" and removes entries that are not part of a complete influenza 
-        genome. 
+        genome.
+        
+        Parameters:        
+                    
+            filter_except_patterns: list(str), optional
+                A list of strings that are used to exclude genomes from the Influenza "complete genome" filter.
+                Any genome where the FASTA header contains one of the strings in this list will not be subjected to 
+                the filter. This was required to ensure that the Goose Guandong H5N1 reference genome (which does not
+                have sequences for all 8 segments) is not filtered out.
         
         """
         # influenza A/B segment lengths
@@ -213,6 +221,18 @@ class FastaHandler():
             if record.is_flu and record.flu_name:
                 if record.flu_name in complete_genome_isolates:
                     n_kept += 1
+                # not a complete genome, check if it is exempt from the filter
+                elif filter_except_patterns:
+                    is_exempt = False
+                    for pattern in filter_except_patterns:
+                        if pattern in record.orig_head:
+                            is_exempt = True
+                            break
+                    if is_exempt:
+                        n_kept += 1
+                    else:
+                        n_filtered += 1
+                        record.include_in_output = False   
                 else:
                     n_filtered += 1
                     record.include_in_output = False
