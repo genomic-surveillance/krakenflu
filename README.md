@@ -1,7 +1,10 @@
-# kraken_flu
-This tool takes care of the modifications that need to be made to KRAKEN2 database input files in order to build a KRAKEN2 database where the segments of influenza genomes appear as new taxa, one per segment. 
+# kraken-flu
+This tool performs pre-processing of viral reference genome data for building custom kraken2 databases.
 
-The default way of handling such genomes in KRAKEN2 is one taxon per genome.
+The main tasks are:
+- remove incomplete influenza genomes
+- impose a unified naming scheme for influenza genomes
+- re-organise the taxonomy for influenza genomes to create artificial taxa for segments (treating segments like separate species)
 
 ## Installation
 Install with pip. You will probably want to create a venv for this first.
@@ -9,76 +12,64 @@ Install with pip. You will probably want to create a venv for this first.
 pip install kraken_flu@git+ssh://git@gitlab.internal.sanger.ac.uk/malariagen1/misc_utils/kraken_flu.git
 ```
 
-## Usage
-Once installed, run with the following command:
-
+## Example Usage
+### Download the NCBI taxonomy files
+This can be done using the kraken2 tool kraken2-build like this (not part of this tool):
 ```shell
-kraken_flu build --taxonomy_path FILE --library_path FILE [--acc2tax_path ACC2TAX_PATH] --out_dir OUT_DIR
+    kraken2-build --download-taxonomy --db TAXONOMY_PATH
 ```
 
-Get help:
+### Download sequence data
+As an example, download the viral section of the NCBI RefSeq resource into a directory SEQ_PATH:
+```shell
+wget -P SEQ_PATH https://ftp.ncbi.nlm.nih.gov/refseq/release/viral/viral.1.1.genomic.fna.gz
+gunzip SEQ_PATH/viral.1.1.genomic.fna.gz
+```
+
+### Run the kraken-flu tool
+This command creates the new taxonomy and sequence files in a temporary directory from which the kraken2-build tool can add them to the new database.  
+The parameters are:  
+--taxonomy_path: path to the NCBI taxonomy data on the local filesystem
+--fasta_path: path to the FASTA file of genome sequences
+--out_dir: temporary output directory for the modified taxonomy and sequence files
+--filter: apply the filter for incomplete flu genomes
+--filter_except: do not apply filter to genomes with this string matching the header
+
+```shell
+kraken_flu \
+    --taxonomy_path  TAXONOMY_PATH \
+    --fasta_path SEQ_PATH/viral.1.1.genomic.fna.gz \
+    --out_dir TMP_DIR \
+    --filter
+    --filter_except "A/Goose/Guangdong/1/96(H5N1)" \
+```
+
+For further help with kraken-flu:
 ```shell
 kraken_flu -h
 ```
 
-
-### Example database creation
-Use kraken2 build tools to download taxonomy and genome sequence data to build a database. 
-
-Step 1: obtain the taxonomy files. These are retrieved from [NCBI](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/) by the kraken tool.
-```shell
-kraken2-build \
-    --download-taxonomy \
-    --db SOME/PATH/
-```
-This command creates a directory SOME/PATH/taxonomy
-
-Step 2: download genome data. In this case, using kraken2 to download a prebuilt version of NCBI RefSeq for the virus division.  
+### Use the kraken-flu outputs to create a kraken2 DB
+Create a folder DB_DIR for the new database and run the kraken2-build tool to add the manipulated sequence data into the database folder like this. The command refers to the file TMP_DIR/library/library.fna, which is the default naming of the kraken-flu output for the manipulated FASTA file.
 
 ```shell
 kraken2-build \
-    --download-library viral \
-    --db SOME/PATH/
+    --add-to-library TMP_DIR/library/library.fna \
+    --db DB_DIR
 ```
-This command creates a directory SOME/PATH/library/viral
 
-Step 3: Use the kraken_flu __build__ tool to scan the files created above and re-assign influenza H1N1 and H3N2 virus genome segments to new taxa, one segment per taxon ID.   
-The tool will create a new directory with the modified versions of the taxonomy and library (FASTA) files. The paths are taken from the above example kraken2 build commands.  
+Add the NCBI accession ID to taxon ID file from the taxonomy download. This is a large file, it is recommended to use a symlink to the original file here such as:
 
 ```shell
-kraken_flu build \
-    --taxonomy_path SOME/PATH/taxonomy \
-    --library_path SOME/PATH/library/viral \
-    --out_dir SOME/OUTPUT/DIR
+ln -s TAXONOMY_PATH/taxonomy/nucl_gb.accession2taxid DB_DIRtaxonomy
 ```
 
-Step 4: use kraken2 to build the database from the modified files  
+Now run the kraken2 database build process:
 
 ```shell
 kraken2-build \
     --build \
-    --db  SOME/OUTPUT/DIR
+    --db DB_DIR
 ```
 
-Optional clean-up step: remove (potentially large) files that are no longer needed in the build directory.  
-
-```shell
-kraken2-build \
-    --clean \
-    --db SOME/OUTPUT/DIR
-```
-
-## Using the filter tool to pre-process large collections of flu genomes
-A filter command is provided, which was designed to filter the large files of all influenza genomes that can be obtained from the [NCBI influenza FTP site](https://ftp.ncbi.nih.gov/genomes/INFLUENZA/) (file "influenza.fna").  
-
-The filter produces a new FASTA file from the download, which only contains the genomes (identified by unique name) that have all 8 segments and at least 90% of the expected sequence length for each of them. In addition, the name of the sequence in the FASTA header must match the pattern ```Influenza [AB].+ segment [1-8]```.
-
-This command creates the filtered FASTA file
-```shell
-kraken_flu filter \
-    --in_fasta NCBI_FASTA_FILE \
-    --out_fasta OUTPUT_FILE
-```
-
-The file generated by this command can be used as the input file to the ```kraken_flu build``` command as outlined [above](#example-database-creation).
-
+The database is now ready to use with the kraken2 command to map unknown reads to the taxonomy and create reports.
