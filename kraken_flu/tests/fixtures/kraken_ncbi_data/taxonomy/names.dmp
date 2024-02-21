@@ -21,7 +21,7 @@
 211044	|	Influenza A virus (A/Puerto Rico/8/34)	|		|	equivalent name	|
 211044	|	Influenza A virus (A/Puerto Rico/8/34(H1N1))	|		|	equivalent name	|
 211044	|	Influenza A virus (STRAIN A/PUERTO RICO/8/34)	|		|	equivalent name	|
-211044	|	nfluenza A virus (A/PR 8/34(H1N1))	|		|	equivalent name	|
+211044	|	Influenza A virus (A/PR 8/34(H1N1))	|		|	equivalent name	|
 335341	|	Influenza A virus (A/New York/392/2004(H3N2))	|		|	scientific name	|
 518987	|	Influenza B virus (B/Lee/1940)	|		|	scientific name	|
 518987	|	Influenza B virus (B/Lee/40)	|		|	equivalent name	|
@@ -48,3 +48,5 @@
 114727	|	H1N1 subtype	|		|	scientific name	|
 119210	|	H3N2 subtype	|		|	scientific name	|
 11520	|	Influenza B virus	|		|	scientific name	|
+11320	|	influenza A virus	|		|	equivalent name	|
+11320	|	Influenza A virus	|		|	scientific name	|
