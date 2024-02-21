@@ -23,6 +23,22 @@ FLU_DATA_REGEX = re.compile(
         r')?' + # close of non-capturing group to make isolate name optional
     r'(?:.*(?:segment|RNA) ([1-8]))?' ) # segment number, capture group 5 (optional)
 
+# This maps influenza gene names to segment numbers
+# It is used for cases where an influenza segment name is given with a gene name but 
+# no segment number so we can translate to a number
+# Leaving off M2 (seg 7) from the list because it is small and a sequence labelled M2 and not
+# M1 or segment 7 is likely to be too short for inclusion anyway
+FLU_GENE2SEG = {
+    'PB2': 1,
+    'PB1': 2,
+    'PA': 3,
+    'HA': 4,
+    'NP': 5,
+    'NA': 6,
+    'M1': 7,
+    'NS1': 8
+}
+
 def parse_flu( in_str:str ):
     """
     Parses key information about flu isolates from a string, which could be a FASTA
@@ -54,4 +70,11 @@ def parse_flu( in_str:str ):
         segment_number = match.group( 5 )
         if segment_number:
             segment_number = int(segment_number)
+        else:
+            # could be that the segment number is not given but the gene, 
+            # which we can convert to a number
+            for gene_name, seg_num in FLU_GENE2SEG.items():
+                pattern = r'[\( ]' + gene_name + r'[ \)] (gene|mRNA|transcript)' 
+                if re.search(pattern, in_str):
+                    segment_number = seg_num
     return flu_type, isolate_name, h_subtype, n_subtype, segment_number
