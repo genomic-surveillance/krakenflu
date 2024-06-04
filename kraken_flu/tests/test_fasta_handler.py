@@ -156,6 +156,20 @@ def test_remove_incomplete_flu_w_except():
     assert fh.remove_incomplete_flu( filter_except_patterns= except_list) == True , 'method returns True'
     assert len( [ x for x in fh.data if not x.include_in_output ] ) == 3 ,'after applying the filter with one exception pattern, there are 3 filtered records (incomplete flu)'
 
+def test_remove_unparsed_flu():
+    # this mock up FASTA file contains 2 sequences, the name of one can be parsed, the other one
+    # contains parts that cannot be parsed and should thus be filtered out
+    fh = FastaHandler( fasta_file_path= FIXTURE_DIR.joinpath(os.path.join('unparseable_flu','unparseable_flu.fna') ) )
+    
+    assert len( fh.data ) == 2, 'there are 2 records in the FASTA file in total'
+    assert len( [ x for x in fh.data if not x.include_in_output ] ) == 0 , 'there are no filtered records before applying the filter'
+
+    assert fh.remove_unparsed_flu() == True, 'method returns True'
+
+    filtered_records = [ x for x in fh.data if not x.include_in_output ]
+    assert len( filtered_records ) == 1 , 'there is 1 filtered record after applying the filter'
+
+    assert filtered_records[0].orig_head == 'kraken:taxid|2697050|NC_045112.2 Influenza A virus (A/Puerto Rico/8/1934(recombinant - this will not parse)) segment 8, complete sequence', 'the expected header was filtered out'
 
 def test_n_seq_total():
     fh = FastaHandler( fasta_file_path=FASTA_FILE)
