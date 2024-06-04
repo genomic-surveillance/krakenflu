@@ -59,14 +59,11 @@ class FastaHandler():
         else:
             kraken_taxid = None
             
-        flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( header )
-        is_fluA = False
-        if flu_type:
-            is_flu = True
-            if flu_type == 'A':
+        is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( header )
+        if flu_type and flu_type == 'A':
                 is_fluA = True
         else:
-            is_flu = False
+            is_fluA = False
             
         return flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype
 

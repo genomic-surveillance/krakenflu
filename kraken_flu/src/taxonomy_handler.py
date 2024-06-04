@@ -470,7 +470,7 @@ class TaxonomyHandler():
                 name = name_record['name']
                 nclass = name_record['nclass']
                 
-                flu_type, isolate_name, h_subtype, n_subtype, _ = parse_flu( name )
+                is_flu, flu_type, isolate_name, h_subtype, n_subtype, _ = parse_flu( name )
 
                 if nclass == 'scientific name' and isolate_name is not None and flu_type == 'A':
                     # this is a flu A isolate, generate 8 nodes in the taxonomy,
