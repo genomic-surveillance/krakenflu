@@ -54,8 +54,49 @@ def test_FLU_DATA_REGEX():
     assert match.group(4) == 'N2', 'N subtype'
     assert match.group(5) == None, 'segment number'
     
+    match = FLU_DATA_REGEX.search('Influenza A virus (A/Fiji/15899/83)')
+    assert match
+    assert match.group(1) == 'A', 'type'
+    assert match.group(2) == 'A/Fiji/15899/83', 'isolate name'
+    assert match.group(3) == None, 'H subtype'
+    assert match.group(4) == None, 'N subtype'
+    assert match.group(5) == None, 'segment number'
+    
+    match = FLU_DATA_REGEX.search('Influenza A virus (A/Hawaii/21/2001(N2))')
+    assert match
+    assert match.group(1) == 'A', 'type'
+    assert match.group(2) == 'A/Hawaii/21/2001(N2)', 'isolate name'
+    assert match.group(3) == None, 'H subtype'
+    assert match.group(4) == 'N2', 'N subtype'
+    assert match.group(5) == None, 'segment number'    
+    
+    match = FLU_DATA_REGEX.search('Influenza A virus (A/Iowa/10/2015(H3))')
+    assert match
+    assert match.group(1) == 'A', 'type'
+    assert match.group(2) == 'A/Iowa/10/2015(H3)', 'isolate name'
+    assert match.group(3) == 'H3', 'H subtype'
+    assert match.group(4) == None, 'N subtype'
+    assert match.group(5) == None, 'segment number'
+
+    match = FLU_DATA_REGEX.search('Influenza A virus (A/swine/Argentina/CIP112-C93.85/2014(H1N1))')
+    assert match
+    assert match.group(1) == 'A', 'type'
+    assert match.group(2) == 'A/swine/Argentina/CIP112-C93.85/2014(H1N1)', 'isolate name'
+    assert match.group(3) == 'H1', 'H subtype'
+    assert match.group(4) == 'N1', 'N subtype'
+    assert match.group(5) == None, 'segment number'
+    
+    match = FLU_DATA_REGEX.search('Influenza A virus (A/swine/Iowa/A01477719/2014(mixed))')
+    assert match
+    assert match.group(1) == 'A', 'type'
+    assert match.group(2) == 'A/swine/Iowa/A01477719/2014(mixed)', 'isolate name'
+    assert match.group(3) == None, 'H subtype'
+    assert match.group(4) == None, 'N subtype'
+    assert match.group(5) == None, 'segment number'
+
     match = FLU_DATA_REGEX.search('some segment virus')
     assert not match
+
     
 def test_parse_flu():
     name = 'Influenza A virus (A/Puerto_Rico/8/34(H10N11))'
@@ -102,3 +143,28 @@ def test_parse_flu():
     assert h_subtype == 'H5' , 'H subtype'
     assert n_subtype == 'N1' , 'N subtype'
     assert segment_number == 5 , 'segment number correctly derived from gene name'
+    
+    # additional tests for isolate names that caused issues
+    name = 'Influenza A virus (A/Fiji/15899/83)'
+    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert flu_type == 'A' ,'type'
+    assert isolate_name == 'A/Fiji/15899/83', 'isolate name'
+    assert h_subtype == None , 'H subtype'
+    assert n_subtype == None , 'N subtype'
+    assert segment_number == None , 'segment number'
+    
+    name = 'Influenza A virus (A/Hawaii/21/2001(N2))'
+    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert flu_type == 'A' ,'type'
+    assert isolate_name == 'A/Hawaii/21/2001(N2)', 'isolate name'
+    assert h_subtype == None , 'H subtype'
+    assert n_subtype == 'N2' , 'N subtype'
+    assert segment_number == None , 'segment number'
+    
+    name = 'Influenza A virus (A/swine/Thailand/KU5.1/2004(H3N2))'
+    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert flu_type == 'A' ,'type'
+    assert isolate_name == 'A/swine/Thailand/KU5.1/2004(H3N2)', 'isolate name'
+    assert h_subtype == 'H3' , 'H subtype'
+    assert n_subtype == 'N2' , 'N subtype'
+    assert segment_number == None , 'segment number'
