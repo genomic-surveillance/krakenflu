@@ -44,6 +44,15 @@ def test_FLU_DATA_REGEX():
     assert match.group(3) == None, 'H subtype'
     assert match.group(4) == None, 'N subtype'
     assert match.group(5) == '1', 'segment number'
+
+    # this caused an issue because literal dot wasn't allowed in FLU_DATA_REGEX        
+    match = FLU_DATA_REGEX.search('Influenza A virus (A/swine/Thailand/KU5.1/2004(H3N2))')
+    assert match
+    assert match.group(1) == 'A', 'type'
+    assert match.group(2) == 'A/swine/Thailand/KU5.1/2004(H3N2)', 'isolate name'
+    assert match.group(3) == 'H3', 'H subtype'
+    assert match.group(4) == 'N2', 'N subtype'
+    assert match.group(5) == None, 'segment number'
     
     match = FLU_DATA_REGEX.search('some segment virus')
     assert not match

@@ -13,7 +13,7 @@ FLU_DATA_REGEX = re.compile(
     r'(?: virus )?' + # allow for " virus " after Influenza type
         r'(?:' + # non-capture group to make the isolate name optional (there are rare cases like "NC_002204.1 Influenza B virus RNA 1")
             r'\('+ # open parenthesis for isolate name 
-                r'([A-Za-z0-9\-_ /]+'+ # isolate name, capture group 2: A/Puerto Rico/8/1934(H1N1)
+                r'([A-Za-z0-9\-_ /.]+'+ # isolate name, capture group 2: A/Puerto Rico/8/1934(H1N1)
                     r'(?:'+ # optional non capturing group for HxNx subtype (only present in flu A)
                         r'\((H[0-9]+)'+ # H subtype, capture group 3: H1
                         r'(N[0-9]+)\)'+ # N subtype, capture group 4: N1
