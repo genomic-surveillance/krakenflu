@@ -472,27 +472,18 @@ class TaxonomyHandler():
     def create_influenza_isolate_segment_taxa(self):
         """
         Like self.create_influenza_type_segment_taxa and self.create_influenza_subtype_segment_taxa,
-        this method creates new nodes in the taxonomy for Influenza A viruses only.
+        this method creates new nodes in the taxonomy. The nodes created in this method represent the actual 
+        reference genomes, ie the isolate segment sequences. These are added to the new levels of the 
+        taxonomy created by self.create_influenza_type_segment_taxa and self.create_influenza_subtype_segment_taxa.
         
-        This method identifies all influenza A isolates by a valid isolate name such as:
-        
-        A/California/07/2009(H1N1)
-        
-        For each such isolates, 8 new nodes are created in the taxonomy, one for each of the possible 
+        For each influenza isolate, 8 new nodes are created in the taxonomy, one for each of the possible 
         segments of the isolate. This class does not look at the available sequence data, thus is does 
         not matter whether or not genome sequence exists for this isolate for all 8 segments. The same 
-        applies to all nodes of the taxonomy. They exist whether or not we have a sequence.
+        applies to all nodes of the taxonomy. They exist whether or not we have a sequence. This follows the general 
+        design of the NCBI taxonomy files, which can be linked to but do not depend on sequence records.
         
-        As detailed in self.create_influenza_subtype_segment_taxa, we currently have a different taxonomy 
-        organisation for the subtype-defining segments 4 and 6 and for all other segments.
-        Segments 4 and 6 are created as children of nodes such as
-        "H1 segment 4", "N5 segment 6" etc
-        whereas other segments are children of "Influenza A segment 1" etc
-        
-        We are also currently only doing this for influenza A. Influenza B genomes are not split into 
-        segments at the moment.
-        
-        THIS MAY CHANGE in future versions.
+        Influenza A and B are treated differently because of the extra level in the taxonomy for segments 4 
+        and 6 of influenza A, which we don't for influenza B.
         
         Returns:
             sets and returns self.influenza_isolate_segment_tax_ids
@@ -516,38 +507,38 @@ class TaxonomyHandler():
         for tax_id in existing_tax_ids:
             for name_record in self.names[ tax_id ]:
                 name = name_record['name']
-                nclass = name_record['nclass']
+                nclass = name_record['nclass'] # scientific name, equivalent name etc (name class)
                 
                 flu_type, isolate_name, h_subtype, n_subtype, _ = parse_flu( name )
 
-                if nclass == 'scientific name' and isolate_name is not None and flu_type == 'A':
-                    # this is a flu A isolate, generate 8 nodes in the taxonomy,
-                    # one for each segment. For segments 4 and 6 we need to know the
-                    # H and N subtype, respectively
-                    if h_subtype is None or n_subtype is None:
-                        # There are some A types that are not subtyped. Skip them
-                        # TODO: should we do this differently? Could still assign them to the
-                        # Influenza A segment x nodes but not the HxNx nodes?
-                        logging.info( f'could not parse H/N subtypes from isolate name {isolate_name}')
-                        continue                    
-                    try:
-                        seg4_parent_id = self.influenza_subtype_segment_tax_ids[h_subtype][4]
-                    except KeyError:
-                        raise ValueError(f'no parent tax id for H subtype {h_subtype} segment 4')
-                    try:
-                        seg6_parent_id = self.influenza_subtype_segment_tax_ids[n_subtype][6]
-                    except KeyError:
-                        raise ValueError(f'no parent tax id for N subtype {n_subtype} segment 6')
+                if nclass == 'scientific name' and isolate_name is not None and flu_type is not None:
+                    # this is a flu isolate, generate 8 nodes in the taxonomy,
+                    # one for each segment. 
+                    # Segments 4 and 6 need special treatment because, in flu A, we attach these as 
+                    # children of the Influenza A Hx segment 4 and Influenza A Nx segment 6 parent nodes, 
+                    # which don't exist for fluB
+                    seg4_parent_id = seg6_parent_id = new_tax_name = parent_tax_id = None
+                    if h_subtype:
+                        try:
+                            seg4_parent_id = self.influenza_subtype_segment_tax_ids[h_subtype][4]
+                        except KeyError:
+                            raise ValueError(f'isolate has H subtype ({h_subtype}) but no parent tax id could be found for segment 4 in this subtype')
+                    if n_subtype:
+                        try:
+                            seg6_parent_id = self.influenza_subtype_segment_tax_ids[n_subtype][6]
+                        except KeyError:
+                            raise ValueError(f'isolate has N subtype ({n_subtype}) but no parent tax id could be found for segment 6 in this subtype')
                     
+                    # create the new taxa
                     for seg_num in range(1,9):
                         new_tax_name = isolate_name + ' segment ' + str(seg_num)
-                        if seg_num == 4:
+                        if seg_num == 4 and seg4_parent_id:
                             parent_tax_id = seg4_parent_id
-                        elif seg_num == 6:
+                        elif seg_num == 6 and seg6_parent_id:
                             parent_tax_id = seg6_parent_id
                         else:
                             try:
-                                parent_tax_id = self.influenza_type_segment_tax_ids['A'][seg_num]
+                                parent_tax_id = self.influenza_type_segment_tax_ids[flu_type][seg_num]
                             except KeyError:
                                 raise ValueError(f'no parent tax id for flu A segment {seg_num}')
                         self.add_taxon(tax_id= new_tax_id_i, parent_tax_id= parent_tax_id, name= new_tax_name)
