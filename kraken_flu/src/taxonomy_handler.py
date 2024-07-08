@@ -285,15 +285,28 @@ class TaxonomyHandler():
     def create_influenza_type_segment_taxa(self):
         """
         For each of the influenza types for which we want to split genomes into segments (currently 
-        only type A), one new node is created in the taxonomy.
-        A datastructure is returned that maps type/segment to the new taxid.
-        
+        only type A), one new node is created in the taxonomy for each segment as a child of the 
+        "Influenza X" original parent node.
+        The parent node ("Influenza A" etc) must exist in the provided taxonomy already. The result of this
+        method is a new level of "artificial" taxon nodes like this (for FluA, same for other Flu types):                                        
+                                                                                    
+                                    ┌──────────────┐                                 
+                                    │ Influenza A  │                                 
+                    ┌────────────────┴───────┬──────┴───────────────────┐             
+        ┌──────────▼──────────┐   ┌─────────▼───────────┐  ┌───────────▼──────────┐  
+        │Influenza A segment 1│   │Influenza A segment 2│  │Influenza A segment 3 │  
+        └──────-────────────-─┘   └─────────────────────┘  └──────────────────────┘  
+                
         NOTE: This is currently restricted to flu A and B. If more types should be handled, add the type letter
         to the list "types" and retrieve the respective parent node IDs in teh code below.
         insert the influenza A segment 1, 2, 3 etc nodes. 
         
+        The datastructured that is returned can be used later to retrieve the new taxon IDs for the purpose of 
+        assigning genome sequences to the new taxon nodes.
+        
         Returns:
             sets and returns self.influenza_type_segment_tax_ids
+            (datastructure that maps type/segment to the new taxid)
         
         """
         # check if we have already done this and, if so, just return the existing data
