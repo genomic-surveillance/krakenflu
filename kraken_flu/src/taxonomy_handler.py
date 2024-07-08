@@ -11,6 +11,33 @@ class TaxonomyHandler():
     This class handles the NCBI taxonomy, its main task is to restructure the taxonomy for
     influenza isolates.
     
+    The flu taxonomy is modified by creating new levels of nodes in order to break down flu references into 
+    segments. This creates a structure as shown here for Flu A:                                                                               
+                                                                                                            
+                                ┌──────────────┐                                                           
+                                │ Influenza A  │                                                           
+               ┌────────────────┴──────┬───────┴──────────────────────┐                                    
+               │                       │                              │                                    
+               │                       │                              │                                    
+               │                       │                              │                                    
+    ┌──────────▼──────────┐ ┌──────────▼──────────┐       ┌───────────▼──────────┐                         
+    │Influenza A segment 1│ │Influenza A segment x│ [...] │Influenza A segment 4 │ [...]                   
+    └─┬───────────────────┘ └─────────────────────┘  ┌────┴──────────────────┬───┘                         
+      │                                              │                       │                             
+      │ ┌──────────────────────────┐   ┌─────────────▼──────────┐ ┌──────────▼─────────────┐               
+      ├─► isolate segment sequence │   │Influenza A H1 segment 4│ │Influenza A H2 segment 4│ [...]         
+      │ └──────────────────────────┘   └┬───────────────────────┘ └──────┬─────────────────┘               
+      │                                 │                                │                                 
+      │ ┌──────────────────────────┐    │  ┌──────────────────────────┐  │  ┌──────────────────────────┐   
+      └─► isolate segment sequence │    ├──► isolate segment sequence │  ├──► isolate segment sequence │   
+        └──────────────────────────┘    │  └──────────────────────────┘  │  └──────────────────────────┘   
+                                        │                                │                                 
+                                        │  ┌──────────────────────────┐  │  ┌──────────────────────────┐   
+                                        └──► isolate segment sequence │  └──► isolate segment sequence │   
+                                           └──────────────────────────┘     └──────────────────────────┘   
+    For Flu B, the same structure is created except that there are no special nodes for the subtypes, ie segments 
+    4 and 6 are not getting special treatment,                                                                                                        
+    
     Parameters:
         taxonomy_path: str, required
             Path to the taxonomy directory from kraken2-build process (kraken2 default name: taxonomy)
