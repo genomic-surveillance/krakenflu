@@ -288,9 +288,9 @@ class TaxonomyHandler():
         only type A), one new node is created in the taxonomy.
         A datastructure is returned that maps type/segment to the new taxid.
         
-        NOTE: This is currently hardcoded to just insert the influenza A segment 1, 2, 3 etc nodes. 
-        It can be easily changed to add nodes for more (or all) influenza genomes by either hardcoding 
-        other types into the 'types' list or by querying the names for all Influenza type records.
+        NOTE: This is currently restricted to flu A and B. If more types should be handled, add the type letter
+        to the list "types" and retrieve the respective parent node IDs in teh code below.
+        insert the influenza A segment 1, 2, 3 etc nodes. 
         
         Returns:
             sets and returns self.influenza_type_segment_tax_ids
@@ -300,18 +300,23 @@ class TaxonomyHandler():
         if self.influenza_type_segment_tax_ids is not None:
             return self.influenza_type_segment_tax_ids
         
-        flu_a_tax_id, _ = self._tax_id_and_parent_id_by_name( 'Influenza A virus')
-        if flu_a_tax_id is None:
+        # retrieve the taxon IDs for the influenza A and B parent nodes
+        flu_tax_ids = {}
+        flu_tax_ids['A'], _ = self._tax_id_and_parent_id_by_name( 'Influenza A virus')
+        if flu_tax_ids['A'] is None:
             raise ValueError('could not find Influenza A in names file')
+        flu_tax_ids['B'], _ = self._tax_id_and_parent_id_by_name( 'Influenza B virus')
+        if flu_tax_ids['B'] is None:
+            raise ValueError('could not find Influenza B in names file')
         
-        # add more types here if needed (e.g. 'B')
-        types = ['A']
+        # add more types here if needed (e.g. 'B') - would need the parent node IDs as well (above)
+        types = ['A','B']
         data = {}
         new_tax_id_i = self.max_tax_id()
         for type in types:
             for seg_num in range(1,9):
                 new_tax_id_i += 1
-                self.add_taxon( tax_id= new_tax_id_i, parent_tax_id= flu_a_tax_id, name=f'Influenza A segment {seg_num}' )
+                self.add_taxon( tax_id= new_tax_id_i, parent_tax_id= flu_tax_ids[type], name=f'Influenza {type} segment {seg_num}' )
                 try:
                     data[type][seg_num] = new_tax_id_i
                 except KeyError:

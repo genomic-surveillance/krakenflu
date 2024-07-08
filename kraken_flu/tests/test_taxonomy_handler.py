@@ -144,10 +144,13 @@ def test_create_influenza_type_segment_taxa():
     assert data == th.influenza_type_segment_tax_ids, 'after running the method, the data returned is also available as a new property'
     assert len(data.keys()) > 0 , 'data is not empty'
     
-    [ a_seg1_tax_id, a_seg1_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza A segment 1')
+    [ _, a_seg1_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza A segment 1')
     assert a_seg1_parent_id == 11320,  'a new taxon for influenza A segment 1 has been added to the taxonomy under the correct parent ID'
-    [ a_seg1_tax_id, a_seg1_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza A segment 2')
+    [ _, a_seg1_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza A segment 2')
     assert a_seg1_parent_id == 11320,  'a new taxon for influenza A segment 1 has been added to the taxonomy under the correct parent ID'
+    [ _, b_seg_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza B segment 1')
+    assert b_seg_parent_id == 11520,  'a new taxon for influenza B segment 1 has been added to the taxonomy under the correct parent ID'
+
 
 def test_create_influenza_subtype_segment_taxa():
     th = TaxonomyHandler( taxonomy_path= TAX_DIR)
