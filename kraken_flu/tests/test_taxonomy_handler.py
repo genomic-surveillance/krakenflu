@@ -185,6 +185,7 @@ def test_create_influenza_isolate_segment_taxa():
     # Segment 4 should be a child of the H1 segment 4 node, segment 6 a child of the
     # N1 segment 6 node and segment 1 (and others) a child of the A segment 1 (etc) node
     isolate_name = 'A/California/07/2009(H1N1)'
+    assert isolate_name in th.influenza_isolate_segment_tax_ids, 'an entry was created for isolate A/California/07/2009(H1N1)'
     tax_id = th.influenza_isolate_segment_tax_ids[ isolate_name ][4]
     assert isinstance( tax_id, int) and tax_id > 0 , 'a segment 4 taxon node was created for isolate A/California/07/2009(H1N1)'
     
@@ -208,5 +209,11 @@ def test_create_influenza_isolate_segment_taxa():
     
     [ tax_id, _ ] = th._tax_id_and_parent_id_by_name( name='A/California/07/2009(H1N1) segment 4')
     assert tax_id, 'a node with isolate name and segment number exists in the taxonomy now'
+    
+    # test a flu B genome
+    isolate_name = 'Influenza B virus (B/Lee/1940)'
+    assert isolate_name in th.influenza_isolate_segment_tax_ids, 'an entry was created for isolate Influenza B virus (B/Lee/1940)'
+    tax_id = th.influenza_isolate_segment_tax_ids[ isolate_name ][1]
+    assert isinstance( tax_id, int) and tax_id > 0 , 'a segment 4 taxon node was created for isolate Influenza B virus (B/Lee/1940)'
 
     
