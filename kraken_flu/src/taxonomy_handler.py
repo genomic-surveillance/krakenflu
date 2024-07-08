@@ -386,10 +386,13 @@ class TaxonomyHandler():
     
     def create_influenza_subtype_segment_taxa(self):
         """
-        Similar to "create_influenza_type_segment_taxa". Inserts new tax into the taxonomy for 
-        Influenza subtype/segment number.
+        Similar to "create_influenza_type_segment_taxa". Inserts new taxa into the taxonomy for 
+        Influenza subtype/segment number such as "Influenza A H1 segment 4", "Influenza A N3 segment 6"
         
-        In this current implementation, we only insert this level of the taxonomy for segments 4 and 6.
+        In this current implementation, we only insert this level of the taxonomy for segments 4 and 6 of 
+        influenza A, because only Influenza A subtyping is built on these segments (Ha and Na genes).
+        For Influenza B, no additional level is inserted here and, consequently, all Influenza B segment sequences 
+        are children of the taxa created in 
         For segment 4, we create one taxon for each H subtype (segment 4 encodes the HA gene). For
         segment 6, one taxon is added for each N subtype (6 encodes NA gene).
         
