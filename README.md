@@ -22,10 +22,10 @@ The main tasks of the tool are:
 - impose a unified naming scheme for influenza genomes
 - re-organise the taxonomy for influenza genomes to create artificial taxa for segments (treating segments like separate species)
 
-For details, see 
+For details, see [How it works](#how-it-works).
 
 ## Installation
-Install with pip. You will probably want to create a venv for this first.
+Install with pip:
 ```shell
 pip install kraken_flu@git+ssh://git@gitlab.internal.sanger.ac.uk/malariagen1/misc_utils/kraken_flu.git
 ```
@@ -118,6 +118,7 @@ The original un-modified taxonomy for Influenza A viruses from [NCBI taxonomy](h
 ```
 
 In the ARD viral pipeline, we treat the 8 segments of the influenza virus like separate genomes, which enables the pipeline to detect reassortant viruses. Classifying segments instead of whole genomes also helps sub-typing influenza A because the sub-type defining segments 4 and 6 (HA and NA gene, respectively) are addressed in separation, taking away the noise from the other 6 segments, which do not define the subtype. 
+
 The taxonomy imposed by kraken_flu looks like this for influenza A (not all nodes are shown):
 ```  
                                ┌──────────────┐                                                           
@@ -145,7 +146,8 @@ The taxonomy imposed by kraken_flu looks like this for influenza A (not all node
 
 
 ```
-Each genome is split into the 8 segments and each segment is assign as a child node of a new node that the tool adds to the flu taxonomy. For segments 4 and 6, the parental node is specific to the sub-type and segment (e.g. H1 segment 4, N2 segment 6 etc). All other segment sequences as well as the new sub-type/segment nodes for segments 4 and 6, are children of new taxonomy nodes for the virus type and segment number, e.g. "A segment 1".
+Each genome is split into the 8 segments and each segment is assign as a child node of a new node that the tool adds to the flu taxonomy. 
+For segments 4 and 6, the parental node is specific to the sub-type and segment (e.g. H1 segment 4, N2 segment 6 etc). All other segment sequences as well as the new sub-type/segment nodes for segments 4 and 6, are children of new taxonomy nodes for the virus type and segment number, e.g. "A segment 1".
 The ARD viral pipeline uses the database created by this tool for the task of identifying the best-fitting reference sequence(s) for a sample and simultaneous typing/sub-typing. 
 
 Take as an example a sample that contains an influenza A H1N1 virus. The viral pipeline uses the kraken2 tool with the database created by kraken_flu, which will show that the sample contains:
@@ -157,13 +159,13 @@ With this information, the pipeline can classify the virus in this sample as an 
 
 ### Overview of the inner workings
 The two classes that do the heavy lifting are ```TaxonomyHandler``` and ```FastaHandler```. The process is orchestrated by a class ```KrakenDbBuilder``` and assisted by common functionality in ```utils```.
-The ```TaxonomyHandler``` reads the NCBI taxonomy files ```nodes.dmp``` and ```names.dmp``` while ```FastaHanlder``` deals with the sequence files. 
-The ```TaxonomyHandler``` class provides methods for adding the new taxonomy nodes as described in [Modifications to the influenza taxonomy](#modifications-to-the-influenza-taxonomy). It adds nodes for every possible segment of every possible type A and type B segment, regardless of whether we have any isolates to match them. This is in keeping with the overall design of kraken2 databases, which use the NCBI taxonomy - and therefore nodes for every organism classified in it - regardless of whether or not a particular database provides sequence data for each of those organisms. 
-For influenza A, the new nodes include all possible sub-type nodes for segments 4 and 6. There are 18 known H subtypes and 11 known N subtypes. For influenza B, there are no sub-type specific segment parent nodes. Instead, all segment nodes for influenza B are at the same level.
+The ```TaxonomyHandler``` reads the NCBI taxonomy files ```nodes.dmp``` and ```names.dmp``` while ```FastaHanlder``` deals with the sequence files.  
+The ```TaxonomyHandler``` class provides methods for adding the new taxonomy nodes as described in [Modifications to the influenza taxonomy](#modifications-to-the-influenza-taxonomy). It adds nodes for every possible segment of every possible type A and type B segment, regardless of whether we have any isolates to match them. This is in keeping with the overall design of kraken2 databases, which use the NCBI taxonomy - and therefore nodes for every organism classified in it - regardless of whether or not a particular database provides sequence data for each of those organisms.  
+For influenza A, the new nodes include all possible sub-type nodes for segments 4 and 6. There are 18 known H subtypes and 11 known N subtypes. For influenza B, there are no sub-type specific segment parent nodes. Instead, all segment nodes for influenza B are at the same level.  
 The ```TaxonomyHandler``` provides a method that identifies the correct new parent node for any influenza isolate segment by its name and attaches the isolate segment sequence to the correct new parent.
 As an example: a sequence named "Influenza A (A/California/07/2009(H1N1)) segment 4" would be attached as a child node to the new taxonomy node "Influenza A H1 segment 4", in turn a child of "Influenza A segment 4".
 
-__Caveat__: at present, the code relies on isolate names having an entry in the NCBI taxonomy names.dmp file. Thus, an isolate sequence in a FASTA file from outside of NCBI will not be added to the taxonomy right now.
+__Caveat__: at present, the code relies on isolate names having an entry in the NCBI taxonomy names.dmp file. Thus, an isolate sequence in a FASTA file from outside of NCBI will not be added to the taxonomy right now. We are not currently using sequence sourced outside of NCBI.  
 A solution to this problem is planned, see this [issue](https://gitlab.internal.sanger.ac.uk/malariagen1/misc_utils/kraken_flu/-/issues/8).
 
 The ```FastaHandler``` class provides the methods for reading and writing FASTA files. The ```KrakenDbBuilder``` class uses a ```TaxonomyHandler``` and a ```FastaHandler``` object to create the modified taxonomy and cross-link the FASTA headers to the taxonomy before writing the modified taxonomy and sequence files to the output folder. 
@@ -172,7 +174,8 @@ Any sequences that are linked to new nodes in the taxonomy (currently only influ
 To run the tool, a CLI is provided by the ```cmd.py``` module. When installing the tool with pip, an executable command ```kraken_flu``` is installed locally. See [Run the kraken-flu tool](#run-the-kraken-flu-tool) for details on how to use it.
 
 #### Influenza genome completeness filter
-The final files are created by ```KrakenDbBuilder::create_db_ready_dir``` which has an option to run a filter for complete influenza genomes as an option. If this filter is used, only those isolates will be kept, that have a full length copy of each of the 8 influenza genome segments. A list of isolate names can be provided, which are exempt from this filter. This is needed to keep, for example, the avian influenza reference Goose Guandong H5N1, which is incomplete.
+The final files are created by ```KrakenDbBuilder::create_db_ready_dir``` which has an option to run a filter for complete influenza genomes. 
+If this filter is used, only those isolates will be kept, that have a full length copy of each of the 8 influenza genome segments. A list of isolate names can be provided, which are exempt from this filter. This is needed to keep, for example, the avian influenza reference Goose Guandong H5N1, which is incomplete.
 
 ### Note on RAM usage
 For the sake of code simplicity and speed of execution, the input taxonomy and sequence files are read into RAM, which significantly simplifies the cross-referencing of the data between taxonomy and sequence library. The files involved are large and a run of this tool is memory hungry but this is not a limiting factor in the environment this was developed for. If this becomes limiting after all, an alternative design would be to build an sqlite database instead of an in-memory datastructure. 
