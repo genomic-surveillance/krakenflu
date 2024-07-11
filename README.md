@@ -8,6 +8,7 @@
     - [Download sequence data](#download-sequence-data)
     - [Run the kraken-flu tool](#run-the-kraken-flu-tool)
     - [Use the kraken-flu outputs to create a kraken2 DB](#use-the-kraken-flu-outputs-to-create-a-kraken2-db)
+  - [Detailed usage recipes](#detailed-usage-recipes)
   - [How it works](#how-it-works)
     - [Modifications to the influenza taxonomy](#modifications-to-the-influenza-taxonomy)
     - [Overview of the inner workings](#overview-of-the-inner-workings)
@@ -91,6 +92,9 @@ kraken2-build \
 ```
 
 The database is now ready to use with the kraken2 command to map unknown reads to the taxonomy and create reports.
+
+## Detailed usage recipes
+See the included jupyter notebooks for a real-world recipe for building a kraken2 database with kraken_flu in the [jupyter_notebooks](jupyter_notebooks) folder of this repo.
 
 ## How it works
 The kraken_flu tool was created to support the GSU-ARD viral metagenomics pipeline by building custom kraken2 databases for simultaneous reference genome selection and typing/sub-typing of viruses. The focus of the tool is on Influenza taxonomy but it can also deal with other viruses that require modifications to the taxonomy in order to be useful for our metagenomics pipeline.
@@ -178,7 +182,5 @@ The final files are created by ```KrakenDbBuilder::create_db_ready_dir``` which 
 If this filter is used, only those isolates will be kept, that have a full length copy of each of the 8 influenza genome segments. A list of isolate names can be provided, which are exempt from this filter. This is needed to keep, for example, the avian influenza reference Goose Guandong H5N1, which is incomplete.
 
 ### Note on RAM usage
-For the sake of code simplicity and speed of execution, the input taxonomy and sequence files are read into RAM, which significantly simplifies the cross-referencing of the data between taxonomy and sequence library. The files involved are large and a run of this tool is memory hungry but this is not a limiting factor in the environment this was developed for. If this becomes limiting after all, an alternative design would be to build an sqlite database instead of an in-memory datastructure. 
-
-
-
+For the sake of code simplicity and speed of execution, the input taxonomy and sequence files are read into RAM, which significantly simplifies the cross-referencing of the data between taxonomy and sequence library. The files involved are large and a run of this tool is memory hungry but this is not a limiting factor in the environment this was developed for. 
+For reference: the taxonomy files from NCBI combined amount to around 400MB in RAM. The sequence libraries of viral RefSeq plus all Influenza genomes in Genbank amount to around 2GB. This should not pose a bottleneck in a modern data science environment.
