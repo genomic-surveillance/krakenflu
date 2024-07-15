@@ -312,7 +312,7 @@ class TaxonomyHandler():
     def create_influenza_type_segment_taxa(self):
         """
         For each of the influenza types for which we want to split genomes into segments (currently 
-        only type A), one new node is created in the taxonomy for each segment as a child of the 
+        A, B and C), one new node is created in the taxonomy for each segment as a child of the 
         "Influenza X" original parent node.
         The parent node ("Influenza A" etc) must exist in the provided taxonomy already. The result of this
         method is a new level of "artificial" taxon nodes like this (for FluA, same for other Flu types):                                        
@@ -324,7 +324,7 @@ class TaxonomyHandler():
         │Influenza A segment 1│   │Influenza A segment 2│  │Influenza A segment 3 │  
         └──────-────────────-─┘   └─────────────────────┘  └──────────────────────┘  
                 
-        NOTE: This is currently restricted to flu A and B. If more types should be handled, add the type letter
+        NOTE: This is currently restricted to flu A, B and C. If more types should be handled, add the type letter
         to the list "types" and retrieve the respective parent node IDs in teh code below.
         insert the influenza A segment 1, 2, 3 etc nodes. 
         
@@ -340,20 +340,18 @@ class TaxonomyHandler():
         if self.influenza_type_segment_tax_ids is not None:
             return self.influenza_type_segment_tax_ids
         
-        # retrieve the taxon IDs for the influenza A and B parent nodes
+        # this will be a lookup of parent tax IDs
         flu_tax_ids = {}
-        flu_tax_ids['A'], _ = self._tax_id_and_parent_id_by_name( 'Influenza A virus')
-        if flu_tax_ids['A'] is None:
-            raise ValueError('could not find Influenza A in names file')
-        flu_tax_ids['B'], _ = self._tax_id_and_parent_id_by_name( 'Influenza B virus')
-        if flu_tax_ids['B'] is None:
-            raise ValueError('could not find Influenza B in names file')
         
         # add more types here if needed (e.g. 'B') - would need the parent node IDs as well (above)
-        types = ['A','B']
+        types = ['A','B','C','D']
         data = {}
         new_tax_id_i = self.max_tax_id()
         for type in types:
+            flu_tax_ids[type], _ = self._tax_id_and_parent_id_by_name( f'Influenza {type} virus')
+            if flu_tax_ids[type] is None:
+                logging.info( f'could not find Influenza {type} in names file: not creating taxonomy for this influenza type')
+                continue
             for seg_num in range(1,9):
                 new_tax_id_i += 1
                 self.add_taxon( tax_id= new_tax_id_i, parent_tax_id= flu_tax_ids[type], name=f'Influenza {type} segment {seg_num}' )
@@ -482,8 +480,8 @@ class TaxonomyHandler():
         applies to all nodes of the taxonomy. They exist whether or not we have a sequence. This follows the general 
         design of the NCBI taxonomy files, which can be linked to but do not depend on sequence records.
         
-        Influenza A and B are treated differently because of the extra level in the taxonomy for segments 4 
-        and 6 of influenza A, which we don't for influenza B.
+        Influenza A and B/C are treated differently because of the extra level in the taxonomy for segments 4 
+        and 6 of influenza A, which we don't for influenza B or C.
         
         Returns:
             sets and returns self.influenza_isolate_segment_tax_ids
@@ -540,7 +538,7 @@ class TaxonomyHandler():
                             try:
                                 parent_tax_id = self.influenza_type_segment_tax_ids[flu_type][seg_num]
                             except KeyError:
-                                raise ValueError(f'no parent tax id for flu A segment {seg_num}')
+                                raise ValueError(f'no parent tax id for flu {flu_type} segment {seg_num}')
                         self.add_taxon(tax_id= new_tax_id_i, parent_tax_id= parent_tax_id, name= new_tax_name)
                         try:
                             data[isolate_name][seg_num] = new_tax_id_i
