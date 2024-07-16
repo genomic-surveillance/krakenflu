@@ -101,6 +101,7 @@ def test_FLU_DATA_REGEX():
 def test_parse_flu():
     name = 'Influenza A virus (A/Puerto_Rico/8/34(H10N11))'
     is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert is_flu == True, 'it is flu'
     assert flu_type == 'A' ,'type'
     assert isolate_name == 'A/Puerto_Rico/8/34(H10N11)', 'isolate name'
     assert h_subtype == 'H10' , 'H subtype'
@@ -128,6 +129,7 @@ def test_parse_flu():
     # We do need to allow this so that we can perform an additional step later to try and fix this
     name = '>kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence'
     is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert is_flu == True, 'still identified as flu'
     assert flu_type == 'B' ,'type'
     assert isolate_name == None, 'no isolate name'
     assert h_subtype is None , 'H subtype'
