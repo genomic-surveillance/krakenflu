@@ -214,6 +214,9 @@ def test_create_influenza_isolate_segment_taxa():
     isolate_name = 'B/Lee/1940'
     assert isolate_name in th.influenza_isolate_segment_tax_ids, 'an entry was created for isolate Influenza B virus (B/Lee/1940)'
     tax_id = th.influenza_isolate_segment_tax_ids[ isolate_name ][1]
-    assert isinstance( tax_id, int) and tax_id > 0 , 'a segment 4 taxon node was created for isolate Influenza B virus (B/Lee/1940)'
+    assert isinstance( tax_id, int) and tax_id > 0 , 'a segment 1 taxon node was created for isolate Influenza B virus (B/Lee/1940)'
 
+    # there is no influenza C in the fixture taxonomy files
+    # so no influenza D segment nodes will be created in the taxonomy initially
+    
     
