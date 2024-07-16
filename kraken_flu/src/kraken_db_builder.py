@@ -179,8 +179,8 @@ class KrakenDbBuilder():
         if not os.path.exists( taxonomy_path ):
             os.mkdir( taxonomy_path )
         
-        logging.info( f'found { self._fasta_handler.n_seq_total} sequence records in {self.fasta_file_path}')
-        logging.info( f'{ self._fasta_handler.n_seq_flu} sequence records identified as influenza')
+        logging.info( f'found { self._fasta_handler.n_seq_total()} sequence records in {self.fasta_file_path}')
+        logging.info( f'{ self._fasta_handler.n_seq_flu()} sequence records identified as influenza')
         
         if filter_incomplete_flu:
             logging.info( f'starting to filter incomplete influenza genomes')

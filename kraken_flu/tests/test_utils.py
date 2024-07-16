@@ -134,6 +134,15 @@ def test_parse_flu():
     assert n_subtype is None , 'N subtype'
     assert segment_number == 1 , 'segment number'
     
+    # Flu B without a segment number
+    name = 'Influenza B virus (B/Lee/1940)'
+    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert flu_type == 'B' ,'type'
+    assert isolate_name == 'B/Lee/1940', 'isolate name'
+    assert h_subtype is None , 'H subtype'
+    assert n_subtype is None , 'N subtype'
+    assert segment_number == None , 'segment number'
+    
     # Real-world case of a genome segment that does not have a segment number but 
     # does have a gene name that can be translated into a number
     name = '>NC_007360.1 Influenza A virus (A/Goose/Guangdong/1/96(H5N1)) nucleocapsid protein (NP) gene, complete cds'
