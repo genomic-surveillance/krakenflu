@@ -213,10 +213,12 @@ def test_create_influenza_isolate_segment_taxa():
     # test a flu B genome
     isolate_name = 'B/Lee/1940'
     assert isolate_name in th.influenza_isolate_segment_tax_ids, 'an entry was created for isolate Influenza B virus (B/Lee/1940)'
-    tax_id = th.influenza_isolate_segment_tax_ids[ isolate_name ][1]
-    assert isinstance( tax_id, int) and tax_id > 0 , 'a segment 1 taxon node was created for isolate Influenza B virus (B/Lee/1940)'
+    tax_id = th.influenza_isolate_segment_tax_ids[ isolate_name ][4]
+    assert isinstance( tax_id, int) and tax_id > 0 , 'a segment 4 taxon node was created for isolate Influenza B virus (B/Lee/1940)'
 
-    # there is no influenza C in the fixture taxonomy files
-    # so no influenza D segment nodes will be created in the taxonomy initially
+    flu_B_seg4_tax_id = th.influenza_type_segment_tax_ids['B'][4]
+    assert flu_B_seg4_tax_id
+    assert flu_B_seg4_tax_id == th.nodes[ tax_id ]['parent_id'], '...the parent node is B type segment 4 (no seg 4 subtypes in flu B)'
+    
     
     
