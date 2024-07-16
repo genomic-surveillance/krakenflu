@@ -136,7 +136,7 @@ def test_parse_flu():
     
     # Flu B without a segment number
     name = 'Influenza B virus (B/Lee/1940)'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
     assert flu_type == 'B' ,'type'
     assert isolate_name == 'B/Lee/1940', 'isolate name'
     assert h_subtype is None , 'H subtype'
