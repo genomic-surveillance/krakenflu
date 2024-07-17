@@ -520,12 +520,12 @@ class TaxonomyHandler():
                         try:
                             seg4_parent_id = self.influenza_subtype_segment_tax_ids[h_subtype][4]
                         except KeyError:
-                            raise ValueError(f'isolate has H subtype ({h_subtype}) but no parent tax id could be found for segment 4 in this subtype')
+                            raise ValueError(f'isolate with name "{name}" has H subtype ({h_subtype}) but no parent tax id could be found for segment 4 in this subtype')
                     if n_subtype:
                         try:
                             seg6_parent_id = self.influenza_subtype_segment_tax_ids[n_subtype][6]
                         except KeyError:
-                            raise ValueError(f'isolate has N subtype ({n_subtype}) but no parent tax id could be found for segment 6 in this subtype')
+                            raise ValueError(f'isolate with name "{name}" has N subtype ({n_subtype}) but no parent tax id could be found for segment 6 in this subtype')
                     
                     # create the new taxa
                     for seg_num in range(1,9):
