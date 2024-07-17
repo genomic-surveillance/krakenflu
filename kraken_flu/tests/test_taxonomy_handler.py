@@ -144,10 +144,13 @@ def test_create_influenza_type_segment_taxa():
     assert data == th.influenza_type_segment_tax_ids, 'after running the method, the data returned is also available as a new property'
     assert len(data.keys()) > 0 , 'data is not empty'
     
-    [ a_seg1_tax_id, a_seg1_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza A segment 1')
+    [ _, a_seg1_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza A segment 1')
     assert a_seg1_parent_id == 11320,  'a new taxon for influenza A segment 1 has been added to the taxonomy under the correct parent ID'
-    [ a_seg1_tax_id, a_seg1_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza A segment 2')
+    [ _, a_seg1_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza A segment 2')
     assert a_seg1_parent_id == 11320,  'a new taxon for influenza A segment 1 has been added to the taxonomy under the correct parent ID'
+    [ _, b_seg_parent_id ] = th._tax_id_and_parent_id_by_name( name='Influenza B segment 1')
+    assert b_seg_parent_id == 11520,  'a new taxon for influenza B segment 1 has been added to the taxonomy under the correct parent ID'
+
 
 def test_create_influenza_subtype_segment_taxa():
     th = TaxonomyHandler( taxonomy_path= TAX_DIR)
@@ -182,6 +185,7 @@ def test_create_influenza_isolate_segment_taxa():
     # Segment 4 should be a child of the H1 segment 4 node, segment 6 a child of the
     # N1 segment 6 node and segment 1 (and others) a child of the A segment 1 (etc) node
     isolate_name = 'A/California/07/2009(H1N1)'
+    assert isolate_name in th.influenza_isolate_segment_tax_ids, 'an entry was created for isolate A/California/07/2009(H1N1)'
     tax_id = th.influenza_isolate_segment_tax_ids[ isolate_name ][4]
     assert isinstance( tax_id, int) and tax_id > 0 , 'a segment 4 taxon node was created for isolate A/California/07/2009(H1N1)'
     
@@ -205,5 +209,16 @@ def test_create_influenza_isolate_segment_taxa():
     
     [ tax_id, _ ] = th._tax_id_and_parent_id_by_name( name='A/California/07/2009(H1N1) segment 4')
     assert tax_id, 'a node with isolate name and segment number exists in the taxonomy now'
+    
+    # test a flu B genome
+    isolate_name = 'B/Lee/1940'
+    assert isolate_name in th.influenza_isolate_segment_tax_ids, 'an entry was created for isolate Influenza B virus (B/Lee/1940)'
+    tax_id = th.influenza_isolate_segment_tax_ids[ isolate_name ][4]
+    assert isinstance( tax_id, int) and tax_id > 0 , 'a segment 4 taxon node was created for isolate Influenza B virus (B/Lee/1940)'
 
+    flu_B_seg4_tax_id = th.influenza_type_segment_tax_ids['B'][4]
+    assert flu_B_seg4_tax_id
+    assert flu_B_seg4_tax_id == th.nodes[ tax_id ]['parent_id'], '...the parent node is B type segment 4 (no seg 4 subtypes in flu B)'
+    
+    
     
