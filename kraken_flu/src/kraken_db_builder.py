@@ -126,7 +126,7 @@ class KrakenDbBuilder():
         self.tax_ids_updated = True
         return True
 
-    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna', filter_incomplete_flu:bool = True,  filter_except_patterns: list= [] ):
+    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna', filter_incomplete_flu:bool = True,  filter_except_patterns: list= [], drop_unparsed_flu:bool = True ):
         """
         Create a directory with all files needed to build a new kraken database. 
         This method triggers the data acquisition from the FastaHandler and TaxonomyHandler, then runs the
@@ -153,6 +153,11 @@ class KrakenDbBuilder():
                 Any genome where the FASTA header contains one of the strings in this list will not be subjected to 
                 the filter. This was required to ensure that the Goose Guandong H5N1 reference genome (which does not
                 have sequences for all 8 segments) is not filtered out.
+                
+            drop_unparsed_flu: bool, optional, defaults to True
+                If True, sequences whose name indicates that it is flu but where the name cannot be parsed
+                properly (we can't obtain an isolate name) will be dropped. Without this filter, such cases
+                would end up as flu whole genomes that are not segmented like the rest of the flu genomes.
             
         Returns:
             True if success
@@ -182,10 +187,22 @@ class KrakenDbBuilder():
         logging.info( f'found { self._fasta_handler.n_seq_total()} sequence records in {self.fasta_file_path}')
         logging.info( f'{ self._fasta_handler.n_seq_flu()} sequence records identified as influenza')
         
-        if filter_incomplete_flu:
-            logging.info( f'starting to filter incomplete influenza genomes')
-            self._fasta_handler.remove_incomplete_flu( filter_except_patterns= filter_except_patterns )
-            logging.info( f'{ self._fasta_handler.n_seq_filtered()} sequence records have been removed as incomplete flu genomes')
+        if filter_incomplete_flu or drop_unparsed_flu:
+            logging.info( f'starting to apply filters on influenza genomes')
+            n_seq_filtered = self._fasta_handler.n_seq_filtered() # should be 0 at this point
+            
+            if filter_incomplete_flu:
+                logging.info( f'starting to filter incomplete influenza genomes')
+                self._fasta_handler.remove_incomplete_flu( filter_except_patterns= filter_except_patterns )
+                n_seq_filtered = self._fasta_handler.n_seq_filtered() - n_seq_filtered
+                logging.info( f'{ n_seq_filtered} flu sequence records have been marked to be removed from output due to being incomplete')
+            if drop_unparsed_flu:
+                logging.info( f'starting to apply drop_unparsed_flu filter')
+                self._fasta_handler.remove_unparsed_flu()
+                n_seq_filtered = self._fasta_handler.n_seq_filtered() - n_seq_filtered
+                logging.info( f'{ n_seq_filtered } flu sequence records have been marked to be removed from output as unparsable')
+        
+            logging.info( f'after applying filters, { self._fasta_handler.n_seq_filtered()} flu sequence records have been marked to be removed from output')
         
         if not self.tax_ids_updated:
             self.update_fasta_tax_ids()

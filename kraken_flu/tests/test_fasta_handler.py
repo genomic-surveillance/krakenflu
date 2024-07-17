@@ -147,6 +147,8 @@ def test_remove_incomplete_flu():
     assert len( fh.data ) == 5505, 'there are still 5505 records in the FASTA file after filtering (the filter does not remove anything, just marks records)'
 
 def test_remove_incomplete_flu_w_except():
+    # test remove_incomplete_flu again but this time with an exception pattern list for isolates that
+    # should be exempt from filtering
     fh = FastaHandler( fasta_file_path= FIXTURE_DIR.joinpath(os.path.join('all_ncbi_flu_download','library.fna') ) )
     
     assert len( fh.data ) == 20, 'there are 20 records in the FASTA file in total'
