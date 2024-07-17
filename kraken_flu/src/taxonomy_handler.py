@@ -328,7 +328,7 @@ class TaxonomyHandler():
         to the list "types" and retrieve the respective parent node IDs in teh code below.
         insert the influenza A segment 1, 2, 3 etc nodes. 
         
-        The datastructured that is returned can be used later to retrieve the new taxon IDs for the purpose of 
+        The datastructure that is returned can be used later to retrieve the new taxon IDs for the purpose of 
         assigning genome sequences to the new taxon nodes.
         
         Returns:
