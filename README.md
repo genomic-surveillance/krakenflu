@@ -12,7 +12,7 @@
   - [How it works](#how-it-works)
     - [Modifications to the influenza taxonomy](#modifications-to-the-influenza-taxonomy)
     - [Overview of the inner workings](#overview-of-the-inner-workings)
-      - [Influenza genome completeness filter](#influenza-genome-completeness-filter)
+      - [Influenza genome completeness and unparsable filters](#influenza-genome-completeness-and-unparsable-filters)
     - [Note on RAM usage](#note-on-ram-usage)
 
 ## Purpose of this tool
@@ -59,8 +59,9 @@ kraken_flu \
     --taxonomy_path  TAXONOMY_PATH \
     --fasta_path SEQ_PATH/viral.1.1.genomic.fna.gz \
     --out_dir TMP_DIR \
-    --filter
+    --filter \
     --filter_except "A/Goose/Guangdong/1/96(H5N1)" \
+    --drop_unparsed_flu
 ```
 
 For further help with kraken-flu:
@@ -177,9 +178,12 @@ Any sequences that are linked to new nodes in the taxonomy (currently only influ
 
 To run the tool, a CLI is provided by the ```cmd.py``` module. When installing the tool with pip, an executable command ```kraken_flu``` is installed locally. See [Run the kraken-flu tool](#run-the-kraken-flu-tool) for details on how to use it.
 
-#### Influenza genome completeness filter
+#### Influenza genome completeness and unparsable filters
 The final files are created by ```KrakenDbBuilder::create_db_ready_dir``` which has an option to run a filter for complete influenza genomes. 
-If this filter is used, only those isolates will be kept, that have a full length copy of each of the 8 influenza genome segments. A list of isolate names can be provided, which are exempt from this filter. This is needed to keep, for example, the avian influenza reference Goose Guandong H5N1, which is incomplete.
+If this filter is used, only those isolates will be kept, that have a full length copy of each of the 8 influenza genome segments. A list of isolate names can be provided, which are exempt from this filter. This is needed to keep, for example, the avian influenza reference Goose Guandong H5N1, which is incomplete.  
+The "unparsable" filter removes sequences whose name looks like an influenza genome but where we cannot parse the name properly. If we don't remove such cases, they cannot be split into segments and will attract reads in kraken2 that are assigned to an un-segmented flu genome.  
+
+The filters for flu (completeness and unparsable) are both implemented in the ```FastaHandler``` class. The filter adds a flag to the data to drop the sequence from final outputs. This has the effect of omitting the affected sequence from the final taxonomy output and thus from the database that will be created from the kraken_flu tool outputs.
 
 ### Note on RAM usage
 For the sake of code simplicity and speed of execution, the input taxonomy and sequence files are read into RAM, which significantly simplifies the cross-referencing of the data between taxonomy and sequence library. The files involved are large and a run of this tool is memory hungry but this is not a limiting factor in the environment this was developed for. 

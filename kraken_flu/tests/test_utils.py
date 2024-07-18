@@ -100,7 +100,8 @@ def test_FLU_DATA_REGEX():
     
 def test_parse_flu():
     name = 'Influenza A virus (A/Puerto_Rico/8/34(H10N11))'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert is_flu == True, 'it is flu'
     assert flu_type == 'A' ,'type'
     assert isolate_name == 'A/Puerto_Rico/8/34(H10N11)', 'isolate name'
     assert h_subtype == 'H10' , 'H subtype'
@@ -108,7 +109,7 @@ def test_parse_flu():
     assert segment_number is None , 'segment number'
     
     name = 'Influenza B virus (STRAIN B/LEE/40) RNA 1'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
     assert flu_type == 'B' ,'type'
     assert isolate_name == 'STRAIN B/LEE/40', 'isolate name'
     assert h_subtype is None , 'H subtype'
@@ -117,7 +118,7 @@ def test_parse_flu():
     
     # should work with any input, including a full FASTA header like this
     name = '>gi|1834444346|gb|MT375832|Influenza B virus (B/Texas/24/2020) segment 2 polymerase PB2 (PB2) gene, complete cds'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
     assert flu_type == 'B' ,'type'
     assert isolate_name == 'B/Texas/24/2020', 'isolate name'
     assert h_subtype is None , 'H subtype'
@@ -127,7 +128,8 @@ def test_parse_flu():
     # THis is a rare case but it does happen: influenza without an isolate name
     # We do need to allow this so that we can perform an additional step later to try and fix this
     name = '>kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    assert is_flu == True, 'still identified as flu'
     assert flu_type == 'B' ,'type'
     assert isolate_name == None, 'no isolate name'
     assert h_subtype is None , 'H subtype'
@@ -136,7 +138,7 @@ def test_parse_flu():
     
     # Flu B without a segment number
     name = 'Influenza B virus (B/Lee/1940)'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
     assert flu_type == 'B' ,'type'
     assert isolate_name == 'B/Lee/1940', 'isolate name'
     assert h_subtype is None , 'H subtype'
@@ -146,7 +148,7 @@ def test_parse_flu():
     # Real-world case of a genome segment that does not have a segment number but 
     # does have a gene name that can be translated into a number
     name = '>NC_007360.1 Influenza A virus (A/Goose/Guangdong/1/96(H5N1)) nucleocapsid protein (NP) gene, complete cds'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
     assert flu_type == 'A' ,'type'
     assert isolate_name == 'A/Goose/Guangdong/1/96(H5N1)', 'isolate name'
     assert h_subtype == 'H5' , 'H subtype'
@@ -155,7 +157,7 @@ def test_parse_flu():
     
     # additional tests for isolate names that caused issues
     name = 'Influenza A virus (A/Fiji/15899/83)'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
     assert flu_type == 'A' ,'type'
     assert isolate_name == 'A/Fiji/15899/83', 'isolate name'
     assert h_subtype == None , 'H subtype'
@@ -163,7 +165,7 @@ def test_parse_flu():
     assert segment_number == None , 'segment number'
     
     name = 'Influenza A virus (A/Hawaii/21/2001(N2))'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
     assert flu_type == 'A' ,'type'
     assert isolate_name == 'A/Hawaii/21/2001(N2)', 'isolate name'
     assert h_subtype == None , 'H subtype'
@@ -171,7 +173,7 @@ def test_parse_flu():
     assert segment_number == None , 'segment number'
     
     name = 'Influenza A virus (A/swine/Thailand/KU5.1/2004(H3N2))'
-    flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
+    is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( name )
     assert flu_type == 'A' ,'type'
     assert isolate_name == 'A/swine/Thailand/KU5.1/2004(H3N2)', 'isolate name'
     assert h_subtype == 'H3' , 'H subtype'

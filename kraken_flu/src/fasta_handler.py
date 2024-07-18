@@ -59,14 +59,11 @@ class FastaHandler():
         else:
             kraken_taxid = None
             
-        flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( header )
-        is_fluA = False
-        if flu_type:
-            is_flu = True
-            if flu_type == 'A':
+        is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number = parse_flu( header )
+        if flu_type and flu_type == 'A':
                 is_fluA = True
         else:
-            is_flu = False
+            is_fluA = False
             
         return flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype
 
@@ -161,8 +158,8 @@ class FastaHandler():
         """
         Inspects the FASTA data to filter out flu genomes that do not have full-length sequences 
         for all 8 segments.
-        This updates the cached "data" and removes entries that are not part of a complete influenza 
-        genome.
+        Genomes that are to be removed are marked by setting attribute include_in_output to False,
+        which is used in write_fasta() to skip the record.
         
         Parameters:        
                     
@@ -171,7 +168,12 @@ class FastaHandler():
                 Any genome where the FASTA header contains one of the strings in this list will not be subjected to 
                 the filter. This was required to ensure that the Goose Guandong H5N1 reference genome (which does not
                 have sequences for all 8 segments) is not filtered out.
+                
+        Returns: 
+            True upon success
         
+        Side effects: 
+            modifies self.data
         """
         # influenza A/B segment lengths
         MIN_SEG_LENGTHS = {
@@ -240,6 +242,30 @@ class FastaHandler():
         logging.info( f'kept {n_kept} influenza genomes, removed {n_filtered}')
         return True
     
+    def remove_unparsed_flu( self ):
+        """
+        Sets the include_in_output attribute to False for genomes that are identified as Influenza but
+        cannot be parsed by the flu name parser utils:parse_flu(), which leads to the removal of the 
+        record at the write_fasta() step.
+        
+        Parameters: 
+            none
+        Returns: 
+            True upon success
+        Side effects: 
+            modifies self.data
+        """
+        n = 0
+        for record in self.data:
+            if record.is_flu and ( not record.flu_type or not record.flu_name ):
+                n+=1
+                record.include_in_output = False
+        
+        if n > 0:
+            logging.info( f'removed {n} influenza genomes where name cannot be parsed')
+
+        return True
+                
     def n_seq_total( self ):
         """
         Returns the total number of sequence records in data

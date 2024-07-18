@@ -5,6 +5,7 @@ KRAKEN_TAX_ID_REGEX = re.compile(r'kraken:taxid\|([0-9]+)\|')
 # could potentially be stricter with the RefSeq IDs as we are only interested in NC_xxxxx(?)
 NCBI_ACC_REGEX = re.compile(r'gb\|[A-Z]+_?[0-9]+|[A-Z]{2}_[0-9]{6,}\.[0-9]')
 FLU_A_SUBTYPE_PARTS_REGEX = re.compile(r'(H[0-9]+)(N[0-9]+)')
+IS_FLU_REGEX = re.compile(r'influenza .* virus', re.IGNORECASE)
 
 # this regex captures all data from FLu strings (FASTA headers, names.dmp file)
 FLU_DATA_REGEX = re.compile(
@@ -50,9 +51,10 @@ def parse_flu( in_str:str ):
             The string to parse
             
     Returns:
-        flu_type, isolate name, H subtype, N subtype, segment number
+        is_flu, flu_type, isolate name, H subtype, N subtype, segment number
         
         where:
+            is_flu: bool (True if this has influenza keywords, False otherwise)
             flu_type: str ('A', 'B', ...)
             H subtype: str ('H1', 'H2', 'H3', ...)
             N subtype: str ('N1', 'N2', ...)
@@ -62,20 +64,30 @@ def parse_flu( in_str:str ):
             Each return value can be None if the pattern does not match
     """
     flu_type = h_subtype = n_subtype = isolate_name = segment_number = None
-    match = FLU_DATA_REGEX.match( in_str )
-    if match:
-        flu_type = match.group( 1 )
-        isolate_name = match.group( 2 )
-        h_subtype = match.group( 3 )
-        n_subtype = match.group( 4 )
-        segment_number = match.group( 5 )
-        if segment_number:
-            segment_number = int(segment_number)
-        else:
-            # could be that the segment number is not given but the gene, 
-            # which we can convert to a number
-            for gene_name, seg_num in FLU_GENE2SEG.items():
-                pattern = r'[\( ]' + gene_name + r'[ \)] (gene|mRNA|transcript)' 
-                if re.search(pattern, in_str):
-                    segment_number = seg_num
-    return flu_type, isolate_name, h_subtype, n_subtype, segment_number
+    
+    # check with a simple regex whether this looks like a flu name at all
+    # and only proceed if it does. This allows us to report a flu name that
+    # doesn't match the complex name-parsing regex so we can filter it out later
+    if IS_FLU_REGEX.search( in_str ):
+        is_flu = True
+    else:
+        is_flu = False
+    
+    if is_flu:    
+        match = FLU_DATA_REGEX.match( in_str )
+        if match:
+            flu_type = match.group( 1 )
+            isolate_name = match.group( 2 )
+            h_subtype = match.group( 3 )
+            n_subtype = match.group( 4 )
+            segment_number = match.group( 5 )
+            if segment_number:
+                segment_number = int(segment_number)
+            else:
+                # could be that the segment number is not given but the gene, 
+                # which we can convert to a number
+                for gene_name, seg_num in FLU_GENE2SEG.items():
+                    pattern = r'[\( ]' + gene_name + r'[ \)] (gene|mRNA|transcript)' 
+                    if re.search(pattern, in_str):
+                        segment_number = seg_num
+    return is_flu, flu_type, isolate_name, h_subtype, n_subtype, segment_number
