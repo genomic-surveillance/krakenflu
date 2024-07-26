@@ -116,11 +116,14 @@ class Sequence(MappedAsDataclass, Base):
     fasta_header: Mapped[str]
     dna_sequence: Mapped[str]
     seq_length: Mapped[int]
-    ncbi_acc: Mapped[Optional[str]] = mapped_column()
-    flu_name: Mapped[Optional[str]] = mapped_column()
-    flu_a_h_subtype: Mapped[Optional[int]] = mapped_column()
-    flu_a_n_subtype: Mapped[Optional[int]] = mapped_column()
+    ncbi_acc: Mapped[Optional[str]] = mapped_column(nullable=True)
+    flu_name: Mapped[Optional[str]] = mapped_column(nullable=True)
+    flu_type: Mapped[Optional[str]] = mapped_column(nullable=True)
+    flu_a_h_subtype: Mapped[Optional[int]] = mapped_column(nullable=True)
+    flu_a_n_subtype: Mapped[Optional[int]] = mapped_column(nullable=True)
     include: Mapped[bool] = mapped_column()
+    category: Mapped[str] = mapped_column(nullable=True)
+    original_tax_id: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     # relationships
     # 1:1 relationship to taxonomy_nodes: enforce single parent
@@ -141,8 +144,7 @@ class Db():
     
     def __init__( self, db_path: str):
         self.db_path = db_path
-        os.makedirs( self.db_path )
-        self._engine = create_engine("sqlite:///{db_path}", echo=False)
+        self._engine = create_engine(f"sqlite:///{db_path}", echo=False)
         # create the DB
         Base.metadata.create_all(self._engine)
         
@@ -150,5 +152,24 @@ class Db():
         # This is a command line tool that does one job, so we use a single session throughout
         self._session = Session(self._engine)
 
-        # more on adjacency list
-        # https://docs.sqlalchemy.org/en/20/_modules/examples/adjacency_list/adjacency_list.html
+    def add_sequence( self, fasta_header:str,  dna_sequence:str, category:str, flu_type:str, ncbi_acc:str, original_taxid:int, is_flu:bool, isolate_name:str, segment_number:int, h_subtype:int, n_subtype:int ):
+        """
+        Add a sequence record to table "sequences" without a link to taxonomy_nodes
+        """
+        self._session.add(
+            Sequence(
+                fasta_header=fasta_header,
+                dna_sequence=dna_sequence,
+                seq_length=len(dna_sequence),
+                ncbi_acc=ncbi_acc,
+                flu_name=isolate_name,
+                flu_type=flu_type,
+                flu_a_h_subtype=h_subtype,
+                flu_a_n_subtype=n_subtype,
+                include=True,
+                category=category,
+                original_tax_id=original_taxid,
+                taxonomy_node= None
+            )
+        )
+        self._session.commit()
