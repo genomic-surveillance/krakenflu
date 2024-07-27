@@ -116,12 +116,14 @@ class Sequence(MappedAsDataclass, Base):
     fasta_header: Mapped[str]
     dna_sequence: Mapped[str]
     seq_length: Mapped[int]
+    segment_number: Mapped[Optional[int]] = mapped_column(nullable=True)
     ncbi_acc: Mapped[Optional[str]] = mapped_column(nullable=True)
     flu_name: Mapped[Optional[str]] = mapped_column(nullable=True)
     flu_type: Mapped[Optional[str]] = mapped_column(nullable=True)
     flu_a_h_subtype: Mapped[Optional[int]] = mapped_column(nullable=True)
     flu_a_n_subtype: Mapped[Optional[int]] = mapped_column(nullable=True)
     include: Mapped[bool] = mapped_column()
+    is_flu: Mapped[bool] = mapped_column()
     category: Mapped[str] = mapped_column(nullable=True)
     original_tax_id: Mapped[Optional[int]] = mapped_column(nullable=True)
 
@@ -144,6 +146,8 @@ class Db():
     
     def __init__( self, db_path: str):
         self.db_path = db_path
+        if os.path.exists(db_path):
+            raise Exception(f"Cannot create database at `{db_path}` - the file exists already.")
         self._engine = create_engine(f"sqlite:///{db_path}", echo=False)
         # create the DB
         Base.metadata.create_all(self._engine)
@@ -162,10 +166,12 @@ class Db():
                 dna_sequence=dna_sequence,
                 seq_length=len(dna_sequence),
                 ncbi_acc=ncbi_acc,
+                is_flu=is_flu,
                 flu_name=isolate_name,
                 flu_type=flu_type,
                 flu_a_h_subtype=h_subtype,
                 flu_a_n_subtype=n_subtype,
+                segment_number=segment_number,
                 include=True,
                 category=category,
                 original_tax_id=original_taxid,
@@ -173,3 +179,4 @@ class Db():
             )
         )
         self._session.commit()
+        

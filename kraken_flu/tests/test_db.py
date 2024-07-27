@@ -1,8 +1,9 @@
 import pytest
 import os.path
 from importlib_resources import files
+from sqlalchemy import select
 
-from kraken_flu.src.db import Db
+from kraken_flu.src.db import Db, Sequence
 
 @pytest.fixture(scope='function')
 def setup_db( tmp_path ):
@@ -18,8 +19,11 @@ def test_db_connect( tmp_path ):
 
 def test_add_sequence(setup_db):
     db = setup_db
+    rows = db._session.execute(select(Sequence.dna_sequence).where( Sequence.fasta_header=='some test fasta header')).all()
+    assert len(rows) == 0, 'before inserting, we have no result'
+    
     db.add_sequence(
-        fasta_header= 'some fasta header',
+        fasta_header= 'some test fasta header',
         dna_sequence= 'ACGCATCGAA',
         category= None,
         flu_type= 'A',
@@ -31,4 +35,7 @@ def test_add_sequence(setup_db):
         h_subtype= 3,
         n_subtype= 2
     )
-    
+    # retrieve the newly inserted sequence row
+    rows = db._session.execute(select(Sequence.dna_sequence).where( Sequence.fasta_header=='some test fasta header')).all()
+    assert len(rows) == 1, 'after inserting, we have a single result'
+    assert rows[0].dna_sequence == 'ACGCATCGAA' ,'... the result has the correct DNA sequence value'
