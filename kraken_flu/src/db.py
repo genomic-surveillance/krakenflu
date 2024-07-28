@@ -92,8 +92,9 @@ class TaxonomyNode(MappedAsDataclass, Base):
 class TaxonomyName(MappedAsDataclass, Base):
     __tablename__ = "taxonomy_names"
 
-# The code snippet you provided is defining the columns for the `TaxonomyNode` class using
-# SQLAlchemy's declarative mapping. Let's break down the code snippet:
+    # We are using a composite PK made up of the tax_id and name column.  
+    # TODO: need to test and confirm whether this really is unique or do we need to use tax_id and unique_name? 
+    # ie can the same name be used in two records for the same taxon ID?
     tax_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("taxonomy_nodes.tax_id"), 
         primary_key=True,
@@ -216,6 +217,10 @@ class Db():
 def add_name(self, ):
         """
         Add a row into the names table.  
+        We are setting the tax_id directly without querying for the matching node (parent).  This 
+        is because we trust the NCBI taxonomy files to contain be a valid representation of the taxonomy 
+        parent2child relationships, so we simply load both tables (nodes and names) independently to re-create 
+        this relationship in the kraken_flu database.  
         """
         self._session.add(
             Node(
