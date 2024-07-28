@@ -102,7 +102,7 @@ class TaxonomyName(MappedAsDataclass, Base):
     )
     name: Mapped[str]= mapped_column(primary_key=True)
     name_class: Mapped[str]= mapped_column()
-    unique_name: Mapped[Optional[str]] = mapped_column()
+    unique_name: Mapped[Optional[str]] = mapped_column(nullable=True)
 
     # relationships
     taxonomy_node: Mapped[TaxonomyNode] = relationship(back_populates="taxonomy_names")
@@ -214,7 +214,7 @@ class Db():
         )
         self._session.commit()
 
-def add_name(self, ):
+def add_name(self, tax_id:int, name:str, name_class:str, unique_name:str):
         """
         Add a row into the names table.  
         We are setting the tax_id directly without querying for the matching node (parent).  This 
@@ -223,20 +223,11 @@ def add_name(self, ):
         this relationship in the kraken_flu database.  
         """
         self._session.add(
-            Node(
+            Name(
                 tax_id= tax_id,
-                parent_tax_id= parent_tax_id,
-                rank= rank,
-                embl_code= embl_code,
-                division_id= division_id,                   
-                inherited_div_flag= inherited_div_flag,            
-                genetic_code_id= genetic_code_id,
-                inherited_GC_flag= inherited_GC_flag,
-                mitochondrial_genetic_code_id= mitochondrial_genetic_code_id,
-                inherited_MGC_flag= inherited_MGC_flag,
-                GenBank_hidden_flag= GenBank_hidden_flag,
-                hidden_subtree_root_flag= hidden_subtree_root_flag,
-                comments= comments
-            )   
+                name= name,
+                name_class = name_class,
+                unique_name= unique_name
+            )
         )
         self._session.commit()
