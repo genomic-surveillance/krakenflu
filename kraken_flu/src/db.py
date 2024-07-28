@@ -94,11 +94,12 @@ class TaxonomyName(MappedAsDataclass, Base):
 
 # The code snippet you provided is defining the columns for the `TaxonomyNode` class using
 # SQLAlchemy's declarative mapping. Let's break down the code snippet:
-    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     tax_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("taxonomy_nodes.tax_id"), init=False
+        ForeignKey("taxonomy_nodes.tax_id"), 
+        primary_key=True,
+        init=False
     )
-    name: Mapped[str]= mapped_column()
+    name: Mapped[str]= mapped_column(primary_key=True)
     name_class: Mapped[str]= mapped_column()
     unique_name: Mapped[Optional[str]] = mapped_column()
 
@@ -109,9 +110,13 @@ class TaxonomyName(MappedAsDataclass, Base):
 class Sequence(MappedAsDataclass, Base):
     __tablename__ = "sequences"
 
-    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    # auto-increment ID primary key
+    # init=False: A new object of this class does not require this attribute for its __init__
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
     tax_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("taxonomy_nodes.tax_id"), init=False
+        ForeignKey("taxonomy_nodes.tax_id"),
+        init=False,
+        nullable=True
     )
     fasta_header: Mapped[str]
     dna_sequence: Mapped[str]
@@ -158,7 +163,11 @@ class Db():
 
     def add_sequence( self, fasta_header:str,  dna_sequence:str, category:str, flu_type:str, ncbi_acc:str, original_taxid:int, is_flu:bool, isolate_name:str, segment_number:int, h_subtype:int, n_subtype:int ):
         """
-        Add a sequence record to table "sequences" without a link to taxonomy_nodes
+        Add a sequence record to table "sequences" without a link to a taxon node (which will be provided later).  
+        NOTE on tax_id: If the FASTA header contains a kraken:taxid tag, we record this in the original_tax_id field.  
+        The tax_id field is only populated later by this tool when we make the final decision about which node we are associating 
+        this sequence with. So the original_tax_id is just a hint that may or may not end up being the tax_id we use in the end, but 
+        both are recorded.
         """
         self._session.add(
             Sequence(
@@ -180,3 +189,49 @@ class Db():
         )
         self._session.commit()
         
+        
+    def add_node(self, tax_id:int, parent_tax_id: int, rank: str, embl_code:str, division_id: int, inherited_div_flag:int, genetic_code_id:int,inherited_GC_flag:int, mitochondrial_genetic_code_id:int, inherited_MGC_flag:int, GenBank_hidden_flag:int, hidden_subtree_root_flag:int, comments:str):
+        """
+        Add a row into the nodes table.  
+        """
+        self._session.add(
+            Node(
+                tax_id= tax_id,
+                parent_tax_id= parent_tax_id,
+                rank= rank,
+                embl_code= embl_code,
+                division_id= division_id,                   
+                inherited_div_flag= inherited_div_flag,            
+                genetic_code_id= genetic_code_id,
+                inherited_GC_flag= inherited_GC_flag,
+                mitochondrial_genetic_code_id= mitochondrial_genetic_code_id,
+                inherited_MGC_flag= inherited_MGC_flag,
+                GenBank_hidden_flag= GenBank_hidden_flag,
+                hidden_subtree_root_flag= hidden_subtree_root_flag,
+                comments= comments
+            )   
+        )
+        self._session.commit()
+
+def add_name(self, ):
+        """
+        Add a row into the names table.  
+        """
+        self._session.add(
+            Node(
+                tax_id= tax_id,
+                parent_tax_id= parent_tax_id,
+                rank= rank,
+                embl_code= embl_code,
+                division_id= division_id,                   
+                inherited_div_flag= inherited_div_flag,            
+                genetic_code_id= genetic_code_id,
+                inherited_GC_flag= inherited_GC_flag,
+                mitochondrial_genetic_code_id= mitochondrial_genetic_code_id,
+                inherited_MGC_flag= inherited_MGC_flag,
+                GenBank_hidden_flag= GenBank_hidden_flag,
+                hidden_subtree_root_flag= hidden_subtree_root_flag,
+                comments= comments
+            )   
+        )
+        self._session.commit()

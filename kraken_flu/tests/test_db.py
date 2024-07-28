@@ -19,7 +19,7 @@ def test_db_connect( tmp_path ):
 
 def test_add_sequence(setup_db):
     db = setup_db
-    rows = db._session.execute(select(Sequence.dna_sequence).where( Sequence.fasta_header=='some test fasta header')).all()
+    rows = db._session.scalars(select(Sequence).where( Sequence.fasta_header=='some test fasta header')).all()
     assert len(rows) == 0, 'before inserting, we have no result'
     
     db.add_sequence(
@@ -36,6 +36,15 @@ def test_add_sequence(setup_db):
         n_subtype= 2
     )
     # retrieve the newly inserted sequence row
-    rows = db._session.execute(select(Sequence.dna_sequence).where( Sequence.fasta_header=='some test fasta header')).all()
+    rows = db._session.scalars(select(Sequence).where( Sequence.fasta_header=='some test fasta header')).all()
     assert len(rows) == 1, 'after inserting, we have a single result'
-    assert rows[0].dna_sequence == 'ACGCATCGAA' ,'... the result has the correct DNA sequence value'
+    row = rows[0]
+    assert isinstance(row, Sequence), '... the result is a Sequence object'
+    assert row.dna_sequence == 'ACGCATCGAA' ,'... the result has the correct DNA sequence value'
+    
+    # We record the original kraken:taxid if there is one in the header but this does not assign
+    # the record to a node in the taxonomy_nodes table and hence does not assign the tax_id field
+    # Instead, we record any kraken:taxid from the FASTA header in the original_tax_id field
+    assert row.taxonomy_node == None ,'... no taxonomy node assigned yet'
+    assert row.tax_id == None, '...no taxonomy node has been assigned yet, so not tax_id is assigned'
+    assert row.original_tax_id == 12345, '... the original kraken taxid from the inserted record is correct'
