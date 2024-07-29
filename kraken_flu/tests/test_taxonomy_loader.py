@@ -2,6 +2,7 @@ import pytest
 import os.path
 from importlib_resources import files
 from sqlalchemy import select
+from sqlalchemy.orm import contains_eager
 
 from kraken_flu.src.taxonomy_loader import load_taxonomy, _load_names, _load_nodes, _read_tax_data_file_row
 from kraken_flu.src.db import Db, TaxonomyName, TaxonomyNode
@@ -10,11 +11,14 @@ FIXTURE_DIR = files('kraken_flu.tests.fixtures')
 NODES_FILE = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','taxonomy','nodes.dmp'))
 NAMES_FILE = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','taxonomy','names.dmp'))
 
+DEBUG=True
+#DEBUG=False
+
 @pytest.fixture(scope='function')
 def setup_db( tmp_path ):
     """ initialise the DB """
     db_path = tmp_path / 'kraken_flu.db'
-    db = Db(db_path)
+    db = Db(db_path, debug=DEBUG)
     yield db
     
 def test__read_tax_data_file_row():
@@ -46,3 +50,23 @@ def test__load_nodes(setup_db):
     
     rows = db._session.execute(select(TaxonomyNode)).all()
     assert len(rows) == 20, 'after running _load_names, we now have 20 rows of data in taxonomy_nodes table'
+    
+def test_load_taxonomy(setup_db):
+    db=setup_db
+    assert len(db._session.execute(select(TaxonomyNode)).all()) ==  len(db._session.execute(select(TaxonomyName)).all()) == 0, 'before we start uploading, no taxonomy nodes or names are in the DB'
+    assert load_taxonomy(db=db, names_file_path=NAMES_FILE, nodes_file_path=NODES_FILE)
+    assert len(db._session.execute(select(TaxonomyNode)).all()) == 20, 'after running load_taxonomy 20 taxonomy_nodes exist in the DB'
+    assert len(db._session.execute(select(TaxonomyName)).all()) == 52, 'after running load_taxonomy 52 taxonomy_names exist in the DB'
+
+    # retrieve a node and corresponding names by tax_id and name class 
+    row = db._session.execute(
+        select(TaxonomyNode)
+        .join(TaxonomyNode.taxonomy_names)
+        .options(contains_eager(TaxonomyNode.taxonomy_names))
+        .where(
+            TaxonomyNode.tax_id == 2697049,
+            TaxonomyName.name_class == 'scientific name',
+        )).unique().one()
+    assert row.TaxonomyNode.parent_tax_id == 694009, 'parent tax_id is correct'
+    assert [ r.name for r in row.TaxonomyNode.taxonomy_names ] == ['Severe acute respiratory syndrome coronavirus 2'], 'a single name is retrieved when filtering for scientific name'
+    
