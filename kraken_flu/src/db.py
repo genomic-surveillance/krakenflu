@@ -183,7 +183,6 @@ class Db():
                 include=True,
                 category=category,
                 original_tax_id=original_taxid,
-                taxonomy_node= None
             )
         )
         self._session.commit()
@@ -215,12 +214,11 @@ class Db():
     def add_name(self, tax_id:int, name:str, name_class:str, unique_name:str):
             """
             Add a row into the names table.  
-            We are setting the tax_id directly without querying for the matching node (parent).  This 
-            is because we trust the NCBI taxonomy files to contain be a valid representation of the taxonomy 
-            parent2child relationships, so we simply load both tables (nodes and names) independently to re-create 
-            this relationship in the kraken_flu database.
-            For this reason, the "taxonomy_node" is set to None here even though there will be a parent in the 
-            taxonomy_nodes table at the end of loading taxonomy data.
+            NOTE: the "proper" SQLA way of creating a new TaxonomyName, which is a child of TaxonomyNode,
+            would be to query for the TaxonomyNode by tax_id, then append the new TaxonomyName to the list 
+            of taxonomy_names. We are instead setting the tax_id directly as we receive it from the input file names.dmp.  
+            This speeds up the process and is fine here because we can rely on the NCBI taxonomy file to provide the
+            parent-child relationship between nodes and names via tax_id.
             """
             self._session.add(
                 TaxonomyName(

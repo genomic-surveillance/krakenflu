@@ -47,7 +47,9 @@ def load_taxonomy(db: Db, names_file_path:str, nodes_file_path:str, acc2taxid_fi
 
 def _load_names(db:Db, names_file_path:str):
     """
-    Upload the names.dmp file to the DB
+    Upload the names.dmp file to the DB. Nodes and names are uploaded separately, relying on the NCBI 
+    taxonomy file to link the two entities by tax_id, ie we are not checking that a taxonomy_node record exists for 
+    the taxonomy_names we are inserting into the DB.
     """
     logging.info( f'starting to upload names from {names_file_path} data to DB')
     n=0
