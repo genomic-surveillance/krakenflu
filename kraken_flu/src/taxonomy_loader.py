@@ -101,7 +101,7 @@ def _load_acc2taxids(db:Db, acc2taxid_file_path:str):
     raise NotImplemented("this function is not yet implemented and needs an update to the Db class: need a table for this data")
     logging.info( f'finish uploading {n} acc2taxid records to DB')
     
-def _read_tax_data_file_row( self, row ):
+def _read_tax_data_file_row( row ):
     """
     Parses one row of data from names and nodes dmp file and returns as list
     Removes the trailing \t| from the last column

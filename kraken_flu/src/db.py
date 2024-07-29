@@ -51,13 +51,13 @@ class Base(DeclarativeBase):
 
 # using the new Annotated Declarative Table style
 # columns are declared with Python class on the left, mapped table column on the right
-class TaxonomyNode(MappedAsDataclass, Base):
+class TaxonomyNode( Base):
     __tablename__ = "taxonomy_nodes"
 
     # columns
-    tax_id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    tax_id: Mapped[int] = mapped_column(primary_key=True)
     parent_tax_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("taxonomy_nodes.tax_id"), init=False
+        ForeignKey("taxonomy_nodes.tax_id")
     )
     rank: Mapped[str]
     embl_code: Mapped[Optional[str]]
@@ -72,51 +72,49 @@ class TaxonomyNode(MappedAsDataclass, Base):
     comments: Mapped[Optional[str]]
 
     # relationships
-    taxonomy_names: Mapped[List[TaxonomyName]] = relationship(back_populates="taxonomy_node")
-    sequence: Mapped[Optional[Sequence]] = relationship(back_populates="taxonomy_node")
+    taxonomy_names: Mapped[List[TaxonomyName]] = relationship()
+    sequence: Mapped[Optional[Sequence]] = relationship()
 
     # children: delete-orphan will trigger a delete cascade when a parent is
     # deleted so that all children are deleted too
     children: Mapped[Dict[str, TaxonomyNode]] = relationship(
         cascade="all, delete-orphan",
         back_populates="parent",
-        collection_class=attribute_keyed_dict("name"),
-        init=False,
-        repr=False,
+        collection_class=attribute_keyed_dict("name")
     )
 
     parent: Mapped[Optional[TaxonomyNode]] = relationship(
-        back_populates="children", remote_side=tax_id, default=None
+        back_populates="children", remote_side=tax_id
     )
     
-class TaxonomyName(MappedAsDataclass, Base):
+class TaxonomyName(Base):
     __tablename__ = "taxonomy_names"
 
     # We are using a composite PK made up of the tax_id and name column.  
     # TODO: need to test and confirm whether this really is unique or do we need to use tax_id and unique_name? 
     # ie can the same name be used in two records for the same taxon ID?
-    tax_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("taxonomy_nodes.tax_id"), 
-        primary_key=True,
-        init=False
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    tax_id: Mapped[int] = mapped_column(
+        ForeignKey("taxonomy_nodes.tax_id")
     )
-    name: Mapped[str]= mapped_column(primary_key=True)
+    name: Mapped[str]= mapped_column()
     name_class: Mapped[str]= mapped_column()
     unique_name: Mapped[Optional[str]] = mapped_column(nullable=True)
 
     # relationships
+    # a TaxonomyName is the child of a TaxonomyNode
     taxonomy_node: Mapped[TaxonomyNode] = relationship(back_populates="taxonomy_names")
 
 
-class Sequence(MappedAsDataclass, Base):
+class Sequence(Base):
     __tablename__ = "sequences"
 
     # auto-increment ID primary key
     # init=False: A new object of this class does not require this attribute for its __init__
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     tax_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("taxonomy_nodes.tax_id"),
-        init=False,
         nullable=True
     )
     fasta_header: Mapped[str]
@@ -196,7 +194,7 @@ class Db():
         Add a row into the nodes table.  
         """
         self._session.add(
-            Node(
+            TaxonomyNode(
                 tax_id= tax_id,
                 parent_tax_id= parent_tax_id,
                 rank= rank,
@@ -214,20 +212,22 @@ class Db():
         )
         self._session.commit()
 
-def add_name(self, tax_id:int, name:str, name_class:str, unique_name:str):
-        """
-        Add a row into the names table.  
-        We are setting the tax_id directly without querying for the matching node (parent).  This 
-        is because we trust the NCBI taxonomy files to contain be a valid representation of the taxonomy 
-        parent2child relationships, so we simply load both tables (nodes and names) independently to re-create 
-        this relationship in the kraken_flu database.  
-        """
-        self._session.add(
-            Name(
-                tax_id= tax_id,
-                name= name,
-                name_class = name_class,
-                unique_name= unique_name
+    def add_name(self, tax_id:int, name:str, name_class:str, unique_name:str):
+            """
+            Add a row into the names table.  
+            We are setting the tax_id directly without querying for the matching node (parent).  This 
+            is because we trust the NCBI taxonomy files to contain be a valid representation of the taxonomy 
+            parent2child relationships, so we simply load both tables (nodes and names) independently to re-create 
+            this relationship in the kraken_flu database.
+            For this reason, the "taxonomy_node" is set to None here even though there will be a parent in the 
+            taxonomy_nodes table at the end of loading taxonomy data.
+            """
+            self._session.add(
+                TaxonomyName(
+                    tax_id= tax_id,
+                    name= name,
+                    name_class = name_class,
+                    unique_name= unique_name
+                )
             )
-        )
-        self._session.commit()
+            self._session.commit()
