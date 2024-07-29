@@ -146,13 +146,16 @@ class Db():
     Parameters:
         db_path: str, required
             absolute path to the sqlite file to be created
+            
+        debug: bool, optional, defaults to False
+            If True, will emit debug messages from SQLAlchemy
     """
     
-    def __init__( self, db_path: str):
+    def __init__( self, db_path: str, debug:bool=False):
         self.db_path = db_path
         if os.path.exists(db_path):
             raise Exception(f"Cannot create database at `{db_path}` - the file exists already.")
-        self._engine = create_engine(f"sqlite:///{db_path}", echo=False)
+        self._engine = create_engine(f"sqlite:///{db_path}", echo=debug)
         # create the DB
         Base.metadata.create_all(self._engine)
         
