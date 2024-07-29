@@ -58,9 +58,9 @@ def _load_names(db:Db, names_file_path:str):
             d = _read_tax_data_file_row( row )
             db.add_name(
                 tax_id= int(d[0]),
-                name= d[1],
-                name_class = d[2],
-                unique_name= d[3]
+                name= d[1],                
+                unique_name= d[2],
+                name_class = d[3]
             )
             n +=1            
     logging.info( f'finished uploading {n} names records to DB')
