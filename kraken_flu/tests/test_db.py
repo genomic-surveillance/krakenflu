@@ -10,6 +10,16 @@ def setup_db( tmp_path ):
     db_path = tmp_path / 'kraken_flu.db'
     db = Db(db_path)
     yield db
+
+@pytest.fixture(scope='function')
+def setup_db_with_fixture( setup_db ):
+    db = setup_db
+    fixture_dir = files('kraken_flu.tests.fixtures')
+    db_fixture_file = fixture_dir.joinpath(os.path.join('db_fixtures','db_fixture1.sql'))
+    with open(db_fixture_file, 'r') as file:
+        file_content = file.read()
+    db._cur.executescript(file_content)
+    yield db
     
 def test_db_connect( tmp_path ):
     db_path = tmp_path / 'kraken_flu.db'
@@ -47,3 +57,10 @@ def test_add_sequence(setup_db):
     # Instead, we record any kraken:taxid from the FASTA header in the original_tax_id field
     assert row['tax_id'] == None, '...no taxonomy node has been assigned yet, so not tax_id is assigned'
     assert row['original_tax_id'] == 12345, '... the original kraken taxid from the inserted record is correct'
+
+def test_get_leaf_node_tax_ids(setup_db_with_fixture):
+    db = setup_db_with_fixture
+    leaf_node_tax_ids = db.get_leaf_node_tax_ids()
+    assert isinstance( leaf_node_tax_ids, list)
+    assert len(leaf_node_tax_ids) == 2, 'the fixtures have 2 leaf nodes'
+    assert set(leaf_node_tax_ids) == set([3,4]), 'correct tax_ids identified as leaf nodes'

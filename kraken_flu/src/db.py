@@ -123,6 +123,22 @@ class Db():
                 'comments': comments
             } 
         )
+        
+    def get_leaf_node_tax_ids(self):
+        """
+        Runs a query to fetch all tax_ids of leaf nodes, ie nodes that have no children
+        """
+        stmt = """
+            SELECT tax_id
+            FROM taxonomy_nodes AS tn1
+            WHERE NOT EXISTS(
+                SELECT *
+                FROM taxonomy_nodes AS tn2
+                WHERE tn2.parent_tax_id = tn1.tax_id
+            )
+        """
+        rows = self._cur.execute(stmt).fetchall()
+        return [ r['tax_id'] for r in rows ]
 
     def add_name(self, tax_id:int, name:str, name_class:str, unique_name:str):
         """
