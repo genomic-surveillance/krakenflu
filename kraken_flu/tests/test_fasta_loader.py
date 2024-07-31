@@ -1,10 +1,9 @@
 import pytest
 import os.path
 from importlib_resources import files
-from sqlalchemy import select
 
 from kraken_flu.src.fasta_loader import load_fasta, _parse_header
-from kraken_flu.src.db import Db, Sequence
+from kraken_flu.src.db import Db
 
 FIXTURE_DIR = files('kraken_flu.tests.fixtures')
 SMALL_VIRUS_FILE = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','library','viral','library.fna'))
@@ -74,37 +73,38 @@ def test__parse_header():
     
 def test_load_fasta( setup_db ):
     db = setup_db
-    rows = db._session.execute(select(Sequence)).all()
+    rows = db._cur.execute("SELECT * FROM sequences").fetchall()
     assert len(rows) == 0, 'no sequence data in DB before we start uploading'
     
     # trigger the DB loading
     assert load_fasta(db, SMALL_VIRUS_FILE), 'loading into DB returns True'
     
-    rows = db._session.execute(select(Sequence)).all()
+    rows = db._cur.execute("SELECT * FROM sequences").fetchall()
     assert len(rows) == 35, '35 rows of sequence data in DB after loadingg'
     
-    rows = db._session.execute(select(Sequence).where(Sequence.segment_number == 1)).all()
+    rows = db._cur.execute("SELECT * FROM sequences WHERE segment_number == 1").fetchall()
     assert len(rows) == 4, '4 sequence records with segment number == 1 (one has RNA 1 instead of segment 1 in the header)'
     
-    rows = db._session.execute(select(Sequence).where(Sequence.ncbi_acc == 'NC_002211.1')).all()
+    rows = db._cur.execute("SELECT * FROM sequences WHERE ncbi_acc == 'NC_002211.1'").fetchall()
     assert len(rows) == 1, '1 sequence records with NCBI accession number NC_002211.1'
     
     # retrieve this record and test all inserted fields are as expected
     # >kraken:taxid|335341|NC_007373.1 Influenza A virus (A/New York/392/2004(H3N2)) segment 1, complete sequence
-    row = db._session.scalars(
-        select(Sequence)
-        .where(
-            Sequence.fasta_header == 'kraken:taxid|335341|NC_007373.1 Influenza A virus (A/New York/392/2004(H3N2)) segment 1, complete sequence',
-        )).one()
-    assert row.ncbi_acc == 'NC_007373.1','retrieved row has the correct NCBI accession'
-    assert row.dna_sequence.startswith('AGCAAAAGCA'), '... DNA seq starts is correct'
-    assert row.dna_sequence.endswith('CTTGTTTCTACT'),'... DNA seq ends is correct'
-    assert row.seq_length == 2341,'... DNA seq length is correct'
-    assert row.category == None, '... no category is set'
-    assert row.flu_type == 'A', '... flu type is correct'
-    assert row.original_tax_id == 335341,'... original kraken taxid is correct'
-    assert row.is_flu, '... is_flu correctly set to True'
-    assert row.flu_name == 'A/New York/392/2004(H3N2)', '... correct flu isolate name'
-    assert row.segment_number == 1, '... correct segment number'
-    assert row.flu_a_h_subtype == 3, '... correct flu H subtype'
-    assert row.flu_a_n_subtype == 2, '... correct flu N subtype'
+    rows = (
+        db._cur.execute(
+        "SELECT * FROM sequences WHERE fasta_header == 'kraken:taxid|335341|NC_007373.1 Influenza A virus (A/New York/392/2004(H3N2)) segment 1, complete sequence'")
+    .fetchall() )
+    assert len(rows) == 1, 'single row returned'
+    row = rows[0]
+    assert row['ncbi_acc'] == 'NC_007373.1','retrieved row has the correct NCBI accession'
+    assert row['dna_sequence'].startswith('AGCAAAAGCA'), '... DNA seq starts is correct'
+    assert row['dna_sequence'].endswith('CTTGTTTCTACT'),'... DNA seq ends is correct'
+    assert row['seq_length'] == 2341,'... DNA seq length is correct'
+    assert row['category'] == None, '... no category is set'
+    assert row['flu_type'] == 'A', '... flu type is correct'
+    assert row['original_tax_id'] == 335341,'... original kraken taxid is correct'
+    assert row['is_flu'], '... is_flu correctly set to True'
+    assert row['flu_name'] == 'A/New York/392/2004(H3N2)', '... correct flu isolate name'
+    assert row['segment_number'] == 1, '... correct segment number'
+    assert row['flu_a_h_subtype'] == 3, '... correct flu H subtype'
+    assert row['flu_a_n_subtype'] == 2, '... correct flu N subtype'

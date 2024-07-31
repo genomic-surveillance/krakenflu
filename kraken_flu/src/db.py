@@ -1,18 +1,4 @@
-from __future__ import annotations
-from typing import Dict
-from typing import Optional
-from typing import List
-from sqlalchemy import create_engine
-from sqlalchemy import ForeignKey
-from sqlalchemy import select
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
-from sqlalchemy.orm import MappedAsDataclass
-from sqlalchemy.orm import relationship
-from sqlalchemy.orm import selectinload
-from sqlalchemy.orm import Session
-from sqlalchemy.orm.collections import attribute_keyed_dict
+import sqlite3
 import os
 
 """
@@ -46,99 +32,6 @@ The schema of the DB is as follows:
 
 """
 
-class Base(DeclarativeBase):
-    pass
-
-# using the new Annotated Declarative Table style
-# columns are declared with Python class on the left, mapped table column on the right
-class TaxonomyNode( Base):
-    __tablename__ = "taxonomy_nodes"
-
-    # columns
-    tax_id: Mapped[int] = mapped_column(primary_key=True)
-    parent_tax_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("taxonomy_nodes.tax_id")
-    )
-    rank: Mapped[str]
-    embl_code: Mapped[Optional[str]]
-    division_id: Mapped[int]                   
-    inherited_div_flag: Mapped[int]            
-    genetic_code_id: Mapped[int]
-    inherited_GC_flag: Mapped[int]
-    mitochondrial_genetic_code_id: Mapped[int]
-    inherited_MGC_flag: Mapped[int]
-    GenBank_hidden_flag: Mapped[int]
-    hidden_subtree_root_flag: Mapped[int]
-    comments: Mapped[Optional[str]]
-
-    # relationships
-    taxonomy_names: Mapped[List[TaxonomyName]] = relationship()
-    sequence: Mapped[Optional[Sequence]] = relationship()
-
-    # children: delete-orphan will trigger a delete cascade when a parent is
-    # deleted so that all children are deleted too
-    children: Mapped[Dict[str, TaxonomyNode]] = relationship(
-        cascade="all, delete-orphan",
-        back_populates="parent",
-        collection_class=attribute_keyed_dict("name")
-    )
-
-    parent: Mapped[Optional[TaxonomyNode]] = relationship(
-        back_populates="children", remote_side=tax_id
-    )
-    
-class TaxonomyName(Base):
-    __tablename__ = "taxonomy_names"
-
-    # We are using a composite PK made up of the tax_id and name column.  
-    # TODO: need to test and confirm whether this really is unique or do we need to use tax_id and unique_name? 
-    # ie can the same name be used in two records for the same taxon ID?
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    tax_id: Mapped[int] = mapped_column(
-        ForeignKey("taxonomy_nodes.tax_id")
-    )
-    name: Mapped[str]= mapped_column()
-    name_class: Mapped[str]= mapped_column()
-    unique_name: Mapped[Optional[str]] = mapped_column(nullable=True)
-
-    # relationships
-    # a TaxonomyName is the child of a TaxonomyNode
-    taxonomy_node: Mapped[TaxonomyNode] = relationship(back_populates="taxonomy_names")
-
-
-class Sequence(Base):
-    __tablename__ = "sequences"
-
-    # auto-increment ID primary key
-    # init=False: A new object of this class does not require this attribute for its __init__
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tax_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("taxonomy_nodes.tax_id"),
-        nullable=True
-    )
-    fasta_header: Mapped[str]
-    dna_sequence: Mapped[str]
-    seq_length: Mapped[int]
-    segment_number: Mapped[Optional[int]] = mapped_column(nullable=True)
-    ncbi_acc: Mapped[Optional[str]] = mapped_column(nullable=True)
-    flu_name: Mapped[Optional[str]] = mapped_column(nullable=True)
-    flu_type: Mapped[Optional[str]] = mapped_column(nullable=True)
-    flu_a_h_subtype: Mapped[Optional[int]] = mapped_column(nullable=True)
-    flu_a_n_subtype: Mapped[Optional[int]] = mapped_column(nullable=True)
-    include: Mapped[bool] = mapped_column()
-    is_flu: Mapped[bool] = mapped_column()
-    category: Mapped[str] = mapped_column(nullable=True)
-    original_tax_id: Mapped[Optional[int]] = mapped_column(nullable=True)
-
-    # relationships
-    # 1:1 relationship to taxonomy_nodes: enforce single parent
-    # NOTE: this uses a 1:1 relationship because the taxonomy and sequence data is loaded from different
-    # files by different processes. Having all data in a single table would require linking the two types of
-    # data at the moment we load them, which is not ideal. 
-    taxonomy_node: Mapped[Optional[TaxonomyNode]] = relationship(back_populates="sequence", single_parent=True)
-
-
 class Db():   
     """
     This class handles all interactions with the SQLite DB, including the DB session.
@@ -150,18 +43,38 @@ class Db():
         debug: bool, optional, defaults to False
             If True, will emit debug messages from SQLAlchemy
     """
-    
     def __init__( self, db_path: str, debug:bool=False):
         self.db_path = db_path
         if os.path.exists(db_path):
             raise Exception(f"Cannot create database at `{db_path}` - the file exists already.")
-        self._engine = create_engine(f"sqlite:///{db_path}", echo=debug)
-        # create the DB
-        Base.metadata.create_all(self._engine)
+
+        # connect and create a cursor (session)
+        self._con = sqlite3.connect(db_path)
+        self._con.row_factory = sqlite3.Row # see https://docs.python.org/3.8/library/sqlite3.html?highlight=word#row-objects
+        self._cur = self._con.cursor()
         
-        # create a session
-        # This is a command line tool that does one job, so we use a single session throughout
-        self._session = Session(self._engine)
+        # create the DB schema
+        self._cur.executescript( self.schema )
+
+    def insert_from_dict(self, table_name:str, data:dict):
+        """
+        Creates an INSERT statement like:
+        INSERT INTO table_name(field1, field2 [...]) VALUES(:field1, :field2 [...])
+        which is called with the field values in an execute on the DB cursor
+
+        Args:
+            data (dict): dictionary of the data, keys must be valid field names
+        """
+        field_name_list = [] # for table_name(field list)
+        value_name_list = [] # for VALUES(names list)
+        values = [] # the values we are inserting in the order of field names
+        for key, value in data.items():
+            field_name_list.append(key)
+            value_name_list.append(':'+key)
+            values.append(value)
+        stmt = f"INSERT INTO {table_name}({','.join(field_name_list)}) VALUES({','.join(value_name_list)})"
+        self._cur.execute(stmt, data)        
+        self._con.commit()
 
     def add_sequence( self, fasta_header:str,  dna_sequence:str, category:str, flu_type:str, ncbi_acc:str, original_taxid:int, is_flu:bool, isolate_name:str, segment_number:int, h_subtype:int, n_subtype:int ):
         """
@@ -171,64 +84,113 @@ class Db():
         this sequence with. So the original_tax_id is just a hint that may or may not end up being the tax_id we use in the end, but 
         both are recorded.
         """
-        self._session.add(
-            Sequence(
-                fasta_header=fasta_header,
-                dna_sequence=dna_sequence,
-                seq_length=len(dna_sequence),
-                ncbi_acc=ncbi_acc,
-                is_flu=is_flu,
-                flu_name=isolate_name,
-                flu_type=flu_type,
-                flu_a_h_subtype=h_subtype,
-                flu_a_n_subtype=n_subtype,
-                segment_number=segment_number,
-                include=True,
-                category=category,
-                original_tax_id=original_taxid,
-            )
+        self.insert_from_dict('sequences',
+            {
+                'fasta_header':fasta_header,
+                'dna_sequence':dna_sequence,
+                'seq_length':len(dna_sequence),
+                'ncbi_acc':ncbi_acc,
+                'is_flu':int(is_flu),
+                'flu_name':isolate_name,
+                'flu_type':flu_type,
+                'flu_a_h_subtype':h_subtype,
+                'flu_a_n_subtype':n_subtype,
+                'segment_number':segment_number,
+                'include':int(True),
+                'category':category,
+                'original_tax_id':original_taxid,
+            } 
         )
-        self._session.commit()
-        
         
     def add_node(self, tax_id:int, parent_tax_id: int, rank: str, embl_code:str, division_id: int, inherited_div_flag:int, genetic_code_id:int,inherited_GC_flag:int, mitochondrial_genetic_code_id:int, inherited_MGC_flag:int, GenBank_hidden_flag:int, hidden_subtree_root_flag:int, comments:str):
         """
         Add a row into the nodes table.  
         """
-        self._session.add(
-            TaxonomyNode(
-                tax_id= tax_id,
-                parent_tax_id= parent_tax_id,
-                rank= rank,
-                embl_code= embl_code,
-                division_id= division_id,                   
-                inherited_div_flag= inherited_div_flag,            
-                genetic_code_id= genetic_code_id,
-                inherited_GC_flag= inherited_GC_flag,
-                mitochondrial_genetic_code_id= mitochondrial_genetic_code_id,
-                inherited_MGC_flag= inherited_MGC_flag,
-                GenBank_hidden_flag= GenBank_hidden_flag,
-                hidden_subtree_root_flag= hidden_subtree_root_flag,
-                comments= comments
-            )   
+        self.insert_from_dict('taxonomy_nodes',
+            {
+                'tax_id': tax_id,
+                'parent_tax_id': parent_tax_id,
+                'rank': rank,
+                'embl_code': embl_code,
+                'division_id': division_id,                   
+                'inherited_div_flag': inherited_div_flag,            
+                'genetic_code_id': genetic_code_id,
+                'inherited_GC_flag': inherited_GC_flag,
+                'mitochondrial_genetic_code_id': mitochondrial_genetic_code_id,
+                'inherited_MGC_flag': inherited_MGC_flag,
+                'GenBank_hidden_flag': GenBank_hidden_flag,
+                'hidden_subtree_root_flag': hidden_subtree_root_flag,
+                'comments': comments
+            } 
         )
-        self._session.commit()
 
     def add_name(self, tax_id:int, name:str, name_class:str, unique_name:str):
-            """
-            Add a row into the names table.  
-            NOTE: the "proper" SQLA way of creating a new TaxonomyName, which is a child of TaxonomyNode,
-            would be to query for the TaxonomyNode by tax_id, then append the new TaxonomyName to the list 
-            of taxonomy_names. We are instead setting the tax_id directly as we receive it from the input file names.dmp.  
-            This speeds up the process and is fine here because we can rely on the NCBI taxonomy file to provide the
-            parent-child relationship between nodes and names via tax_id.
-            """
-            self._session.add(
-                TaxonomyName(
-                    tax_id= tax_id,
-                    name= name,
-                    name_class = name_class,
-                    unique_name= unique_name
-                )
-            )
-            self._session.commit()
+        """
+        Add a row into the names table. 
+        NOTE: there is no check here to ensure the referenced tax_id actually exists in the taxonomy_nodes 
+        parent table. This saves a significant number of SELECTs and the check should not be required because 
+        we are basically just re-creating the taxonomy database from NCBI using the flat file export.
+        """
+        self.insert_from_dict('taxonomy_names',
+            {
+                'tax_id': tax_id,
+                'name': name,
+                'name_class': name_class,
+                'unique_name': unique_name
+            } 
+        )
+
+    @property        
+    def schema(self):
+        """
+        The database schema as a string. Used for the creation of the DB
+        """
+        return """
+            CREATE TABLE taxonomy_nodes (
+                tax_id INTEGER NOT NULL, 
+                parent_tax_id INTEGER, 
+                rank VARCHAR NOT NULL, 
+                embl_code VARCHAR, 
+                division_id INTEGER NOT NULL, 
+                inherited_div_flag INTEGER NOT NULL, 
+                genetic_code_id INTEGER NOT NULL, 
+                "inherited_GC_flag" INTEGER NOT NULL, 
+                mitochondrial_genetic_code_id INTEGER NOT NULL, 
+                "inherited_MGC_flag" INTEGER NOT NULL, 
+                "GenBank_hidden_flag" INTEGER NOT NULL, 
+                hidden_subtree_root_flag INTEGER NOT NULL, 
+                comments VARCHAR, 
+                PRIMARY KEY (tax_id), 
+                FOREIGN KEY(parent_tax_id) REFERENCES taxonomy_nodes (tax_id)
+            );
+
+            CREATE TABLE taxonomy_names (
+                id INTEGER NOT NULL, 
+                tax_id INTEGER NOT NULL, 
+                name VARCHAR NOT NULL, 
+                name_class VARCHAR NOT NULL, 
+                unique_name VARCHAR, 
+                PRIMARY KEY (id), 
+                FOREIGN KEY(tax_id) REFERENCES taxonomy_nodes (tax_id)
+            );
+
+            CREATE TABLE sequences (
+                id INTEGER NOT NULL, 
+                tax_id INTEGER, 
+                fasta_header VARCHAR NOT NULL, 
+                dna_sequence VARCHAR NOT NULL, 
+                seq_length INTEGER NOT NULL, 
+                segment_number INTEGER, 
+                ncbi_acc VARCHAR, 
+                flu_name VARCHAR, 
+                flu_type VARCHAR, 
+                flu_a_h_subtype INTEGER, 
+                flu_a_n_subtype INTEGER, 
+                include BOOLEAN NOT NULL, 
+                is_flu BOOLEAN NOT NULL, 
+                category VARCHAR, 
+                original_tax_id INTEGER, 
+                PRIMARY KEY (id), 
+                FOREIGN KEY(tax_id) REFERENCES taxonomy_nodes (tax_id)
+            );
+        """
