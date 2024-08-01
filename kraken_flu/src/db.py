@@ -155,7 +155,85 @@ class Db():
                 'unique_name': unique_name
             } 
         )
+        
+    def get_all_tax_ids_paths_root_to_leaf(self):
+        """
+        Queries the DB to retrieve a list of lists as follows:
+            [ 
+                [root_tax_id, child_tax_id1, child_tax_id2, ... leaf_tax_id1],
+                [root_tax_id, child_tax_id3, child_tax_id4, ... leaf_tax_id2],]
+            ]
+        Every top level list element is a list of tax_ids that represent a path through the
+        taxonomy from root to a leaf. The final datastructure contains one top level list for
+        every leaf node in the taxonomy
 
+        Returns:
+            list of lists
+        """
+        leaf_node_tax_ids = self.get_leaf_node_tax_ids()
+        data = []
+        
+        # CONTINUE HERE
+        raise NotImplementedError
+
+    def get_tax_ids_path_root_to(self, starting_tax_id:int):
+        """
+        For a given node by tax_id, traverse the taxonomy from child to parent and collect 
+        tax_ids until we hit the root node.  
+        Return as a list in order from root tax_id to the one we started from, ie from parent to 
+        child. 
+        Example:
+        path = db.get_tax_ids_path_root_to(12)
+        [1, 4, 12]
+        -> means the node with tax_id 12 has a path (of tax_ids) from root (1) via node 4.
+        
+        Args:
+            starting_tax_id: int, required
+                The tax_id from where we start to query towards the root.
+                There is no check to ensure this is actually a leaf
+
+        Returns:
+            list: list of tax_ids in order from root to the node we started from
+        """
+        tax_id = starting_tax_id
+        path = []
+        while tax_id:
+            path.append(tax_id)
+            tax_id = self.get_parent_tax_id(tax_id)
+        path.reverse()
+        return path
+        
+    
+    def get_parent_tax_id(self, tax_id:int):
+        """
+        From a given node, identified by tax_id, find the parent tax_id.  
+        Returns None for the root taxonomy node, which has no tax_id
+
+        Args:
+            tax_id: int, required
+                The tax_id for the node for which we want to identify the parent
+
+        Returns:
+            parent_tax_id: int
+        """
+        stmt = """
+            SELECT tax_id
+            FROM taxonomy_nodes
+            WHERE tax_id = (
+                SELECT parent_tax_id 
+                FROM taxonomy_nodes 
+                WHERE tax_id = ?
+            )
+        """
+        rows= self._cur.execute(stmt,[tax_id]).fetchall()
+        if not rows:
+            return None
+        elif len(rows) > 1:
+            raise ValueError(f"taxonomy node with tax_id {tax_id} has more than one parent, which should not be possible")
+        else:
+            return rows[0]['tax_id']
+
+    
     @property        
     def schema(self):
         """

@@ -64,3 +64,14 @@ def test_get_leaf_node_tax_ids(setup_db_with_fixture):
     assert isinstance( leaf_node_tax_ids, list)
     assert len(leaf_node_tax_ids) == 2, 'the fixtures have 2 leaf nodes'
     assert set(leaf_node_tax_ids) == set([3,4]), 'correct tax_ids identified as leaf nodes'
+    
+def test_get_parent_tax_id(setup_db_with_fixture):
+    db = setup_db_with_fixture
+    assert db.get_parent_tax_id(4) == 2, 'node with tax_id 4 has parent with tax_id 2'
+    assert db.get_parent_tax_id(1) == None, 'the root node has no parent'
+    
+def test_get_tax_ids_path_root_to(setup_db_with_fixture):
+    db = setup_db_with_fixture
+    path = db.get_tax_ids_path_root_to(4)
+    assert isinstance(path, list) 
+    assert path == [1, 2, 4], 'correct path of tax_ids from root (1) to the requested node (4)'
