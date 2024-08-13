@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from collections import defaultdict
 
 """
 This module contains the definitions of classes to handle the sqlite DB for kraken_flu
@@ -234,7 +235,28 @@ class Db():
             raise ValueError(f"taxonomy node with tax_id {tax_id} has more than one parent, which should not be possible")
         else:
             return rows[0]['tax_id']
-
+        
+    def get_flu_segment_data_dict(self):
+        """
+        Returns a dictionary of all flu names with segment lengths
+        Returns:
+            Dictionary with the following structure:
+                { flu_name: {segment_number: sequence_length} }
+        """
+        stmt = """
+        SELECT 
+            flu_name,
+            segment_number,
+            seq_length
+        FROM sequences
+        WHERE is_flu = 1
+        """
+        data = defaultdict(lambda: defaultdict(int))
+        rows = self._cur.execute(stmt).fetchall()
+        for row in rows:
+            data[ row['flu_name'] ][ row['segment_number']] = row['seq_length']
+            
+        return data
     
     @property        
     def schema(self):

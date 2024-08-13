@@ -20,6 +20,16 @@ def setup_db_with_fixture( setup_db ):
     db._cur.executescript(file_content)
     yield db
     
+@pytest.fixture(scope='function')
+def setup_db_with_real_world_fixture( setup_db ):
+    db = setup_db
+    fixture_dir = files('kraken_flu.tests.fixtures')
+    db_fixture_file = fixture_dir.joinpath(os.path.join('db_fixtures','db_fixtures2.sql'))
+    with open(db_fixture_file, 'r') as file:
+        file_content = file.read()
+    db._cur.executescript(file_content)
+    yield db
+    
 def test_db_connect( tmp_path ):
     db_path = tmp_path / 'kraken_flu.db'
     assert not os.path.exists(db_path), 'before we build a DB, the DB file does not exist'
@@ -84,3 +94,12 @@ def test_get_all_tax_ids_paths_root_to_leaf(setup_db_with_fixture):
     assert [1, 2, 4] in data, 'one of the paths from root to leaf is 1->2->4'
     assert [1,3] in data , 'one of the paths from root to leaf is 1->3'
     assert len(data) ==2 , 'there are 2 paths from root to leaf nodes'
+    
+def test_get_flu_segment_data_dict(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    data = db.get_flu_segment_data_dict()
+    assert isinstance(data, dict), 'returns a dict'
+    assert len(data.keys())>0, 'we got some flu sequence data'
+    assert 'A/Puerto Rico/8/1934(H1N1)' in data, 'a flu isolate name that is in the fixtures is found in the data dict'
+    assert set(data['A/Puerto Rico/8/1934(H1N1)'].keys())==set([1,2,3,4,5,6,7,8]), '...there are keys for each of the 8 segments for this flu isolate'
+    assert data['A/Puerto Rico/8/1934(H1N1)'][3]== 2233, '...and has the correct length recorded for segment 3'
