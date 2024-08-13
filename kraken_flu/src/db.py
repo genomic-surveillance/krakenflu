@@ -176,7 +176,7 @@ class Db():
         # CONTINUE HERE
         raise NotImplementedError
 
-    def get_tax_ids_path_root_to(self, starting_tax_id:int):
+    def get_tax_ids_path_root_to_node(self, starting_tax_id:int):
         """
         For a given node by tax_id, traverse the taxonomy from child to parent and collect 
         tax_ids until we hit the root node.  

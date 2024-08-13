@@ -70,7 +70,7 @@ def test_get_parent_tax_id(setup_db_with_fixture):
     assert db.get_parent_tax_id(4) == 2, 'node with tax_id 4 has parent with tax_id 2'
     assert db.get_parent_tax_id(1) == None, 'the root node has no parent'
     
-def test_get_tax_ids_path_root_to(setup_db_with_fixture):
+def test_get_tax_ids_path_root_to_node(setup_db_with_fixture):
     db = setup_db_with_fixture
     path = db.get_tax_ids_path_root_to(4)
     assert isinstance(path, list) 
