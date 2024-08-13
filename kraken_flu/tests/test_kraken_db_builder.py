@@ -8,7 +8,7 @@ FIXTURE_DIR = files('kraken_flu.tests.fixtures')
 TAX_DIR = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','taxonomy'))
 
 SMALL_VIRUS_FILE = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','library','viral','library.fna'))
-
+OTHER_SMALL_VIRUS_FILE = FIXTURE_DIR.joinpath(os.path.join('ncbi_data_not_kraken','library','viral','library.fna'))
 
 def test_ini_no_patht():
     kdb = KrakenDbBuilder()
@@ -27,6 +27,10 @@ def test_load_fasta():
     assert kdb.fasta_files_loaded == [], 'before we upload a FASTA file, the list of loaded FASTA files is empty'
     kdb.load_fasta_file(file_path=SMALL_VIRUS_FILE)
     assert kdb.fasta_files_loaded == [SMALL_VIRUS_FILE ], 'after loading one file, the list of loaded FASTA contains the path of the single file loaded'
+
+    # add a second FASTA file, set the category this time
+    kdb.load_fasta_file(file_path=OTHER_SMALL_VIRUS_FILE, category='other')
+    assert kdb.fasta_files_loaded == [SMALL_VIRUS_FILE, OTHER_SMALL_VIRUS_FILE], 'now there are two FASTA file path recorded as loaded into DB'
 
 def test_load_taxonomy():
     kdb = KrakenDbBuilder()
