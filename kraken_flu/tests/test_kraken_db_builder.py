@@ -15,7 +15,7 @@ def test_ini_no_patht():
     assert kdb
     assert isinstance(kdb._db, Db)
     assert kdb.db_path,'a temp file path has been assigned to build the DB'
-    assert kdb.db_ready() == False, 'the initial state of the DB is not ready'
+    assert not kdb.db_ready(), 'the initial state of the DB is not ready'
     
 def test_init_path( tmp_path ):
     db_path = tmp_path / 'kraken_flu.db'
@@ -34,6 +34,14 @@ def test_load_fasta():
 
 def test_load_taxonomy():
     kdb = KrakenDbBuilder()
-    assert kdb.taxonomy_loaded == False, 'taxonomy_loaded returns False before we load anything'
+    assert not kdb.taxonomy_loaded, 'taxonomy_loaded returns False before we load anything'
     kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR)
-    assert kdb.taxonomy_loaded == True , 'after loading, taxonomy_loaded returns True'
+    assert kdb.taxonomy_loaded, 'after loading, taxonomy_loaded returns True'
+    
+def test_db_ready():
+    kdb = KrakenDbBuilder()
+    assert not kdb.db_ready(), 'db_ready is False before we load the files into DB'
+    kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR)
+    assert not kdb.db_ready(), 'db_ready is still False after loading just the taxonomy files into DB'
+    kdb.load_fasta_file(file_path=SMALL_VIRUS_FILE)
+    assert kdb.db_ready(), 'after also loading at least one FASTA file, db_ready is now True'
