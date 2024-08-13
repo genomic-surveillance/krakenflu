@@ -1,7 +1,6 @@
 import pytest
 import os.path
 from importlib_resources import files
-from sqlalchemy import select
 
 from kraken_flu.src.db import Db
 
