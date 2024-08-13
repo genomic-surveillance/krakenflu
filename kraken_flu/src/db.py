@@ -190,7 +190,7 @@ class Db():
         Args:
             starting_tax_id: int, required
                 The tax_id from where we start to query towards the root.
-                There is no check to ensure this is actually a leaf
+                This does not have to be a leaf node.
 
         Returns:
             list: list of tax_ids in order from root to the node we started from
