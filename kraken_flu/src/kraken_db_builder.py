@@ -1,26 +1,21 @@
-from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
-from Bio.Seq import Seq
-import re
-import csv
-import shutil
 import os.path
 import logging
+from tempfile import NamedTemporaryFile
 
-from kraken_flu.src.fasta_handler import FastaHandler
-from kraken_flu.src.taxonomy_handler import TaxonomyHandler
+from kraken_flu.src.fasta_loader import load_fasta
+from kraken_flu.src.taxonomy_loader import load_taxonomy
+from kraken_flu.src.db import Db
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
 
 class KrakenDbBuilder():   
     """
-    This class orchestrates the modifications needed in order to re-organise the influenza 
-    genomes in the taxonomy. It uses the FastaHandler and TaxonomyHandler classes for the 
-    heavy lifting.
+    This class orchestrates the process of creating the modified files for the building of a Kraken DB. 
+    It uses the Db class to create a backend database and calls on taxonomy_loader and fasta_loader to 
+    populate the DB, then performs the modifications on the taxonomy structure in the DB before exporting the 
+    files required to build the final kraken2 DB using the kraken2 build tool.   
     
-    Use this class to create all the files that are needed to build a kraken2 DB with reorganised flu
-    genomes.
-    
+    TODO: need to check that this example is still correct:
     Consider this example
     of a library build on NCBI viral refseq:
     
@@ -70,23 +65,87 @@ class KrakenDbBuilder():
     required. This can be obtained from https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz
     
     Parameters:
-        taxonomy_path: str, required
-            path to the taxonomy directory from kraken2-build process (kraken2 default name: taxonomy), 
-            which must contain the files nodes.dmp and names.dmp
-            
-        fasta_file_path: str, required
-            path to the library (genome data) directory from kraken2-build process (kraken2 default name: library)
-        
+        db_path: str, optional
+            If provided, the databses will be built at this path and it will not be deleted at the end of 
+            the process. If not provided, the DB will be built as a temp file and will be deleted in the end.  
     """
     
-    def __init__( self, taxonomy_path: str, fasta_file_path: str ):
-        self.taxonomy_path = taxonomy_path
-        self.fasta_file_path = fasta_file_path
-    
-        self._fasta_handler = FastaHandler( self.fasta_file_path )
-        self._taxonomy_handler = TaxonomyHandler( self.taxonomy_path )
-        
+    def __init__( self, db_path:str=None):
         self.tax_ids_updated = False
+        self.taxonomy_loaded = False
+        self.fasta_files_loaded = []
+        
+        if db_path:
+            self.db_path = db_path
+        else:
+            self.db_path = NamedTemporaryFile().name
+        self._db = Db(db_path=self.db_path)
+    
+    def db_ready(self):
+        """
+        Returns True if the DB preparations have been completed and the DB is ready for exports
+        The DB is ready if we have loaded the taxonomy data and at least one FASTA library. The 
+        class has no knowledge of how many FASTA files the user wants to add to the library so it 
+        cannot know whether all intended FASTA files have been loaded. 
+        """
+        if len(self.fasta_files_loaded)>0 and self.taxonomy_loaded:
+            return True
+        else:
+            return False
+        
+    def load_taxonomy_files(self, taxonomy_dir:str):
+        """
+        Load taxonomy files from a directory that contains the NCBI taxonomy download.  
+        The directory needs to contain files names.dmp and nodes.dmp and may also contain a file 
+        of 
+
+        Args:
+            taxonomy_dir: str, required
+                Path to the directory of downloaded NCBI taxonomy files. Must contain files
+                * names.dmp 
+                * nodes.dmp  
+                If it contains a file "nucl_gb.accession2taxid" then this is also loaded into the DB.
+        """
+        if not os.path.exists( taxonomy_dir) or not os.path.isdir( taxonomy_dir ):
+            raise ValueError(f'path does not exist or is not a directory: {taxonomy_dir}')
+        
+        names_file_path = os.path.join(taxonomy_dir,'names.dmp')
+        if not os.path.exists(names_file_path) or not os.path.isfile(names_file_path):
+            raise ValueError(f"cannot find file 'names.dmp' in taxonomy directory {taxonomy_dir}")
+        
+        nodes_file_path = os.path.join(taxonomy_dir,'nodes.dmp')
+        if not os.path.exists(nodes_file_path) or not os.path.isfile(nodes_file_path):
+            raise ValueError(f"cannot find file 'nodes.dmp' in taxonomy directory {taxonomy_dir}")
+        
+        acc2tax_file_path = os.path.join(taxonomy_dir,'nucl_gb.accession2taxid')
+        if not os.path.exists( acc2tax_file_path ) or not os.path.isfile( acc2tax_file_path ):
+            acc2tax_file_path = None
+            
+        load_taxonomy(
+            db= self._db,  
+            names_file_path= names_file_path, 
+            nodes_file_path= nodes_file_path, 
+            acc2taxid_file_path= acc2tax_file_path
+        )
+        
+        self.taxonomy_loaded= True        
+
+    def load_fasta_file(self, file_path:str, category:str=None):
+        """
+        Uses the fasta_loader to load a FASTA file into the DB. For details, see fasta_loader module.
+
+        Args:
+            file_path: str, required
+                Path to the FASTA file we are loading into the DB
+            
+            category: str, optional
+                If provided, will be used to set the column "category" in the "sequences" 
+                table, which can be used later to create associations with taxonomy nodes.  
+                This is used for cases where we load a specific FASTA file for a known virus 
+                (type) and we want to save a hint in the DB for the taxonomy association later. 
+        """
+        load_fasta(db=self._db, file_path=file_path, category=category)
+        self.fasta_files_loaded.append(file_path)
         
     def update_fasta_tax_ids( self ):
         """
