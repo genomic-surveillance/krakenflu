@@ -9,6 +9,10 @@ from kraken_flu.src.utils import KRAKEN_TAX_ID_REGEX, NCBI_ACC_REGEX
 from kraken_flu.src.utils import parse_flu
 from kraken_flu.src.db import Db
 
+"""
+This module contains the functionality for loading sequence data from FASTA into the sqlite database    
+"""
+
 def load_fasta(db: Db, file_path:str, category:str=None):
     """
     Main function. Orchestrates the loading of a FASTA sequence file into the database.

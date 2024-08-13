@@ -5,6 +5,10 @@ import logging
 from kraken_flu.src.utils import parse_flu
 from kraken_flu.src.db import Db
 
+"""
+This module contains the functionality for loading taxonomy data into the sqlite database    
+"""
+
 def load_taxonomy(db: Db, names_file_path:str, nodes_file_path:str, acc2taxid_file_path:str = None):
     """
     Main function. Orchestrates the loading of the NCBI taxonomy data into the database.
