@@ -173,8 +173,10 @@ class Db():
         leaf_node_tax_ids = self.get_leaf_node_tax_ids()
         data = []
         
-        # CONTINUE HERE
-        raise NotImplementedError
+        for leaf_node_tax_id in leaf_node_tax_ids:
+            data.append( self.get_tax_ids_path_root_to_node(leaf_node_tax_id))
+            
+        return data
 
     def get_tax_ids_path_root_to_node(self, starting_tax_id:int):
         """

@@ -72,6 +72,16 @@ def test_get_parent_tax_id(setup_db_with_fixture):
     
 def test_get_tax_ids_path_root_to_node(setup_db_with_fixture):
     db = setup_db_with_fixture
-    path = db.get_tax_ids_path_root_to(4)
+    path = db.get_tax_ids_path_root_to_node(4)
     assert isinstance(path, list) 
     assert path == [1, 2, 4], 'correct path of tax_ids from root (1) to the requested node (4)'
+    
+def test_get_all_tax_ids_paths_root_to_leaf(setup_db_with_fixture):
+    db = setup_db_with_fixture
+    data = db.get_all_tax_ids_paths_root_to_leaf()
+    assert isinstance(data, list), 'returns a list'
+    assert len(data) >0, 'list is not empty'
+    assert isinstance(data[0], list), 'elements are lists'
+    assert [1, 2, 4] in data, 'one of the paths from root to leaf is 1->2->4'
+    assert [1,3] in data , 'one of the paths from root to leaf is 1->3'
+    assert len(data) ==2 , 'there are 2 paths from root to leaf nodes'
