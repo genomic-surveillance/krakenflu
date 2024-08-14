@@ -5,7 +5,7 @@ from importlib_resources import files
 from kraken_flu.src.db import Db
 
 # set this to True to make the tests print all executed SQL or False to stop that
-PRINT_SQL_TRACE=True
+PRINT_SQL_TRACE=False
 
 @pytest.fixture(scope='function')
 def setup_db( tmp_path ):
