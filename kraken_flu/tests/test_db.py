@@ -4,10 +4,13 @@ from importlib_resources import files
 
 from kraken_flu.src.db import Db
 
+# set this to True to make the tests print all executed SQL or False to stop that
+PRINT_SQL_TRACE=True
+
 @pytest.fixture(scope='function')
 def setup_db( tmp_path ):
     db_path = tmp_path / 'kraken_flu.db'
-    db = Db(db_path)
+    db = Db(db_path, debug=PRINT_SQL_TRACE)
     yield db
 
 @pytest.fixture(scope='function')
@@ -95,11 +98,35 @@ def test_get_all_tax_ids_paths_root_to_leaf(setup_db_with_fixture):
     assert [1,3] in data , 'one of the paths from root to leaf is 1->3'
     assert len(data) ==2 , 'there are 2 paths from root to leaf nodes'
     
-def test_get_flu_segment_data_dict(setup_db_with_real_world_fixture):
+def test_get_flu_name_segment_data_dict(setup_db_with_real_world_fixture):
     db = setup_db_with_real_world_fixture
-    data = db.get_flu_segment_data_dict()
+    data = db.get_flu_name_segment_data_dict()
     assert isinstance(data, dict), 'returns a dict'
     assert len(data.keys())>0, 'we got some flu sequence data'
-    assert 'A/Puerto Rico/8/1934(H1N1)' in data, 'a flu isolate name that is in the fixtures is found in the data dict'
+    expected_flu_names =set([
+        'A/California/07/2009(H1N1)',
+        'A/New York/392/2004(H3N2)',
+        'A/Puerto Rico/8/1934(H1N1)',
+        'B/Lee/1940'
+    ])
+    assert set(data.keys()) == expected_flu_names, 'the data contains the four expected flu names'
     assert set(data['A/Puerto Rico/8/1934(H1N1)'].keys())==set([1,2,3,4,5,6,7,8]), '...there are keys for each of the 8 segments for this flu isolate'
     assert data['A/Puerto Rico/8/1934(H1N1)'][3]== 2233, '...and has the correct length recorded for segment 3'
+    
+def test_mark_as_not_included(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    
+    # before we run the process, no records in the fixture sequences are marked as include=0
+    stmt='SELECT * FROM sequences WHERE include=0'
+    rows = db._cur.execute(stmt).fetchall()
+    assert len(rows) == 0 , 'there are no sequences marked as not included before we begin'
+    ids=[1,5,8,10]
+    db.mark_as_not_included(ids=ids)
+    rows = db._cur.execute(stmt).fetchall()
+    assert len(rows) == 4 , 'after marking as not included, we now retrieve 4 rows of sequences with included=0'
+
+def test_retrieve_unnamed_unsegmented_flu(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    ids = db.retrieve_unnamed_unsegmented_flu()
+    assert len(ids)==1, 'a single sequence in the fixture data is an "unnamed flu", ie no proper isolate name but identified as flu (kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence)'
+    

@@ -51,6 +51,9 @@ class Db():
 
         # connect and create a cursor (session)
         self._con = sqlite3.connect(db_path)
+        if debug:
+            self._con.set_trace_callback(print)
+        
         self._con.row_factory = sqlite3.Row # see https://docs.python.org/3.8/library/sqlite3.html?highlight=word#row-objects
         self._cur = self._con.cursor()
         
@@ -236,9 +239,13 @@ class Db():
         else:
             return rows[0]['tax_id']
         
-    def get_flu_segment_data_dict(self):
+    def get_flu_name_segment_data_dict(self):
         """
-        Returns a dictionary of all flu names with segment lengths
+        Returns a dictionary of all flu names with segment lengths for all records in sequences that
+        are marked as flu and have a flu name (there are also records that are marked as flu and have 
+        no flu name because it could not be parsed - we can't use those because we can't group segments)
+        The returned data structure groups the data by flu isolate name.
+        
         Returns:
             Dictionary with the following structure:
                 { flu_name: {segment_number: sequence_length} }
@@ -249,7 +256,7 @@ class Db():
             segment_number,
             seq_length
         FROM sequences
-        WHERE is_flu = 1
+        WHERE is_flu = 1 AND flu_name IS NOT NULL AND segment_number IS NOT NULL
         """
         data = defaultdict(lambda: defaultdict(int))
         rows = self._cur.execute(stmt).fetchall()
@@ -257,6 +264,41 @@ class Db():
             data[ row['flu_name'] ][ row['segment_number']] = row['seq_length']
             
         return data
+    
+    def retrieve_unnamed_unsegmented_flu(self):
+        """
+        Retrieve records from sequences where flu_name is empty or flu segment is not assign but is_flu is True, ie the record
+        name identifies it as flu but it doesn't have a proper flu isolate name.
+        """
+        stmt = """
+        SELECT id
+        FROM sequences
+        WHERE is_flu = 1 AND (flu_name IS NULL or segment_number IS NULL)
+        """
+        return [ x['id'] for x in self._cur.execute(stmt)]
+    
+    def mark_as_not_included(self, ids:list):
+        """
+        Marks sequences as "not included" for final output by setting the include value to 0
+
+        Args:
+            ids: list, required
+                List of sequences.id for records we want to exclude from final output
+
+        Returns:
+            True on success
+        
+        Side effects:
+            Sets value of sequences.include
+        """
+        stmt="""
+            UPDATE sequences
+            SET include = 0
+            WHERE id IN (%s)  
+        """
+        ids_str = ','.join(map(str,ids))
+        self._cur.execute(stmt % ids_str)
+        self._con.commit()
     
     @property        
     def schema(self):
