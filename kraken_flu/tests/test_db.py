@@ -130,3 +130,8 @@ def test_retrieve_unnamed_unsegmented_flu(setup_db_with_real_world_fixture):
     ids = db.retrieve_unnamed_unsegmented_flu()
     assert len(ids)==1, 'a single sequence in the fixture data is an "unnamed flu", ie no proper isolate name but identified as flu (kraken:taxid|518987|NC_002204.1 Influenza B virus RNA 1, complete sequence)'
     
+def test_retrieve_sequence_ids_by_flu_name(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    ids = db.retrieve_sequence_ids_by_flu_name('A/Puerto Rico/8/1934(H1N1)')
+    assert isinstance(ids, list), 'returns a list'
+    assert len(ids) == 8 , 'there are 8 records with this name'

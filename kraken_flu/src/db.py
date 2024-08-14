@@ -265,6 +265,24 @@ class Db():
             
         return data
     
+    def retrieve_sequence_ids_by_flu_name(self, name:str):
+        """
+        Query sequences by flu_name and return a list of the sequences.id
+
+        Args:
+            name: str, required
+                flu_name field value to search with
+                
+        Returns:
+            List of sequences.id for records with matching flu_name value
+        """
+        stmt = """
+            SELECT id
+            FROM sequences
+            WHERE flu_name = ?
+        """
+        return [x['id'] for x in self._cur.execute(stmt,[name]).fetchall()]
+    
     def retrieve_unnamed_unsegmented_flu(self):
         """
         Retrieve records from sequences where flu_name is empty or flu segment is not assign but is_flu is True, ie the record
