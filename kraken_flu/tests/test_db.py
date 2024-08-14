@@ -111,7 +111,8 @@ def test_get_flu_name_segment_data_dict(setup_db_with_real_world_fixture):
     ])
     assert set(data.keys()) == expected_flu_names, 'the data contains the four expected flu names'
     assert set(data['A/Puerto Rico/8/1934(H1N1)'].keys())==set([1,2,3,4,5,6,7,8]), '...there are keys for each of the 8 segments for this flu isolate'
-    assert data['A/Puerto Rico/8/1934(H1N1)'][3]== 2233, '...and has the correct length recorded for segment 3'
+    assert set(data['A/Puerto Rico/8/1934(H1N1)'][3].keys()) == set(['length','id']), 'data has correct keys'
+    assert data['A/Puerto Rico/8/1934(H1N1)'][3]['length']== 2233, '...and has the correct length recorded for segment 3'
     
 def test_mark_as_not_included(setup_db_with_real_world_fixture):
     db = setup_db_with_real_world_fixture

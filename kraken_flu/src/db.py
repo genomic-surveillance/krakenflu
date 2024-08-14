@@ -248,20 +248,23 @@ class Db():
         
         Returns:
             Dictionary with the following structure:
-                { flu_name: {segment_number: sequence_length} }
+                { flu_name: {segment_number: {length: sequence_length, id= sequences.id} }
         """
         stmt = """
-        SELECT 
+        SELECT
+            id,
             flu_name,
             segment_number,
             seq_length
         FROM sequences
         WHERE is_flu = 1 AND flu_name IS NOT NULL AND segment_number IS NOT NULL
         """
-        data = defaultdict(lambda: defaultdict(int))
+        data = defaultdict(lambda: defaultdict(lambda: defaultdict()))
         rows = self._cur.execute(stmt).fetchall()
         for row in rows:
-            data[ row['flu_name'] ][ row['segment_number']] = row['seq_length']
+            data[ row['flu_name'] ][ row['segment_number']] = {
+                'length': row['seq_length'],
+                'id': row['id'] }
             
         return data
     
