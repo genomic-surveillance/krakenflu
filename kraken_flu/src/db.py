@@ -317,6 +317,21 @@ class Db():
         ids_str = ','.join(map(str,ids))
         self._cur.execute(stmt % ids_str)
         self._con.commit()
+        
+    def max_tax_id(self):
+        """
+        Returns the maximum tax_id from the nodes table, which is used to assign safe new taxon ids for the 
+        nodes we are going to add.
+
+        Returns:
+            int: maximum tax_id in the nodes table
+        """
+        stmt="""
+        SELECT MAX(tax_id) AS max_tax_id
+        FROM taxonomy_nodes
+        """
+        row = self._cur.execute(stmt).fetchone()
+        return row['max_tax_id']
     
     @property        
     def schema(self):

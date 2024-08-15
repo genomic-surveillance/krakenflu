@@ -135,3 +135,7 @@ def test_retrieve_sequence_ids_by_flu_name(setup_db_with_real_world_fixture):
     ids = db.retrieve_sequence_ids_by_flu_name('A/Puerto Rico/8/1934(H1N1)')
     assert isinstance(ids, list), 'returns a list'
     assert len(ids) == 8 , 'there are 8 records with this name'
+    
+def test_max_tax_id(setup_db_with_fixture):
+    db = setup_db_with_fixture
+    assert db.max_tax_id() == 4,'the maximum tax_id in the fixtures nodes table is 4'
