@@ -79,6 +79,7 @@ class KrakenDbBuilder():
         self.taxonomy_loaded = False
         self.fasta_files_loaded = []
         self.db_path = None
+        self._next_new_tax_id = None
         
         if db:
             self._db = db
@@ -100,6 +101,18 @@ class KrakenDbBuilder():
             return True
         else:
             return False
+        
+    def next_new_tax_id(self):
+        """
+        Returns the next available new taxon ID to be used for creating new nodes.  
+        Starts off as maximum tax_id in the DB +1, then increments by one every time it is requested
+        """
+        if not self._next_new_tax_id:
+            self._next_new_tax_id = self._db.max_tax_id() + 1
+        else:
+            self._next_new_tax_id+=1
+        
+        return self._next_new_tax_id
         
     def load_taxonomy_files(self, taxonomy_dir:str):
         """

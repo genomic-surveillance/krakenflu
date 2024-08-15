@@ -126,3 +126,8 @@ def test_filter_incomplete_flu(setup_db_with_real_world_fixture):
     rows = db._cur.execute(not_included_stmt).fetchall()
     assert len(rows) == 15 , 'making another isolate incomplete but also including it in the exempt names should leave the isolate unfiltered and the exclude count unchanged'
     
+def test_next_new_tax_id(setup_db_with_fixture):
+    db = setup_db_with_fixture
+    kdb = KrakenDbBuilder(db=db)
+    assert kdb.next_new_tax_id() == db.max_tax_id() + 1, 'the initial next new tax_id is the maximum tax_id from the DB +1'
+    assert kdb.next_new_tax_id() == db.max_tax_id() + 2, 'requesting a new tax id again returns an incremented id'
