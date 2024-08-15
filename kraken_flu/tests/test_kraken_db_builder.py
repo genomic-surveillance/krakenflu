@@ -1,3 +1,4 @@
+import pytest
 import os.path
 from importlib_resources import files
 
@@ -10,7 +11,36 @@ TAX_DIR = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','taxonomy'))
 SMALL_VIRUS_FILE = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','library','viral','library.fna'))
 OTHER_SMALL_VIRUS_FILE = FIXTURE_DIR.joinpath(os.path.join('ncbi_data_not_kraken','library','viral','library.fna'))
 
-def test_ini_no_patht():
+# set this to True to make the tests print all executed SQL or False to stop that
+PRINT_SQL_TRACE=True
+
+@pytest.fixture(scope='function')
+def setup_db( tmp_path ):
+    db_path = tmp_path / 'kraken_flu.db'
+    db = Db(db_path, debug=PRINT_SQL_TRACE)
+    yield db
+
+@pytest.fixture(scope='function')
+def setup_db_with_fixture( setup_db ):
+    db = setup_db
+    fixture_dir = files('kraken_flu.tests.fixtures')
+    db_fixture_file = fixture_dir.joinpath(os.path.join('db_fixtures','db_fixture1.sql'))
+    with open(db_fixture_file, 'r') as file:
+        file_content = file.read()
+    db._cur.executescript(file_content)
+    yield db
+
+@pytest.fixture(scope='function')
+def setup_db_with_real_world_fixture( setup_db ):
+    db = setup_db
+    fixture_dir = files('kraken_flu.tests.fixtures')
+    db_fixture_file = fixture_dir.joinpath(os.path.join('db_fixtures','db_fixtures2.sql'))
+    with open(db_fixture_file, 'r') as file:
+        file_content = file.read()
+    db._cur.executescript(file_content)
+    yield db
+
+def test_init_no_patht():
     kdb = KrakenDbBuilder()
     assert kdb
     assert isinstance(kdb._db, Db)
@@ -45,3 +75,54 @@ def test_db_ready():
     assert not kdb.db_ready(), 'db_ready is still False after loading just the taxonomy files into DB'
     kdb.load_fasta_file(file_path=SMALL_VIRUS_FILE)
     assert kdb.db_ready(), 'after also loading at least one FASTA file, db_ready is now True'
+    
+def test_filter_incomplete_flu(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    not_included_stmt='SELECT * FROM sequences WHERE include=0'
+    rows = db._cur.execute(not_included_stmt).fetchall()
+    assert len(rows) == 0 , 'there are no sequences marked as not included before we begin'
+    
+    assert kdb.filter_incomplete_flu()
+    
+    # The data for flu B isolate B/Lee/1940 has a segment 1 with a name that cannot be parsed
+    # For that reason, without any attempt to rescue this isolate, the method should now identify
+    # 7 segments that do have a flu_name but this isolate is incomplete due to the missing segment 1
+    rows = db._cur.execute(not_included_stmt).fetchall()
+    assert len(rows) == 7 , 'due to one flu B seg1 not having a parsable flu isolate name, the 7 remaining segments are incomplete and hence marked not to be included'
+    
+    # Make another isolate incomplete by setting the segment length to something very small
+    select_a_seg1_stmt = """
+    SELECT id 
+    FROM sequences
+    WHERE flu_name = ?
+    AND segment_number = 1
+    """
+    seq1_row = db._cur.execute(select_a_seg1_stmt,['A/Puerto Rico/8/1934(H1N1)']).fetchone()
+    assert seq1_row
+    update_stmt = """
+    UPDATE sequences
+    SET seq_length = 100
+    WHERE id = ?
+    """
+    db._cur.execute(update_stmt,[seq1_row['id']])
+    db._con.commit()
+
+    # rerun the filter, it should now filter out all segments of this isolate because it no longer
+    # has 8 full-length segments
+    assert kdb.filter_incomplete_flu()
+
+    rows = db._cur.execute(not_included_stmt).fetchall()
+    assert len(rows) == 15 , 'setting seg1 one one isolate to a very small length results in all 8 segments of this isolate being excluded, bringing total exclude count to 15'
+    
+    # make another isolate incomplete but this time exclude it from the filter, so it should still pass
+    isolate_name='A/California/07/2009(H1N1)'
+    seq1_row = db._cur.execute(select_a_seg1_stmt,[isolate_name]).fetchone()
+    assert seq1_row
+    db._cur.execute(update_stmt,[seq1_row['id']])
+    db._con.commit()
+    
+    assert kdb.filter_incomplete_flu(filter_except_patterns=[isolate_name])
+    rows = db._cur.execute(not_included_stmt).fetchall()
+    assert len(rows) == 15 , 'making another isolate incomplete but also including it in the exempt names should leave the isolate unfiltered and the exclude count unchanged'
+    

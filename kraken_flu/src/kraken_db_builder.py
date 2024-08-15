@@ -67,19 +67,27 @@ class KrakenDbBuilder():
     Parameters:
         db_path: str, optional
             If provided, the databses will be built at this path and it will not be deleted at the end of 
-            the process. If not provided, the DB will be built as a temp file and will be deleted in the end.  
+            the process. If not provided, the DB will be built as a temp file and will be deleted in the end.
+        
+        db: Db object. optional
+            This is only provided for testing and debugging. It allows to pass in a fully built db as a Db object.  
+            
     """
     
-    def __init__( self, db_path:str=None):
+    def __init__( self, db_path:str=None, db:Db=None):
         self.tax_ids_updated = False
         self.taxonomy_loaded = False
         self.fasta_files_loaded = []
+        self.db_path = None
         
-        if db_path:
-            self.db_path = db_path
+        if db:
+            self._db = db
         else:
-            self.db_path = NamedTemporaryFile().name
-        self._db = Db(db_path=self.db_path)
+            if db_path:
+                self.db_path = db_path
+            else:
+                self.db_path = NamedTemporaryFile().name
+            self._db = Db(db_path=self.db_path)
     
     def db_ready(self):
         """
@@ -146,6 +154,94 @@ class KrakenDbBuilder():
         """
         load_fasta(db=self._db, file_path=file_path, category=category)
         self.fasta_files_loaded.append(file_path)
+        
+    def filter_unnamed_unsegmented_flu(self):
+        """
+        Marks all flu records as include=0 where the sequence name indicates flu but the isolate  
+        name couldn't be parsed, ie the flu_name field is empty and/or segment is empty
+        
+        Args:
+            None
+            
+        Returns:
+            True on success
+            
+        Side effects:
+            sets sequences.include field
+        """
+        unnamed_flu_sequence_ids = self._db.retrieve_unnamed_unsegmented_flu()
+        self._db.mark_as_not_included( unnamed_flu_sequence_ids )
+        return True
+        
+    def filter_incomplete_flu( self, filter_except_patterns:list = [] ):
+        """
+        Filter out flu genomes that do not have full-length sequences for all 8 segments.
+        Genomes that are to be removed are marked by setting attribute include_in_output to False but are 
+        not removed from the DB.
+        
+        Parameters:        
+                    
+            filter_except_patterns: list(str), optional
+                A list of strings that are used to exclude genomes from the Influenza "complete genome" filter.
+                Any genome where the FASTA header contains one of the strings in this list will not be subjected to 
+                the filter. This was required to ensure that the Goose Guandong H5N1 reference genome (which does not
+                have sequences for all 8 segments) is not filtered out.
+                
+        Returns: 
+            number of removed genomes
+        
+        Side effects: 
+            modifies the DB, sets field "include" to False for sequences that are filtered out
+        """
+        # influenza A/B segment lengths
+        # TODO: check that this also applies to influenza C and D, bearing in mind they don't need to 
+        # be exact as long as we use the MIN_SEQ_LEN_PROPORTION not too strictly
+        MIN_SEG_LENGTHS = {
+            1: 2341,
+            2: 2341,
+            3: 2233,
+            4: 1778,
+            5: 1565,
+            6: 1413,
+            7: 1027,
+            8: 890
+        }
+        
+        # minimum proportion of each of the segments that must be covered
+        MIN_SEQ_LEN_PROPORTION = 0.9
+        
+        logging.info( f'starting filter to remove incomplete flu genomes')
+    
+        flu_data = self._db.get_flu_name_segment_data_dict()
+        sequence_ids_to_remove = []
+        isolate_removal_count = 0
+        isolate_total_count = 0
+        isolate_exempt_count = 0
+        for isolate_name, segment_data in flu_data.items():
+            isolate_total_count+=1
+            if isolate_name in filter_except_patterns:
+                # this one should not be subjected to filtering - skip
+                isolate_exempt_count+=1
+                continue
+            remove_isolate=False
+            # filter out if we don't have all 8 segments
+            if sorted(segment_data.keys()) != list(range(1,9)):
+                remove_isolate = True
+            for segment_number, length in segment_data.items():
+                if length < MIN_SEG_LENGTHS[ segment_number ] * MIN_SEQ_LEN_PROPORTION:
+                    remove_isolate = True
+                    continue
+            if remove_isolate:
+                ids = self._db.retrieve_sequence_ids_by_flu_name(isolate_name)
+                sequence_ids_to_remove.extend(ids)
+                isolate_removal_count+=1
+        
+        logging.info( f'{isolate_removal_count} of {isolate_total_count} flu isolates were identified as incomplete ({isolate_exempt_count} matched exempt list). Marking in database')
+        self._db.mark_as_not_included(sequence_ids_to_remove)
+        logging.info( f'Completed updating database')
+        return True
+    
+        
         
     def update_fasta_tax_ids( self ):
         """
