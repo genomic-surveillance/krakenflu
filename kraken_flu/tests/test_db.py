@@ -139,3 +139,7 @@ def test_retrieve_sequence_ids_by_flu_name(setup_db_with_real_world_fixture):
 def test_max_tax_id(setup_db_with_fixture):
     db = setup_db_with_fixture
     assert db.max_tax_id() == 4,'the maximum tax_id in the fixtures nodes table is 4'
+    
+def test_retrieve_tax_id_by_node_scientific_name(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    assert db.retrieve_tax_id_by_node_scientific_name('Influenza A virus') == 11320,'correct tax_id found for fluA'

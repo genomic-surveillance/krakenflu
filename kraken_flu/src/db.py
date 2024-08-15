@@ -283,6 +283,40 @@ class Db():
         """
         return [x['id'] for x in self._cur.execute(stmt,[name]).fetchall()]
     
+    def retrieve_tax_id_by_node_scientific_name(self,name:str, one:bool=True):
+        """
+        Retrieves the tax_id for a node identified by its scientific name.  
+
+        Args:
+            name: str, required
+                Scientific name to search for.  
+                
+            one: bool, optional, defaults to True
+                If True, returns a single tax_id and throws exception if more than 
+                one is found
+                
+        Returns:
+            tax_id (int) or list of tax_ids if one==False
+            None if no rows found
+        """
+        stmt = """
+        SELECT taxonomy_nodes.tax_id
+        FROM taxonomy_nodes
+        INNER JOIN taxonomy_names ON(taxonomy_names.tax_id = taxonomy_nodes.tax_id) 
+        WHERE name_class = "scientific name" AND name = ? 
+        """
+        rows = self._cur.execute(stmt,[name]).fetchall()
+        if not rows:
+            return None
+        tax_ids = [x['tax_id'] for x in rows]
+        if one:
+            if len(tax_ids)>1:
+                raise ValueError(f"more than one record found with scientific name '{name}")
+            else:
+                return tax_ids[0]
+        else:
+            return tax_ids
+    
     def retrieve_unnamed_unsegmented_flu(self):
         """
         Retrieve records from sequences where flu_name is empty or flu segment is not assign but is_flu is True, ie the record
