@@ -160,6 +160,48 @@ class Db():
             } 
         )
         
+    def add_taxon(self, tax_id:int, parent_tax_id:int, name:str):
+        """
+        Adds a new taxon to the DB, which consists of a new record in taxonomy_nodes and a linked 
+        record in taxonomy_names.  
+        This is meant to be used for the creation of new "artificial" taxa. Some field data needs to be 
+        provided for a node record that is not relevant for these new taxon and is just hardcode here.  
+        The name_class is hardcoded to be "scientific name".  
+        A parent_tax_id is required so that the new node has a parent in the taxonomy.  
+
+        Args:
+            tax_id: int, required
+                The tax_id for the new node
+        
+            parent_tax_id: int, required
+                The tax_id of the parent node of this new taxon.  
+                
+            name: str, required
+                The scientific name for the new taxon
+        """
+        self.add_node(
+            tax_id= tax_id,
+            parent_tax_id= parent_tax_id,
+            rank='no rank',
+            embl_code=None,
+            division_id=9,
+            inherited_div_flag=1,
+            genetic_code_id=1,
+            inherited_GC_flag=1,
+            mitochondrial_genetic_code_id=0,
+            inherited_MGC_flag=1,
+            GenBank_hidden_flag=0,
+            hidden_subtree_root_flag=0,
+            comments='kraken_flu added node'
+        )
+        self.add_name(
+            tax_id= tax_id,
+            name= name,
+            name_class= 'scientific name',
+            unique_name= name
+        )
+        
+        
     def get_all_tax_ids_paths_root_to_leaf(self):
         """
         Queries the DB to retrieve a list of lists as follows:

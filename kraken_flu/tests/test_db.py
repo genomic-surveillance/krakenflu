@@ -143,3 +143,28 @@ def test_max_tax_id(setup_db_with_fixture):
 def test_retrieve_tax_id_by_node_scientific_name(setup_db_with_real_world_fixture):
     db = setup_db_with_real_world_fixture
     assert db.retrieve_tax_id_by_node_scientific_name('Influenza A virus') == 11320,'correct tax_id found for fluA'
+
+def test_add_taxon(setup_db_with_fixture):
+    db = setup_db_with_fixture
+    stmt="""
+    SELECT 
+        taxonomy_nodes.parent_tax_id AS parent_tax_id,
+        taxonomy_names.name AS name,
+        taxonomy_names.name_class AS name_class
+    FROM taxonomy_nodes
+    INNER JOIN taxonomy_names ON(taxonomy_nodes.tax_id = taxonomy_names.tax_id)
+    WHERE taxonomy_nodes.tax_id = ?
+    """
+    tax_id = 1000
+    parent_tax_id = 1
+    name='a new taxon'
+    rows = db._cur.execute(stmt,[tax_id]).fetchall()
+    assert not rows, 'before we insert the new taxon, it does not exist'
+    db.add_taxon(tax_id= tax_id, parent_tax_id= parent_tax_id, name= name) 
+    rows = db._cur.execute(stmt,[tax_id]).fetchall()
+    assert len(rows)==1, 'now the new taxon exists'
+    assert rows[0]['name'] == name, '...it has the correct name'
+    assert rows[0]['parent_tax_id'] == parent_tax_id, '...it has the correct parent'
+    assert rows[0]['name_class'] == 'scientific name', '...it has the hardcoded name_class scientific name'
+    
+    
