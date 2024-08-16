@@ -385,8 +385,7 @@ class Db():
             segment_number,
             flu_type, 
             flu_a_h_subtype, 
-            flu_a_n_subtype, 
-            is_flu 
+            flu_a_n_subtype
         FROM sequences
         WHERE is_flu = 1
         """
@@ -414,6 +413,32 @@ class Db():
         ids_str = ','.join(map(str,ids))
         self._cur.execute(stmt % ids_str)
         self._con.commit()
+        
+    def set_tax_id_for_sequence(self, id:int, tax_id:int):
+        """
+        Set the tax_id for a sequence record identified by its sequence.id  
+        
+        Args:
+            id: int, required
+                id of the sequences record to be updated
+                
+            tax_id: int, required
+                new tax_id for the sequences record
+                
+        Returns:
+            True on success
+            
+        Side effects:
+            Sets sequences.tax_id
+        """
+        stmt="""
+            UPDATE sequences
+            SET tax_id = ?
+            WHERE id= ?  
+        """
+        self._cur.execute(stmt, [tax_id, id])
+        self._con.commit() 
+        return True
         
     def max_tax_id(self):
         """

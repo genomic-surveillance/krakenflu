@@ -172,3 +172,15 @@ def test_retrieve_all_flu_sequences(setup_db_with_real_world_fixture):
     rows = db.retrieve_all_flu_sequences()
     assert isinstance(rows, list) 
     assert len(rows)==32, 'there are 32 records of sequences with the is_flu flag set'
+    
+def test_set_tax_id_for_sequence(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    stmt="SELECT tax_id FROM sequences WHERE id=1"
+    row = db._cur.execute(stmt).fetchone()
+    assert row
+    assert not row['tax_id'], 'before we start, sequences.id=1 has no tax_id set'
+    db.set_tax_id_for_sequence(id=1, tax_id=999)
+    row = db._cur.execute(stmt).fetchone()
+    assert row['tax_id']==999, 'after the update, the record has the correct tax_id set'
+    
+    
