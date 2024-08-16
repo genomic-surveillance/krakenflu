@@ -1,6 +1,7 @@
 import os.path
 import logging
 from tempfile import NamedTemporaryFile
+from collections import defaultdict
 
 from kraken_flu.src.fasta_loader import load_fasta
 from kraken_flu.src.taxonomy_loader import load_taxonomy
@@ -80,6 +81,7 @@ class KrakenDbBuilder():
         self.fasta_files_loaded = []
         self.db_path = None
         self._next_new_tax_id = None
+        self._new_flu_node_ids = None
         
         if db:
             self._db = db
@@ -254,7 +256,86 @@ class KrakenDbBuilder():
         logging.info( f'Completed updating database')
         return True
     
+    def create_segmented_flu_taxonomy_nodes(self, missing_parent_is_exception:bool=False):
+        """
+        Creates the new taxon nodes for flu and returns tax_ids datastructure.  
+        The result is a two new levels of "artificial" taxon nodes that looks like this for influenza A: 
+                                    ┌──────────────────┐                                                         
+                                    │ Influenza A virus│                                                         
+                   ┌────────────────┴──────┬───────────┴──────────────────┐                                  
+        ┌──────────▼──────────┐ ┌──────────▼──────────┐       ┌───────────▼──────────┐                       
+        │Influenza A segment 1│ │Influenza A segment x│ [...] │Influenza A segment 4 │ [...]                 
+        └─┬───────────────────┘ └─────────────────────┘  ┌────┴──────────────────┬───┘                        
+          │ ┌──────────────────────────┐   ┌─────────────▼──────────┐ ┌──────────▼─────────────┐             
+          ├─► isolate segment sequence │   │Influenza A H1 segment 4│ │Influenza A H2 segment 4│ [...]       
+          │ └──────────────────────────┘   └┬───────────────────────┘ └──────┬─────────────────┘             
+          │ ┌──────────────────────────┐    │  ┌──────────────────────────┐  │  ┌──────────────────────────┐ 
+          └─► isolate segment sequence │    ├──► isolate segment sequence │  ├──► isolate segment sequence │ 
+            └──────────────────────────┘    │  └──────────────────────────┘  │  └──────────────────────────┘ 
+                [...]                       │  ┌──────────────────────────┐  │  ┌──────────────────────────┐ 
+                                            └──► isolate segment sequence │  └──► isolate segment sequence │ 
+                                               └──────────────────────────┘     └──────────────────────────┘ 
+                                                    [...]                               [...]              
+        For flu B,C and D, the additional level for Hx and Nx segments are not created because these flu types 
+        are not further classified by segments 4 and 6.  
         
+        The creation of new nodes will only be run once. If it has already been run, the previously generated 
+        new_node_ids data is returned as-is.  
+
+        Parameters:
+            missing_parent_is_exception: bool, optional, defaults to False
+                Parental nodes for Influenza X Virus must exist in the DB for all virus types prior to 
+                building the new taxonomy structure.  
+                If this flag is True, a missing type is treated as an exception, otherwise it is simply 
+                shown in the logs and the building ot the custom taxonomy is skipped for that virus type
+        
+        Returns:
+            dict of new node names to node taxon ids
+            Structure:
+            { tpye: { subtype: {segment_number: tax_id}}}
+        
+        """
+        if self._new_flu_node_ids:
+            return self._new_flu_node_ids
+        
+        types = ['A','B','C','D']
+        new_node_ids = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+        for type in types:
+            parent_node_name = f"Influenza {type} virus"
+            parent_tax_id = self._db.retrieve_tax_id_by_node_scientific_name(parent_node_name)
+            if not parent_tax_id:
+                if missing_parent_is_exception:
+                    raise ValueError(f"parent node '{parent_node_name}' not found in DB")
+                else:
+                    logging.warning(f"parent node '{parent_node_name}' not found in DB - skipping")
+                    continue
+            # create the new type/segment nodes
+            for seg_num in range(1,9):
+                new_tax_id = self.next_new_tax_id()
+                subtype_str= None
+                self._db.add_taxon( tax_id= new_tax_id, parent_tax_id= parent_tax_id, name=f'Influenza {type} segment {seg_num}' )
+                new_node_ids[type][subtype_str][seg_num] = new_tax_id
+
+                # create all Hx and Nx segment nodes if this is flu A and one of the relevant segments (4 or 6)
+                if type=='A':
+                    # the nodes created here should have the segment node as its parent
+                    segment_parent_tax_id = new_tax_id
+                    if seg_num == 4:
+                        subtype_letter = 'H'
+                        max_subtype_num = 18
+                    elif seg_num == 6:
+                        subtype_letter = 'N'
+                        max_subtype_num = 11
+                    else:
+                        continue
+                    for subtype_num in range(1,max_subtype_num+1):
+                        new_tax_id = self.next_new_tax_id()
+                        subtype_str = subtype_letter+str(subtype_num)
+                        self._db.add_taxon( tax_id= new_tax_id, parent_tax_id= segment_parent_tax_id, name=f'Influenza {type} {subtype_str} segment {seg_num}' )
+                        new_node_ids[type][subtype_str][seg_num] = new_tax_id
+        self._new_flu_node_ids = new_node_ids
+        return new_node_ids        
+                
         
     def update_fasta_tax_ids( self ):
         """

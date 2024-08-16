@@ -131,3 +131,59 @@ def test_next_new_tax_id(setup_db_with_fixture):
     kdb = KrakenDbBuilder(db=db)
     assert kdb.next_new_tax_id() == db.max_tax_id() + 1, 'the initial next new tax_id is the maximum tax_id from the DB +1'
     assert kdb.next_new_tax_id() == db.max_tax_id() + 2, 'requesting a new tax id again returns an incremented id'
+
+def test_create_segmented_flu_taxonomy_nodes(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    stmt = """
+    SELECT 
+        taxonomy_nodes.tax_id AS tax_id,
+        taxonomy_nodes.parent_tax_id AS parent_tax_id,
+        taxonomy_names.name AS name,
+        taxonomy_names.name_class AS name_class
+    FROM taxonomy_nodes
+    INNER JOIN taxonomy_names ON(taxonomy_nodes.tax_id = taxonomy_names.tax_id)
+    WHERE taxonomy_names.name = ? and taxonomy_names.name_class = 'scientific name'
+    """
+    rows = db._cur.execute(stmt,['Influenza A virus']).fetchall()
+    assert len(rows) == 1, 'a node exists for "Influenza Virus A" before we start'
+    rows = db._cur.execute(stmt,['Influenza A segment 1']).fetchall()
+    assert not rows, 'no node exists for "Influenza A segment 1" before we start'
+    
+    new_node_ids = kdb.create_segmented_flu_taxonomy_nodes()
+    assert isinstance(new_node_ids, dict), 'create_segmented_flu_taxonomy_node returns a dict'
+    assert isinstance(new_node_ids['A'][None][1],int), 'the data structure returned assigns an int to a combination of virus type subtype and segment number'
+    type_A_seg1_tax_id = new_node_ids['A'][None][1]
+    assert type_A_seg1_tax_id >0 , 'the type A segment 1 new tax_id is a non-zero integer'
+    
+    rows = db._cur.execute(stmt,['Influenza A segment 1']).fetchall()
+    assert len(rows), 'a node exists now for "Influenza A segment 1"'
+    assert rows[0]['tax_id'] == new_node_ids['A'][None][1], 'the new node tax_id has been correctly recorded in the returned datastrcuture'
+    
+    rows = db._cur.execute(stmt,['Influenza A segment 4']).fetchall()
+    assert len(rows), 'a node exists now for "Influenza A segment 4"'
+    infA_seg_4_tax_id = new_node_ids['A'][None][4]
+    assert infA_seg_4_tax_id >0 , 'got a tax_id for the new node "Influenza A segment 4"'
+    
+    rows = db._cur.execute(stmt,['Influenza A H2 segment 4']).fetchall()
+    assert len(rows), 'a node exists now for "Influenza H2 subtype segment 4"'
+    infA_H2_seg_4_tax_id = new_node_ids['A']['H2'][4]
+    assert infA_H2_seg_4_tax_id >0 , 'got a tax_id for the new node "Influenza A H2 segment 4"'
+    infA_H2_seg_4_parent_tax_id=rows[0]['parent_tax_id']
+    assert infA_H2_seg_4_parent_tax_id>0, 'got a parent_tax_id for  "Influenza A H2 segment 4"'
+
+    assert infA_H2_seg_4_parent_tax_id == infA_seg_4_tax_id ,'the parent of "Influenza A H2 segment 4" is  "Influenza A segment 4"'
+
+    rows = db._cur.execute(stmt,['Influenza A N11 segment 6']).fetchall()
+    assert len(rows), 'a node exists now for "Influenza N11 subtype segment 6"'
+    
+    rows = db._cur.execute(stmt,['Influenza B segment 4']).fetchall()
+    assert len(rows), 'a node exists now for "Influenza B segment 4"'
+    
+    rows = db._cur.execute(stmt,['Influenza B H2 segment 4']).fetchall()
+    assert not rows, 'for influenza B, no H2 subtype nodes under segment 4 have been created"'
+    
+    rows = db._cur.execute(stmt,['Influenza C segment 1']).fetchall()
+    assert not rows, 'no Influenza C parent node exists in the fixtures, hence no Influenza C new taxonomy a node exists now for "Influenza H2 subtype segment 4"'
+    
+    
