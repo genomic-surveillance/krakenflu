@@ -371,6 +371,27 @@ class Db():
         """
         return [ x['id'] for x in self._cur.execute(stmt)]
     
+    def retrieve_all_flu_sequences(self):
+        """
+        Retrieve all sequences marked as flu.  
+        
+        Returns:
+            list of rows
+        """
+        stmt="""
+        SELECT 
+            id,
+            flu_name,
+            segment_number,
+            flu_type, 
+            flu_a_h_subtype, 
+            flu_a_n_subtype, 
+            is_flu 
+        FROM sequences
+        WHERE is_flu = 1
+        """
+        return self._cur.execute(stmt).fetchall()
+    
     def mark_as_not_included(self, ids:list):
         """
         Marks sequences as "not included" for final output by setting the include value to 0

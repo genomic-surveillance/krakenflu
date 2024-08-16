@@ -167,4 +167,8 @@ def test_add_taxon(setup_db_with_fixture):
     assert rows[0]['parent_tax_id'] == parent_tax_id, '...it has the correct parent'
     assert rows[0]['name_class'] == 'scientific name', '...it has the hardcoded name_class scientific name'
     
-    
+def test_retrieve_all_flu_sequences(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    rows = db.retrieve_all_flu_sequences()
+    assert isinstance(rows, list) 
+    assert len(rows)==32, 'there are 32 records of sequences with the is_flu flag set'
