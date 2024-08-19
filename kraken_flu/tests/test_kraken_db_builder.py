@@ -186,4 +186,63 @@ def test_create_segmented_flu_taxonomy_nodes(setup_db_with_real_world_fixture):
     rows = db._cur.execute(stmt,['Influenza C segment 1']).fetchall()
     assert not rows, 'no Influenza C parent node exists in the fixtures, hence no Influenza C new taxonomy a node exists now for "Influenza H2 subtype segment 4"'
     
+def test_assign_flu_taxonomy_nodes(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    stmt1 = """
+        SELECT 
+            sequences.tax_id AS seq_tax_id, 
+            taxonomy_nodes.tax_id AS node_tax_id,
+            taxonomy_nodes.parent_tax_id AS seq_parent_tax_id
+        FROM sequences
+        LEFT OUTER JOIN taxonomy_nodes ON (sequences.tax_id = taxonomy_nodes.tax_id)
+        WHERE flu_name = ? AND segment_number = ?
+    """
+    stmt2 = """
+        SELECT 
+            taxonomy_nodes.tax_id AS tax_id,
+            taxonomy_names.name
+        FROM taxonomy_nodes
+        INNER JOIN taxonomy_names ON(taxonomy_nodes.tax_id = taxonomy_names.tax_id)
+        WHERE taxonomy_names.name = ?
+    """
+    
+    fluA_puerto_rico_8_seq_rows = db._cur.execute(stmt1,["A/Puerto Rico/8/1934(H1N1)", 8]).fetchall()
+    assert len(fluA_puerto_rico_8_seq_rows) == 1, 'found the sequences record for A/Puerto Rico/8/1934(H1N1) segment 8'
+    assert not fluA_puerto_rico_8_seq_rows[0]['seq_tax_id'], '...before we start, no tax_id is assigned to this sequence'
+    assert not fluA_puerto_rico_8_seq_rows[0]['node_tax_id'], '...no taxonomy_nodes record exists yet for this sequence'
+    
+    # run the tax_id assignment and re-query for the flu A sequence, which should now have an associated 
+    # taxonomy node created, which should be a child node of one of the new flu A segment taxonomy nodes
+    kdb.assign_flu_taxonomy_nodes()
+    fluA_puerto_rico_8_rows = db._cur.execute(stmt1,["A/Puerto Rico/8/1934(H1N1)", 8]).fetchall()
+    assert fluA_puerto_rico_8_rows[0]['seq_tax_id'], '...after running assign_flu_taxonomy_nodes, the record now has a tax_id assigned'
+    assert fluA_puerto_rico_8_rows[0]['node_tax_id'], '...there is also a taxonomy_nodes record associated with this sequence now'
+    assert fluA_puerto_rico_8_rows[0]['seq_parent_tax_id'], '...the associated taxonomy node has a parent_tax_id'
+    
+    # retrieve the taxonomy node Inlfuenza A segment 8 and check that it is assigned as a parent 
+    fluA_seg8_node = db._cur.execute(stmt2,['Influenza A segment 8']).fetchone()
+    assert fluA_seg8_node, 'found flu A segment 8 node'
+    assert fluA_puerto_rico_8_rows[0]['seq_parent_tax_id'] == fluA_seg8_node['tax_id'], '...the parent of this flu A segment 8 sequence is the new node "Influenza A segment 8"'
+    
+    # same for flu A segment 4, which should be the child of a "Influenza A H1 segment 4" node
+    fluA_puerto_rico_4_rows = db._cur.execute(stmt1,["A/Puerto Rico/8/1934(H1N1)", 4]).fetchall()
+    assert fluA_puerto_rico_4_rows[0]['seq_tax_id'], '...after running assign_flu_taxonomy_nodes, the record now has a tax_id assigned'
+    assert fluA_puerto_rico_4_rows[0]['node_tax_id'], '...there is also a taxonomy_nodes record associated with this sequence now'
+    assert fluA_puerto_rico_4_rows[0]['seq_parent_tax_id'], '...the associated taxonomy node has a parent_tax_id'
+    
+    # retrieve the taxonomy node Inlfuenza A segment 8 and check that it is assigned as a parent 
+    fluA_h1_seg4_node = db._cur.execute(stmt2,['Influenza A H1 segment 4']).fetchone()
+    assert fluA_h1_seg4_node, 'found flu A H1 segment 4 node'
+    assert fluA_puerto_rico_4_rows[0]['seq_parent_tax_id'] == fluA_h1_seg4_node['tax_id'], '...the parent of this flu A segment 8 sequence is the new node "Influenza A segment 8"'
+    
+    
+    # check a flu B segment, where there is no Hx segment 4, just Flu B segment 4 as the parent node
+    fluB_4_rows = db._cur.execute(stmt1,["B/Lee/1940", 4]).fetchall()
+    assert fluB_4_rows[0]['seq_tax_id'], 'Flu B/Lee/1940 has a tax_id assigned'
+    assert fluB_4_rows[0]['node_tax_id'], '...there is also a taxonomy_nodes record associated with this sequence now'
+    assert fluB_4_rows[0]['seq_parent_tax_id'], '...the associated taxonomy node has a parent_tax_id'
+    fluB_seg4_node = db._cur.execute(stmt2,['Influenza B segment 4']).fetchone()
+    assert fluA_seg8_node, 'found flu B segment 4 node'
+    assert fluB_4_rows[0]['seq_parent_tax_id'] == fluB_seg4_node['tax_id'], '...the parent of this flu B segment 4 sequence is the new node "Influenza B segment 4"'
     

@@ -335,12 +335,71 @@ class KrakenDbBuilder():
                         new_node_ids[type][subtype_str][seg_num] = new_tax_id
         self._new_flu_node_ids = new_node_ids
         return new_node_ids        
-                
-        
-    def update_fasta_tax_ids( self ):
+            
+    def assign_flu_taxonomy_nodes(self):
         """
-        Combines the TaxonomyHandler and FastaHandler to update taxon IDs for output of the new
-        FASTA file.
+        Assigns sequences that are identified as flu to the new taxonomy nodes from method 
+        "create_segmented_flu_taxonomy_nodes", which is run at this point if it hasn't been run already.  
+        This involves the following steps:
+            - create a new taxonomy node for the flue genome in the taxonomy
+            - set the parent of this new node to one of the nodes created by  "create_segmented_flu_taxonomy_nodes"
+            - set the tax_id of the sequence record to the tax_id of the new record in taxonomy_nodes
+
+        Returns:
+            True on success
+            
+        Side effect:
+            - creates new records in taxonomy_nodes and taxonomy_names
+            - sequences.tax_id
+        """
+        # get the tax_ids for the new nodes or run the creation of the new nodes if not done already
+        if not self._new_flu_node_ids:
+            new_flu_node_ids = self.create_segmented_flu_taxonomy_nodes()
+        else:
+            new_flu_node_ids = self._new_flu_node_ids
+            
+        flu_sequences = self._db.retrieve_all_flu_sequences()
+        for flu_sequence in flu_sequences:
+            flu_name= flu_sequence['flu_name']
+            flu_type= flu_sequence['flu_type']
+            segment_number= flu_sequence['segment_number']
+            flu_a_h_subtype= flu_sequence['flu_a_h_subtype']
+            flu_a_n_subtype= flu_sequence['flu_a_n_subtype']
+            id= flu_sequence['id']
+            if not flu_name and segment_number:
+                continue
+            
+            if segment_number=='4' and flu_a_h_subtype:
+                subtype='H' + flu_a_h_subtype
+            elif segment_number=='6' and flu_a_n_subtype:
+                subtype='N' + flu_a_n_subtype 
+            else:
+                subtype= None
+                
+            # Get the tax_id of the matching parent node created by "create_segmented_flu_taxonomy_nodes"
+            parent_tax_id = new_flu_node_ids[flu_type][subtype][segment_number]
+            if not parent_tax_id:
+                raise ValueError(f"could not find the parent node for flu type: {flu_sequence['flu_type']}, subtype: {subtype}, segment: {flu_sequence['segment_number']}")    
+                
+            # create the new node/name records for the flu sequence and link it to the parent node
+            new_tax_id = self.next_new_tax_id()
+            self._db.add_taxon(
+                tax_id= new_tax_id,
+                parent_tax_id= parent_tax_id,
+                name= ' '.join([flu_name, 'segment',str(segment_number)])
+            )
+            
+            # link the sequence record to the newly created taxonomy_node
+            self._db.set_tax_id_for_sequence(id=id, tax_id= new_tax_id)
+            
+        return True
+                
+    # DELETE 
+    def link_tax_ids( self ):
+        """
+        This should be the last step in the building of the database. It assigns sequences to taxonomy 
+        nodes by setting the tax_id field.  
+        
         
         Paramters:
             none
