@@ -508,4 +508,12 @@ class Db():
                 PRIMARY KEY (id), 
                 FOREIGN KEY(tax_id) REFERENCES taxonomy_nodes (tax_id)
             );
+
+            CREATE TABLE seq2taxid (
+                id INTEGER NOT NULL,
+                ncbi_acc VARCHAR,
+                tax_id INTEGER,
+                PRIMARY KEY (id),
+                FOREIGN KEY(ncbi_acc) REFERENCES sequences (ncbi_acc)
+            );
         """
