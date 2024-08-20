@@ -440,6 +440,36 @@ class Db():
         self._con.commit() 
         return True
         
+    def set_tax_id_and_mod_fasta_header_for_sequence(self, id:int, tax_id:int, mod_fasta_header:str):
+        """
+        Set the tax_id for a sequence record identified by its sequence.id  
+        
+        Args:
+            id: int, required
+                id of the sequences record to be updated
+                
+            tax_id: int, required
+                new tax_id for the sequences record
+                
+            mod_fasta_header: str, required
+                A modified FASTA header for this record, which will be used when the 
+                data is exported to a FASTA file
+                
+        Returns:
+            True on success
+            
+        Side effects:
+            Sets sequences.tax_id
+        """
+        stmt="""
+            UPDATE sequences
+            SET tax_id = ?, mod_fasta_header = ?
+            WHERE id= ?  
+        """
+        self._cur.execute(stmt, [tax_id, mod_fasta_header, id])
+        self._con.commit() 
+        return True
+        
     def max_tax_id(self):
         """
         Returns the maximum tax_id from the nodes table, which is used to assign safe new taxon ids for the 
@@ -492,7 +522,8 @@ class Db():
             CREATE TABLE sequences (
                 id INTEGER NOT NULL, 
                 tax_id INTEGER, 
-                fasta_header VARCHAR NOT NULL, 
+                fasta_header VARCHAR NOT NULL,
+                mod_fasta_header VARCHAR NULL,
                 dna_sequence VARCHAR NOT NULL, 
                 seq_length INTEGER NOT NULL, 
                 segment_number INTEGER, 
