@@ -345,6 +345,13 @@ class KrakenDbBuilder():
             - set the parent of this new node to one of the nodes created by  "create_segmented_flu_taxonomy_nodes"
             - set the tax_id of the sequence record to the tax_id of the new record in taxonomy_nodes
 
+        NOTE: The rationale for creating a new taxonomy node for each genome is that we provide multiple 
+        genomes for influenza. In order to make kraken2 assign reads to a specific genome, each genome must have its own 
+        node in the taxonomy. This is not the case for RefSeq sequences in the NCBI taxonomy, because there is usually 
+        only one genome for each species.  
+        For these reasons, every flu genome in our modified taxonomy has its own tax_id, whereas the flu A genome segments 
+        downloaded from NCBI all have the same tax_id, which is the tax_id of "Influenza A virus"
+        
         Returns:
             True on success
             
@@ -369,10 +376,10 @@ class KrakenDbBuilder():
             if not flu_name and segment_number:
                 continue
             
-            if segment_number=='4' and flu_a_h_subtype:
-                subtype='H' + flu_a_h_subtype
-            elif segment_number=='6' and flu_a_n_subtype:
-                subtype='N' + flu_a_n_subtype 
+            if segment_number==4 and flu_a_h_subtype:
+                subtype='H' + str(flu_a_h_subtype)
+            elif segment_number==6 and flu_a_n_subtype:
+                subtype='N' + str(flu_a_n_subtype) 
             else:
                 subtype= None
                 
