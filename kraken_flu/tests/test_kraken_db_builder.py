@@ -191,7 +191,8 @@ def test_assign_flu_taxonomy_nodes(setup_db_with_real_world_fixture):
     kdb = KrakenDbBuilder(db=db)
     stmt1 = """
         SELECT 
-            sequences.tax_id AS seq_tax_id, 
+            sequences.tax_id AS seq_tax_id,
+            sequences.mod_fasta_header AS mod_fasta_header,
             taxonomy_nodes.tax_id AS node_tax_id,
             taxonomy_nodes.parent_tax_id AS seq_parent_tax_id
         FROM sequences
@@ -219,6 +220,8 @@ def test_assign_flu_taxonomy_nodes(setup_db_with_real_world_fixture):
     assert fluA_puerto_rico_8_rows[0]['seq_tax_id'], '...after running assign_flu_taxonomy_nodes, the record now has a tax_id assigned'
     assert fluA_puerto_rico_8_rows[0]['node_tax_id'], '...there is also a taxonomy_nodes record associated with this sequence now'
     assert fluA_puerto_rico_8_rows[0]['seq_parent_tax_id'], '...the associated taxonomy node has a parent_tax_id'
+    assert fluA_puerto_rico_8_rows[0]['mod_fasta_header'] == 'A/Puerto Rico/8/1934(H1N1) segment 8', '...the sequences record has an alternative FASTA header assigned correctly'
+
     
     # retrieve the taxonomy node Inlfuenza A segment 8 and check that it is assigned as a parent 
     fluA_seg8_node = db._cur.execute(stmt2,['Influenza A segment 8']).fetchone()

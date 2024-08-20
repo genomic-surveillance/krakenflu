@@ -383,6 +383,10 @@ class KrakenDbBuilder():
             else:
                 subtype= None
                 
+            # provide a unified alternative name for the sequence that will be written to the 
+            # final FASTA output file
+            mod_fasta_header = flu_name + ' segment ' + str(segment_number)
+                
             # Get the tax_id of the matching parent node created by "create_segmented_flu_taxonomy_nodes"
             parent_tax_id = new_flu_node_ids[flu_type][subtype][segment_number]
             if not parent_tax_id:
@@ -397,7 +401,7 @@ class KrakenDbBuilder():
             )
             
             # link the sequence record to the newly created taxonomy_node
-            self._db.set_tax_id_for_sequence(id=id, tax_id= new_tax_id)
+            self._db.set_tax_id_and_mod_fasta_header_for_sequence(id=id, tax_id= new_tax_id, mod_fasta_header= mod_fasta_header)
             
         return True
                 
