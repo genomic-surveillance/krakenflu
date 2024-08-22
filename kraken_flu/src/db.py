@@ -523,7 +523,55 @@ class Db():
         """
         if included_only:
             stmt+=' WHERE include = 1'
-        
+            
+        return self._iterator(stmt)
+            
+    def all_taxonomy_names_iterator(self):
+        """
+        Creates an iterator over all records in the names table. 
+
+        Returns:
+            iterator over taxonomy_names records.  
+        """
+        stmt="""
+        SELECT
+            id, 
+            tax_id, 
+            name, 
+            name_class, 
+            unique_name    
+        FROM taxonomy_names
+        """
+        return self._iterator(stmt)
+    
+    def all_taxonomy_nodes_iterator(self):
+        """
+        Creates an iterator over all records in the nodes table. 
+
+        Returns:
+            iterator over taxonomy_nodes records.  
+        """
+        stmt="""
+        SELECT
+            tax_id, 
+            parent_tax_id, 
+            rank, 
+            embl_code, 
+            division_id, 
+            inherited_div_flag, 
+            genetic_code_id, 
+            "inherited_GC_flag", 
+            mitochondrial_genetic_code_id, 
+            "inherited_MGC_flag", 
+            "GenBank_hidden_flag", 
+            hidden_subtree_root_flag, 
+            comments 
+        FROM taxonomy_nodes
+        """
+        return self._iterator(stmt)
+
+    
+    def _iterator(self, stmt):
         for row in self._con.execute(stmt):
             yield row
     
