@@ -183,4 +183,24 @@ def test_set_tax_id_for_sequence(setup_db_with_real_world_fixture):
     row = db._cur.execute(stmt).fetchone()
     assert row['tax_id']==999, 'after the update, the record has the correct tax_id set'
     
+def test_all_sequences_iterator(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    it = db.all_sequences_iterator()
+    row=next(it)
+    assert row, 'can retrieve a row at a time from iterator'
+    assert row['fasta_header'], 'the row has a fasta-Header attribute'
+    
+    # get the remaining rows
+    rows=[]
+    for row in it:
+        rows.append(row)
+    assert len(rows) == 34, 'there are 35 sequences in the fixtures of which 34 remain after the first row has already been retrieved before'
+    
+    # start again and fetch all 35 rows into the list
+    it = db.all_sequences_iterator()
+
+    rows=[]
+    for row in it:
+        rows.append(row)
+    assert len(rows) == 35, 'retrieved all 35 sequences in the fixtures'
     

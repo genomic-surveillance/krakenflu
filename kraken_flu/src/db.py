@@ -485,6 +485,48 @@ class Db():
         row = self._cur.execute(stmt).fetchone()
         return row['max_tax_id']
     
+    def all_sequences_iterator(self, included_only:bool=True):
+        """
+        Creates an iterator over all records in the sequences table. By default, filtering 
+        for records that have the "include" flag set.  
+        
+        Args:
+            included_only: bool, optional, defaults to True.
+                If True, retrieves only records with include=1
+
+        Returns:
+            iterator over sequences records.  
+            Can be used like this:
+                it = db.all_sequences_iterator()
+                for row in it:
+                    do something with row
+        """
+        stmt="""
+        SELECT
+            id, 
+            tax_id, 
+            fasta_header,
+            mod_fasta_header,
+            dna_sequence, 
+            seq_length, 
+            segment_number, 
+            ncbi_acc, 
+            flu_name, 
+            flu_type, 
+            flu_a_h_subtype, 
+            flu_a_n_subtype, 
+            include, 
+            is_flu, 
+            category, 
+            original_tax_id        
+        FROM sequences
+        """
+        if included_only:
+            stmt+=' WHERE include = 1'
+        
+        for row in self._con.execute(stmt):
+            yield row
+    
     @property        
     def schema(self):
         """
