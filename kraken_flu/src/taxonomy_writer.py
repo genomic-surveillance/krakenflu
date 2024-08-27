@@ -12,7 +12,8 @@ def write_taxonomy(db: Db, output_dir:str):
     
     Args:
         output_dir: str, required
-            Path to the putput directory into which the nodes and names files are written
+            Path to the outtput directory into which the nodes and names files are written.  
+            The path is created if it doesn't exists yet.
     
     Returns:
         True on success
@@ -21,13 +22,19 @@ def write_taxonomy(db: Db, output_dir:str):
         Writes to file
             
     """
-    raise NotImplementedError
+    if not os.path.exists( output_dir ):
+        os.makedirs( output_dir )
+        
+    _write_nodes_file(db, os.path.join(output_dir,'nodes.dmp'))
+    _write_names_file(db, os.path.join(output_dir,'names.dmp'))
 
     return True
 
 def _write_nodes_file(db: Db, path:str):
     """
-    Writes the nodes.dmp file
+    Writes the nodes.dmp file.  
+    Obtains an iterator over the database records from the Db object, so we are not 
+    reading the large table into memory all at once.  
 
     Args:
         db: Db, required
@@ -56,7 +63,9 @@ def _write_nodes_file(db: Db, path:str):
     
 def _write_names_file(db: Db, path:str):
     """
-    Writes the names.dmp file
+    Writes the names.dmp file.  
+    Obtains an iterator over the database records from the Db object, so we are not 
+    reading the large table into memory all at once.  
 
     Args:
         db: Db, required
@@ -67,21 +76,21 @@ def _write_names_file(db: Db, path:str):
     """
     names_it = db.all_taxonomy_names_iterator()
     cols = [
-        'id', 
-        'tax_id', 
-        'name', 
-        'name_class', 
-        'unique_name'    
+        'tax_id',
+        'name',
+        'unique_name',
+        'name_class'
     ]
     return _write_to_file_from_iterator(names_it, cols, path)
 
 def _write_to_file_from_iterator(it, cols, path):
     """
-    Takes an iterator and a file name and writes the data to the file
+    Takes a database table results iterator and a file name and writes the data to the file.  
+    The order of columns is dictated by the "cols" list of column/field names.  
     """
     with open( path, 'w' ) as out_fh:
-        for node in it:
-            rowdata = [ node[x] for x in cols]
+        for item in it:
+            rowdata = [ item[x] for x in cols]
             row_str = _format_for_tax_file_output( rowdata= rowdata)
             out_fh.write(row_str + "\n")
     return True
