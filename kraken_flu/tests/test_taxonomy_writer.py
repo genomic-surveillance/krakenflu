@@ -63,7 +63,6 @@ def test_write_taxonomy(setup_db_with_real_world_fixture, tmp_path):
     exp_nodes_out_file = out_dir / 'nodes.dmp'
     assert not exp_nodes_out_file.is_file(), 'before we start, the expected file nodes.dmp does not exist'
     
-    
     write_taxonomy(db, out_dir)
     
     assert exp_names_out_file.is_file(), 'after running write_taxonomy, the expected file names.dmp exists'
