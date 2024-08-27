@@ -4,7 +4,9 @@ from tempfile import NamedTemporaryFile
 from collections import defaultdict
 
 from kraken_flu.src.fasta_loader import load_fasta
+from kraken_flu.src.fasta_writer import write_fasta
 from kraken_flu.src.taxonomy_loader import load_taxonomy
+from kraken_flu.src.taxonomy_writer import write_taxonomy
 from kraken_flu.src.db import Db
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
@@ -445,13 +447,9 @@ class KrakenDbBuilder():
         self.tax_ids_updated = True
         return True
 
-    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna', filter_incomplete_flu:bool = True,  filter_except_patterns: list= [], drop_unparsed_flu:bool = True ):
+    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna' ):
         """
-        Create a directory with all files needed to build a new kraken database. 
-        This method triggers the data acquisition from the FastaHandler and TaxonomyHandler, then runs the
-        changing of taxonomy IDs (delegating to the two handlers) before writing a new FASTA file with updated 
-        kraken:taxid tags as well as the names and nodes files of the NCBI taxonomy with the added taxa.
-        
+        Create a directory with all files needed to build a new kraken database.
         The FASTA file is named library.fna as per kraken2 convention but can be given a different name. The 
         NCBI taxonomy files names.dmp and nodes.dmp cannot be renamed as kraken2 relies on those names.
         
@@ -464,22 +462,8 @@ class KrakenDbBuilder():
                 if true, force overwrite whatever is already in the output dir. If not, will fail
                 if directory already exists
                 
-            filter_incomplete_flu: bool, optional, defaults to True
-                If True, runs the filter that removes incomplete influenza genomes. See FastaHandler for details
-                            
-            filter_except_patterns: list(str), optional
-                A list of strings that are used to exclude genomes from the Influenza "complete genome" filter.
-                Any genome where the FASTA header contains one of the strings in this list will not be subjected to 
-                the filter. This was required to ensure that the Goose Guandong H5N1 reference genome (which does not
-                have sequences for all 8 segments) is not filtered out.
-                
-            drop_unparsed_flu: bool, optional, defaults to True
-                If True, sequences whose name indicates that it is flu but where the name cannot be parsed
-                properly (we can't obtain an isolate name) will be dropped. Without this filter, such cases
-                would end up as flu whole genomes that are not segmented like the rest of the flu genomes.
-            
         Returns:
-            True if success
+            True on success
             
         Side effects:
             Writes files to path
@@ -489,47 +473,21 @@ class KrakenDbBuilder():
         taxonomy_path = os.path.join( path, 'taxonomy' )
         
         fasta_file_path = os.path.join( library_path, fasta_file_name )
-        names_file_path = os.path.join( taxonomy_path, 'names.dmp')
-        nodes_file_path = os.path.join( taxonomy_path, 'nodes.dmp')
 
         if os.path.exists( path ): 
             if not force:
                 raise ValueError(f'directory { path } exists already. Will not write into existing directory')
         else:
-            os.mkdir( path )
+            os.makedirs( path )
             
         if not os.path.exists( library_path ):
-            os.mkdir( library_path )
+            os.makedirs( library_path )
         if not os.path.exists( taxonomy_path ):
-            os.mkdir( taxonomy_path )
+            os.makedirs( taxonomy_path )
         
-        logging.info( f'found { self._fasta_handler.n_seq_total()} sequence records in {self.fasta_file_path}')
-        logging.info( f'{ self._fasta_handler.n_seq_flu()} sequence records identified as influenza')
-        
-        if filter_incomplete_flu or drop_unparsed_flu:
-            logging.info( f'starting to apply filters on influenza genomes')
-            n_seq_filtered = self._fasta_handler.n_seq_filtered() # should be 0 at this point
-            
-            if filter_incomplete_flu:
-                logging.info( f'starting to filter incomplete influenza genomes')
-                self._fasta_handler.remove_incomplete_flu( filter_except_patterns= filter_except_patterns )
-                n_seq_filtered = self._fasta_handler.n_seq_filtered() - n_seq_filtered
-                logging.info( f'{ n_seq_filtered} flu sequence records have been marked to be removed from output due to being incomplete')
-            if drop_unparsed_flu:
-                logging.info( f'starting to apply drop_unparsed_flu filter')
-                self._fasta_handler.remove_unparsed_flu()
-                n_seq_filtered = self._fasta_handler.n_seq_filtered() - n_seq_filtered
-                logging.info( f'{ n_seq_filtered } flu sequence records have been marked to be removed from output as unparsable')
-        
-            logging.info( f'after applying filters, { self._fasta_handler.n_seq_filtered()} flu sequence records have been marked to be removed from output')
-        
-        if not self.tax_ids_updated:
-            self.update_fasta_tax_ids()
-        
-        logging.info( f'writing output files')
-        self._fasta_handler.write_fasta( fasta_file_path )
-        self._taxonomy_handler.write_names_file( names_file_path )
-        self._taxonomy_handler.write_nodes_file( nodes_file_path )
-        logging.info( f'---- process complete ----')
+        logging.info( f'writing output files to {path}')
+        write_fasta(self._db, fasta_file_path)
+        write_taxonomy(self._db, taxonomy_path)
+        logging.info( 'output files completed')
         return True
 

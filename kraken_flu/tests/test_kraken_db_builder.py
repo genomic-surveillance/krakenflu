@@ -249,3 +249,18 @@ def test_assign_flu_taxonomy_nodes(setup_db_with_real_world_fixture):
     assert fluA_seg8_node, 'found flu B segment 4 node'
     assert fluB_4_rows[0]['seq_parent_tax_id'] == fluB_seg4_node['tax_id'], '...the parent of this flu B segment 4 sequence is the new node "Influenza B segment 4"'
     
+def test_create_db_ready_dir(setup_db_with_real_world_fixture, tmp_path):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    out_dir = tmp_path / "kdb_out_dir"
+    exp_names_out_file = out_dir / 'taxonomy' / 'names.dmp'
+    assert not exp_names_out_file.is_file(), 'before we start, the expected file names.dmp does not exist'
+    
+    exp_lib_out_file = out_dir / 'library' / 'library.fna'
+    assert not exp_lib_out_file.is_file(), 'before we start, the expected file library.fna does not exist'
+    
+    kdb.create_db_ready_dir(path= out_dir)
+
+    assert exp_names_out_file.is_file(), 'after running create_db_ready_dir, the expected file taxonomy/names.dmp exists'
+    assert exp_lib_out_file.is_file(), 'after running create_db_ready_dir, the expected file library/library.fna exists'
