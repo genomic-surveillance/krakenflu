@@ -86,11 +86,6 @@ def args_parser():
         help = 'one or more strings/patterns that are used to exclude genomes from the Influenza "complete genome" filter (if used)'
     )
 
-    parser.add_argument(
-        '--drop_unparsed_flu',
-        action = 'store_true',
-        help = 'drop flu isolate data where we cannot parse the name properly, ie we can determine that it is flu but cannot obtain an isolate name'        
-    )
     return parser
 
 def main():
