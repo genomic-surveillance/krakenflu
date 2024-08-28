@@ -1,6 +1,7 @@
 import re
 import os.path
-import logging 
+import logging
+import csv 
 
 from kraken_flu.src.utils import parse_flu
 from kraken_flu.src.db import Db
@@ -98,14 +99,30 @@ def _load_nodes(db:Db, nodes_file_path:str):
     logging.info( f'finished uploading {n} nodes records to DB')   
     return True
 
-def _load_acc2taxids(db:Db, acc2taxid_file_path:str):
+def _load_seq2taxids(db:Db, acc2taxid_file_path:str):
     """
     Upload the accession to taxid file from NCBI to the DB
     """
     logging.info( f'starting to upload names from {acc2taxid_file_path} data to DB')
+
+    d_rename = {
+        "accession":"ncbi_acc",
+        "taxid":"tax_id"
+    }
+
     n=0
-    raise NotImplemented("this function is not yet implemented and needs an update to the Db class: need a table for this data")
+    with open(acc2taxid_file_path, 'r') as fh:
+        fd = csv.csv.DictReader(fh, delimiter="\t")(fh, delimiter="\t")
+        for row in fd:
+            row["version"] = row.pop("accession.version").split(".")[-1]
+            for prior, post in d_rename.items():
+                row[post] = row.pop(prior)
+
+            db.add_seq2taxid(**row)
+            
+            n+=1
     logging.info( f'finish uploading {n} acc2taxid records to DB')
+    return True
     
 def _read_tax_data_file_row( row ):
     """
