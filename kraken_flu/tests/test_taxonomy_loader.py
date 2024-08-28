@@ -2,12 +2,13 @@ import pytest
 import os.path
 from importlib_resources import files
 
-from kraken_flu.src.taxonomy_loader import load_taxonomy, _load_names, _load_nodes, _read_tax_data_file_row
+from kraken_flu.src.taxonomy_loader import load_taxonomy, _load_names, _load_nodes, _read_tax_data_file_row, load_seq2taxid
 from kraken_flu.src.db import Db
 
 FIXTURE_DIR = files('kraken_flu.tests.fixtures')
 NODES_FILE = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','taxonomy','nodes.dmp'))
 NAMES_FILE = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','taxonomy','names.dmp'))
+ACC2TAXID_FILE = FIXTURE_DIR.joinpath(os.path.join('ncbi_data_not_kraken','nucl_gb.accession2taxid'))
 
 DEBUG=True
 #DEBUG=False
@@ -71,3 +72,10 @@ def test_load_taxonomy(setup_db):
     assert rows[0]['parent_tax_id'] == 694009, 'parent tax_id is correct'
     #assert [ r.name for r in row.TaxonomyNode.taxonomy_names ] == ['Severe acute respiratory syndrome coronavirus 2'], 'a single name is retrieved when filtering for scientific name'
     
+    def test__load_seq2taxids(setup_db):
+        db = setup_db
+        assert len(db._cur.execute("select * FROM seq2taxid").fetchall()) ==  len(db._cur.execute("select * FROM seq2taxid").fetchall()) == 0, 'before we start uploading, no seq2taxid records are present in the DB'
+        assert load_seq2taxids(db=db, acc2taxid_file_path=ACC2TAXID_FILE)
+        assert len(db._cur.execute("select * FROM seq2taxid").fetchall()) == 35, 'after running load_seq2taxids 20 accessions exist in the DB'
+
+        #TODO complete test
