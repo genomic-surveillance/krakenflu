@@ -38,7 +38,7 @@ def load_taxonomy(db: Db, names_file_path:str, nodes_file_path:str, acc2taxid_fi
         raise ValueError(f"{names_file_path} is not a file")
     if not os.path.isfile( nodes_file_path ):
         raise ValueError(f"{nodes_file_path} is not a file")
-    if acc2taxid_file_path and not not os.path.isfile( acc2taxid_file_path ):
+    if acc2taxid_file_path and not os.path.isfile( acc2taxid_file_path ):
         raise ValueError(f"{acc2taxid_file_path} is not a file")
     
     _load_names(db,names_file_path)
