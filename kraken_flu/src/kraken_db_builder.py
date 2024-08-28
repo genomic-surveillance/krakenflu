@@ -406,46 +406,6 @@ class KrakenDbBuilder():
             self._db.set_tax_id_and_mod_fasta_header_for_sequence(id=id, tax_id= new_tax_id, mod_fasta_header= mod_fasta_header)
             
         return True
-                
-    # DELETE 
-    def link_tax_ids( self ):
-        """
-        This should be the last step in the building of the database. It assigns sequences to taxonomy 
-        nodes by setting the tax_id field.  
-        
-        
-        Paramters:
-            none
-            
-        Returns:
-            True on success
-            
-        Side effects:
-            - updates taxids in slef._fasta_handler.data
-            - sets self.tax_ids_update to True
-        """
-        if self.tax_ids_updated:
-            # already done this, nothing to do
-            return True
-                
-        logging.info( f'starting to assign new taxonomy IDs to sequence records')
-        
-        # trigger the cascade to create the new taxa
-        self._taxonomy_handler.create_influenza_isolate_segment_taxa()
-        
-        for fasta_record in self._fasta_handler.data:
-            # currently, we only make changes to flu sequences
-            if fasta_record.is_flu and fasta_record.flu_name and fasta_record.flu_seg_num:
-                try:
-                    taxid = self._taxonomy_handler.influenza_isolate_segment_tax_ids[ fasta_record.flu_name ][ fasta_record.flu_seg_num ]
-                    fasta_record.taxid = taxid
-                except KeyError:
-                    logging.info( f'found influenza record for isolate "{fasta_record.flu_name}" segment { fasta_record.flu_seg_num} in FASTA file but no corresponding entry in taxonomy - skipping')
-
-        logging.info( f'finished assigning new taxonomy IDs')
-
-        self.tax_ids_updated = True
-        return True
 
     def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna' ):
         """
