@@ -51,6 +51,10 @@ class Db():
 
         # connect and create a cursor (session)
         self._con = sqlite3.connect(db_path)
+
+         # Enable foreign key support
+        self._con.execute("PRAGMA foreign_keys = ON;")
+        
         if debug:
             self._con.set_trace_callback(print)
         
@@ -79,6 +83,19 @@ class Db():
         stmt = f"INSERT INTO {table_name}({','.join(field_name_list)}) VALUES({','.join(value_name_list)})"
         self._cur.execute(stmt, data)        
         self._con.commit()
+
+    def add_seq2taxid(self, ncbi_acc:str, acc_version:int, tax_id:int, gi:int,):
+        """
+        Add a sequence record into the "seq2taxid" table
+        """
+        self.insert_from_dict('seq2taxid',
+            {
+                "ncbi_acc":ncbi_acc,
+                "acc_version":acc_version,
+                "tax_id":tax_id,
+                "gi":gi
+            }
+        )
 
     def add_sequence( self, fasta_header:str,  dna_sequence:str, category:str, flu_type:str, ncbi_acc:str, original_taxid:int, is_flu:bool, isolate_name:str, segment_number:int, h_subtype:int, n_subtype:int ):
         """
@@ -512,8 +529,11 @@ class Db():
             CREATE TABLE seq2taxid (
                 id INTEGER NOT NULL,
                 ncbi_acc VARCHAR,
+                acc_version INTEGER,
                 tax_id INTEGER,
+                gi INTEGER,
                 PRIMARY KEY (id),
-                FOREIGN KEY(ncbi_acc) REFERENCES sequences (ncbi_acc)
+                FOREIGN KEY(ncbi_acc) REFERENCES sequences (ncbi_acc),
+                FOREIGN KEY(tax_id) REFERENCES taxonomy_nodes (tax_id)
             );
         """
