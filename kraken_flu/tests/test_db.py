@@ -183,4 +183,6 @@ def test_set_tax_id_for_sequence(setup_db_with_real_world_fixture):
     row = db._cur.execute(stmt).fetchone()
     assert row['tax_id']==999, 'after the update, the record has the correct tax_id set'
     
-    
+def test_add_seq2taxid(setup_db_with_real_world_fixture):
+    """TODO"""
+    pass
