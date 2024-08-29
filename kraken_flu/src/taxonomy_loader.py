@@ -58,7 +58,7 @@ def _load_names(db:Db, names_file_path:str):
     TODO: the only difference to _load_nodes is now the list of field names in the data dict.  Should combine the two methods.  
     """
     n_names = _get_num_records(names_file_path)
-    logging.info( f'starting to upload{n_names} names records from {names_file_path} data to DB')
+    logging.info( f'starting to upload {n_names} names records from {names_file_path} data to DB')
     
     with open( names_file_path, 'r' ) as fh:
         with db.bulk_insert_buffer(table_name='taxonomy_names') as b:
@@ -72,7 +72,7 @@ def _load_names(db:Db, names_file_path:str):
                         'name_class': d[3]
                     }
                 )
-                if n_inserted >= 0:
+                if n_inserted > 0:
                     logging.info(f'flushed {n_inserted} records to DB')
             
     logging.info( f'finished uploading names records to DB')
@@ -83,7 +83,7 @@ def _load_nodes(db:Db, nodes_file_path:str):
     Upload the names.dmp file to the DB
     """
     n_nodes = _get_num_records(nodes_file_path)
-    logging.info( f'starting to upload{n_nodes} names records from {nodes_file_path} data to DB')
+    logging.info( f'starting to upload {n_nodes} names records from {nodes_file_path} data to DB')
     
     with open( nodes_file_path, 'r' ) as fh:
         with db.bulk_insert_buffer(table_name='taxonomy_nodes') as b:
@@ -106,7 +106,7 @@ def _load_nodes(db:Db, nodes_file_path:str):
                         'comments': d[12]
                     }
                 )
-                if n_inserted >= 0:
+                if n_inserted > 0:
                     logging.info(f'flushed {n_inserted} records to DB')
             
     logging.info( f'finished uploading nodes records to DB')

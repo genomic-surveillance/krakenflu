@@ -38,7 +38,7 @@ def load_fasta(db: Db, file_path:str, category:str=None):
             
     """
     n_seqs = _get_num_records(file_path)
-    logging.info( f'starting to upload{n_seqs} names records from {file_path} data to DB')
+    logging.info( f'starting to upload {n_seqs} names records from {file_path} data to DB')
     
     with open( file_path ) as fh:
         with db.bulk_insert_buffer(table_name='sequences') as b:
@@ -69,7 +69,7 @@ def load_fasta(db: Db, file_path:str, category:str=None):
                         'include':int(True)
                     }
                 )
-                if n_inserted >= 0:
+                if n_inserted > 0:
                     logging.info(f'flushed {n_inserted} records to DB')
 
     logging.info( f'finished uploading sequence records to DB')
