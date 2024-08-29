@@ -61,7 +61,7 @@ def _load_names(db:Db, names_file_path:str):
     logging.info( f'starting to upload {n_names} names records from {names_file_path} data to DB')
     
     with open( names_file_path, 'r' ) as fh:
-        with db.bulk_insert_buffer(table_name='taxonomy_names') as b:
+        with db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size= 50000) as b:
             for row in fh:
                 d = _read_tax_data_file_row( row )
                 n_inserted = b.add_row(
@@ -86,7 +86,7 @@ def _load_nodes(db:Db, nodes_file_path:str):
     logging.info( f'starting to upload {n_nodes} names records from {nodes_file_path} data to DB')
     
     with open( nodes_file_path, 'r' ) as fh:
-        with db.bulk_insert_buffer(table_name='taxonomy_nodes') as b:
+        with db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as b:
             for row in fh:
                 d = _read_tax_data_file_row( row )
                 n_inserted = b.add_row(

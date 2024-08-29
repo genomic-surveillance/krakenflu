@@ -41,11 +41,10 @@ def load_fasta(db: Db, file_path:str, category:str=None):
     logging.info( f'starting to upload {n_seqs} names records from {file_path} data to DB')
     
     with open( file_path ) as fh:
-        with db.bulk_insert_buffer(table_name='sequences') as b:
+        with db.bulk_insert_buffer(table_name='sequences', buffer_size= 10000) as b:
             for record in SeqIO.parse(fh, "fasta"):
                 header = record.description
                 sequence = record.seq
-                seqlen = len( sequence )
                 flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype = _parse_header(header)
                 
                 # For the DB, we just want to store the integer of the H and N subtype
