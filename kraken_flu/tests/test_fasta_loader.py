@@ -2,7 +2,7 @@ import pytest
 import os.path
 from importlib_resources import files
 
-from kraken_flu.src.fasta_loader import load_fasta, _parse_header
+from kraken_flu.src.fasta_loader import load_fasta, _parse_header, _get_num_records
 from kraken_flu.src.db import Db
 
 FIXTURE_DIR = files('kraken_flu.tests.fixtures')
@@ -108,3 +108,6 @@ def test_load_fasta( setup_db ):
     assert row['segment_number'] == 1, '... correct segment number'
     assert row['flu_a_h_subtype'] == 3, '... correct flu H subtype'
     assert row['flu_a_n_subtype'] == 2, '... correct flu N subtype'
+    
+def test__get_num_records():
+    assert _get_num_records(SMALL_VIRUS_FILE) == 35, '35 FASTA records in the file'

@@ -2,7 +2,7 @@ import pytest
 import os.path
 from importlib_resources import files
 
-from kraken_flu.src.taxonomy_loader import load_taxonomy, _load_names, _load_nodes, _read_tax_data_file_row
+from kraken_flu.src.taxonomy_loader import load_taxonomy, _load_names, _load_nodes, _read_tax_data_file_row, _get_num_records
 from kraken_flu.src.db import Db
 
 FIXTURE_DIR = files('kraken_flu.tests.fixtures')
@@ -70,4 +70,7 @@ def test_load_taxonomy(setup_db):
     assert len(rows) == 1, 'a single result is returned'
     assert rows[0]['parent_tax_id'] == 694009, 'parent tax_id is correct'
     #assert [ r.name for r in row.TaxonomyNode.taxonomy_names ] == ['Severe acute respiratory syndrome coronavirus 2'], 'a single name is retrieved when filtering for scientific name'
+    
+def test__get_num_records():
+    assert _get_num_records(NAMES_FILE) == 52, 'there are 52 lines in the names file'
     

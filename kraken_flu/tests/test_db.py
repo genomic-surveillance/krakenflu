@@ -2,7 +2,7 @@ import pytest
 import os.path
 from importlib_resources import files
 
-from kraken_flu.src.db import Db
+from kraken_flu.src.db import Db, BulkInsertBuffer
 
 # set this to True to make the tests print all executed SQL or False to stop that
 PRINT_SQL_TRACE=False
@@ -204,3 +204,74 @@ def test_all_sequences_iterator(setup_db_with_real_world_fixture):
         rows.append(row)
     assert len(rows) == 35, 'retrieved all 35 sequences in the fixtures'
     
+def test_get_field_names(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    expected_fields = [
+        'id',
+        'tax_id', 
+        'name',
+        'name_class', 
+        'unique_name'
+    ]
+    assert db.get_field_names('taxonomy_names') == expected_fields, 'retrieving the expected field names for a table'
+
+def test_bulk_insert(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    
+    rows = db._cur.execute("SELECT * FROM taxonomy_names WHERE name IN(?,?)",['bulk1','bulk2']).fetchall()
+    assert not rows, 'before we do the bulk insert, the rows do not exist in the table'
+    
+    table_name= 'taxonomy_names'
+    field_names= [
+        'tax_id', 
+        'name',
+        'name_class', 
+        'unique_name'
+    ]
+    data= [
+        [ 100001, 'bulk1', 'scientific name', None],
+        [ 100002, 'bulk2', 'scientific name', None]
+    ]
+    db.bulk_insert(table_name= table_name, field_names= field_names, field_data= data)
+    
+    rows = db._cur.execute("SELECT * FROM taxonomy_names WHERE name IN(?,?)",['bulk1','bulk2']).fetchall()
+    assert len(rows) == 2, 'after we do the bulk insert, the 2 new rows exist in the table'
+    
+def test_bulk_insert_buffer(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    
+    rows = db._cur.execute("SELECT * FROM taxonomy_names WHERE name IN(?,?)",['bulk1','bulk2']).fetchall()
+    assert not rows, 'before we do the bulk insert, the rows do not exist in the table'
+
+    data= [
+        { 'tax_id': 100001, 'name': 'bulk1', 'name_class': 'scientific name', 'unique_name': None},
+        { 'tax_id': 100002, 'name': 'bulk2', 'name_class': 'scientific name', 'unique_name': None}
+    ]
+    
+    with db.bulk_insert_buffer('taxonomy_names') as b:
+        for row in data:
+            n_inserted = b.add_row(row)
+            assert n_inserted==0, 'buffer size is 5000, so every add_row call just buffers (will flush to DB when losing context)'
+    
+    rows = db._cur.execute("SELECT * FROM taxonomy_names WHERE name IN(?,?)",['bulk1','bulk2']).fetchall()
+    assert len(rows) == 2, 'after we do the bulk insert, the 2 new rows exist in the table'
+    
+def test_bulk_insert_buffer_force_single(setup_db_with_real_world_fixture):
+    # same as test_bulk_insert_buffer but set the buffer size to single row, so that each row will trigger one INSERT
+    db = setup_db_with_real_world_fixture
+    
+    rows = db._cur.execute("SELECT * FROM taxonomy_names WHERE name IN(?,?)",['bulk1','bulk2']).fetchall()
+    assert not rows, 'before we do the bulk insert, the rows do not exist in the table'
+
+    data= [
+        { 'tax_id': 100001, 'name': 'bulk1', 'name_class': 'scientific name', 'unique_name': None},
+        { 'tax_id': 100002, 'name': 'bulk2', 'name_class': 'scientific name', 'unique_name': None}
+    ]
+    
+    with db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size=1) as b:
+        for row in data:
+            n_inserted = b.add_row(row)
+            assert n_inserted == 1, 'every row added triggers a flush to DB'
+    
+    rows = db._cur.execute("SELECT * FROM taxonomy_names WHERE name IN(?,?)",['bulk1','bulk2']).fetchall()
+    assert len(rows) == 2, 'after we do the bulk insert, the 2 new rows exist in the table'

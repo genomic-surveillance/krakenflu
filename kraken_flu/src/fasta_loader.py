@@ -2,7 +2,7 @@ from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 import re
-import os.path
+import subprocess
 import logging 
 
 from kraken_flu.src.utils import KRAKEN_TAX_ID_REGEX, NCBI_ACC_REGEX
@@ -37,37 +37,42 @@ def load_fasta(db: Db, file_path:str, category:str=None):
         loads data into backend DB 
             
     """
+    n_seqs = _get_num_records(file_path)
+    logging.info( f'starting to upload{n_seqs} names records from {file_path} data to DB')
     
-    logging.info( f'uploading FASTA to DB from { file_path }')
-    n=0
     with open( file_path ) as fh:
-        for record in SeqIO.parse(fh, "fasta"):
-            n+=1
-            header = record.description
-            sequence = record.seq
-            seqlen = len( sequence )
-            flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype = _parse_header(header)
-            
-            # For the DB, we jsut want to store the integer of the H and N subtype
-            h_subtype = h_subtype and h_subtype.replace('H', '')
-            n_subtype = n_subtype and n_subtype.replace('N', '')
-            
-            db.add_sequence(
-                fasta_header= header,
-                dna_sequence= str(sequence),
-                category= category,
-                flu_type= flu_type,
-                ncbi_acc= ncbi_acc,
-                original_taxid= kraken_taxid,
-                is_flu= is_flu,
-                isolate_name= isolate_name,
-                segment_number= segment_number, 
-                h_subtype= h_subtype,
-                n_subtype= n_subtype
-            )
+        with db.bulk_insert_buffer(table_name='sequences') as b:
+            for record in SeqIO.parse(fh, "fasta"):
+                header = record.description
+                sequence = record.seq
+                seqlen = len( sequence )
+                flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype = _parse_header(header)
+                
+                # For the DB, we just want to store the integer of the H and N subtype
+                h_subtype = h_subtype and h_subtype.replace('H', '')
+                n_subtype = n_subtype and n_subtype.replace('N', '')
+                
+                n_inserted = b.add_row(
+                    {
+                        'fasta_header': header,
+                        'dna_sequence': str(sequence),
+                        'seq_length':len(sequence),
+                        'category': category,
+                        'flu_type': flu_type,
+                        'ncbi_acc': ncbi_acc,
+                        'original_tax_id': kraken_taxid,
+                        'is_flu': int(is_flu),
+                        'flu_name': isolate_name,
+                        'segment_number': segment_number, 
+                        'flu_a_h_subtype': h_subtype,
+                        'flu_a_n_subtype': n_subtype,
+                        'include':int(True)
+                    }
+                )
+                if n_inserted >= 0:
+                    logging.info(f'flushed {n_inserted} records to DB')
 
-    logging.info( f'finished uploading {n} sequences from { file_path }')
-    
+    logging.info( f'finished uploading sequence records to DB')
     return True
 
 def _parse_header(header:str):
@@ -109,3 +114,12 @@ def _parse_header(header:str):
         
     return flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype
 
+def _get_num_records(file_path):
+    """
+    Counts FASTA records in file file_path
+    """
+    p = subprocess.run(f"grep -c '^>' {file_path}", shell=True, check=True, capture_output=True, encoding='utf-8')
+    if not p.returncode:
+        return int(p.stdout)
+    else:
+        raise Exception("failed to runcommand to count FASTA records in file")

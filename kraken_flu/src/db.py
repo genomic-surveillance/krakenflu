@@ -65,9 +65,22 @@ class Db():
         Creates an INSERT statement like:
         INSERT INTO table_name(field1, field2 [...]) VALUES(:field1, :field2 [...])
         which is called with the field values in an execute on the DB cursor
+        
+        TODO: this method and bulk_insert are very similar and should be merged into one method
+        that can handle both, a single dict or the bulk data list of lists used for the bulk_insert method.  
+        This could be done either by checking the type of input data we receive or by explicitly 
+        setting a mode argument. The only real difference between the two is how to construct the 
+        field values list for the sql. We can use executemany for both use cases.  
 
         Args:
             data (dict): dictionary of the data, keys must be valid field names
+            
+        Returns:
+            True on success
+            
+        Side effects:
+            Insert data into table
+            
         """
         field_name_list = [] # for table_name(field list)
         value_name_list = [] # for VALUES(names list)
@@ -79,7 +92,53 @@ class Db():
         stmt = f"INSERT INTO {table_name}({','.join(field_name_list)}) VALUES({','.join(value_name_list)})"
         self._cur.execute(stmt, data)        
         self._con.commit()
-
+        return True
+        
+    def bulk_insert(self, table_name:str, field_names:list, field_data:list):
+        """
+        Performs a bulk insert of several rows into a database table.  
+        
+        Args:
+            table_name: str, required
+                Name of the table to insert into
+                
+            field_names: list, required
+                List of field names to insert into
+                
+            field_data: list, required
+                List of lists of data for the table fields/columns. Order of data in lists must match 
+                the order of field provided in argument field_names
+                
+        Returns:
+            True on success
+            
+        Side effects:
+            Insert data into table
+            
+        """
+        if not isinstance(field_data,list) or not isinstance(field_data[0],list):
+            raise ValueError("field_data must be a list of lists")
+        
+        stmt = f"INSERT INTO {table_name}({','.join(field_names)}) VALUES({','.join(['?']*len(field_names))})"
+        self._cur.executemany(stmt, field_data)        
+        self._con.commit()
+        return True
+        
+    def bulk_insert_buffer(self, table_name:str, buffer_size= 5000):
+        """
+        Returns a context manager BulkInsertBuffer object to manage buffered bulk inserts.  
+        See class definition for BulkInsertBuffer in this module for details.
+        
+        Args:
+        table_name: str, required
+            The name of the table we are inserting into
+            
+        buffer_size: int, optional, defaults to 5000
+            The number of rows of data to hold in RAM before flushing to the DB
+            
+        """
+        return BulkInsertBuffer( db=self, table_name= table_name, buffer_size= buffer_size )
+        
     def add_sequence( self, fasta_header:str,  dna_sequence:str, category:str, flu_type:str, ncbi_acc:str, original_taxid:int, is_flu:bool, isolate_name:str, segment_number:int, h_subtype:int, n_subtype:int ):
         """
         Add a sequence record to table "sequences" without a link to a taxon node (which will be provided later).  
@@ -575,6 +634,19 @@ class Db():
         for row in self._con.execute(stmt):
             yield row
     
+    def get_field_names(self, table_name:str):
+        """
+        Returns a list of the column/field names of the table
+
+        Args:
+            table_name: str, required
+
+        Returns:
+            list of field names
+        """
+        data= self._cur.execute(f"SELECT * FROM {table_name} LIMIT 1")
+        return [c[0] for c in data.description]
+    
     @property        
     def schema(self):
         """
@@ -630,3 +702,86 @@ class Db():
                 FOREIGN KEY(tax_id) REFERENCES taxonomy_nodes (tax_id)
             );
         """
+
+class BulkInsertBuffer():
+    """
+    This class provides a buffer for INSERT statements into a single table, with the 
+    purpose of increasing performance at the database build step where we have to load 
+    GB of data into the database from NCBI taxonomy files and FASTA files. This would take 
+    too long with one INSERT transaction per row of incoming data.   
+    The buffer can be filled with data row by row and automatically triggers a write 
+    operation when it is full. The size of the buffer can be set to a desired number of rows.  
+    
+    Use with context manager like so:
+    
+        >>> with BulkInsertBuffer('taxonomy_names') as b:
+        >>>     for row in row_data:
+        >>>         b.add_row({'name':'some name', 'name_class': 'scientific name'})
+            
+    At this point, all row data will have been committed to the DB, nothing else to do
+        
+    Args:
+        table_name: str, required
+            The name of the table we are inserting into
+            
+        buffer_size: int, optional, defaults to 5000
+            The number of rows of data to hold in RAM before flushing to the DB
+        
+    """
+    def __init__(self, table_name:str, db=Db, buffer_size= 5000):
+        self._db = db
+        self.table_name = table_name
+        self.field_names = db.get_field_names(table_name)
+        self.buffer_size = buffer_size
+        self.field_data = [] # a list of lists of row data populated when calling add_row
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if self.field_data:
+            self._write_buffer()
+            
+    def add_row(self, data_dict:dict):
+        """
+        Adds a row of data to the buffer. When the buffer is full, triggers a DB INSERT. 
+        
+        Args:
+            dict of field names to field values
+            
+        Return:
+            number of flushed rows to DB, 0 when we are just buffering >0 when commit triggered
+
+        """
+        row_data = []
+        n=0
+        for field_name in self.field_names:
+            if field_name in data_dict:
+                row_data.append( data_dict[field_name])
+                n+=1
+            else:
+                # no data provided for this field, set it to NULL
+                row_data.append(None)
+
+        if n < len(data_dict):
+            # if we are here, we have unused items in the kwargs dict, ie values for fields that don't exist
+            raise ValueError("field names provided to 'add_row' that do not exist in the database table")
+        
+        self.field_data.append( row_data )
+        n_inserted = 0
+        if len( self.field_data ) >= self.buffer_size:
+            n_inserted = self._write_buffer()
+
+        return n_inserted
+        
+    def _write_buffer(self):
+        """
+        Commits the buffer to the database and empties it out. Called by add_row whenever we hit the 
+        max buffer size of rows and by __exit__ to empty out the remaining buffer before we lose the 
+        context.  
+        Returns number of rows inserted
+        """
+        n = len(self.field_data)
+        self._db.bulk_insert(self.table_name, self.field_names, self.field_data)
+        self.field_data = [] # reset the buffer
+        return n
