@@ -83,7 +83,7 @@ def _load_nodes(db:Db, nodes_file_path:str):
     Upload the names.dmp file to the DB
     """
     n_nodes = _get_num_records(nodes_file_path)
-    logging.info( f'starting to upload {n_nodes} names records from {nodes_file_path} data to DB')
+    logging.info( f'starting to upload {n_nodes} nodes records from {nodes_file_path} data to DB')
     
     with open( nodes_file_path, 'r' ) as fh:
         with db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as b:
@@ -116,8 +116,7 @@ def _load_acc2taxids(db:Db, acc2taxid_file_path:str):
     """
     Upload the accession to taxid file from NCBI to the DB
     """
-    logging.info( f'starting to upload names from {acc2taxid_file_path} data to DB')
-    n=0
+    logging.info( f'starting to upload acc2taxid records from {acc2taxid_file_path} data to DB')
     raise NotImplemented("this function is not yet implemented and needs an update to the Db class: need a table for this data")
     logging.info( f'finish uploading {n} acc2taxid records to DB')
     
