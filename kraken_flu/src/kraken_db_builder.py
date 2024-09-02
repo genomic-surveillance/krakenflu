@@ -2,6 +2,7 @@ import os.path
 import logging
 from tempfile import NamedTemporaryFile
 from collections import defaultdict
+from math import floor
 
 from kraken_flu.src.fasta_loader import load_fasta
 from kraken_flu.src.fasta_writer import write_fasta
@@ -205,8 +206,10 @@ class KrakenDbBuilder():
         Side effects:
             sets sequences.include field
         """
+        logging.info("started excluding unnamed and/or unsegmented influenza records from DB")
         unnamed_flu_sequence_ids = self._db.retrieve_unnamed_unsegmented_flu()
         self._db.mark_as_not_included( unnamed_flu_sequence_ids )
+        logging.info("finished excluding unnamed and/or unsegmented influenza records")
         return True
         
     def filter_incomplete_flu( self, filter_except_patterns:list = [] ):
@@ -249,12 +252,21 @@ class KrakenDbBuilder():
         logging.info( f'starting filter to remove incomplete flu genomes')
     
         flu_data = self._db.get_flu_name_segment_data_dict()
+        n_total = len(flu_data)
+        logging.info( f"found {n_total} distinct influenza isolate names in the DB - starting to analyse them for completeness")
+        
         sequence_ids_to_remove = []
         isolate_removal_count = 0
         isolate_total_count = 0
         isolate_exempt_count = 0
+        last_log_cp = 0
         for isolate_name, segment_data in flu_data.items():
             isolate_total_count+=1
+            percent_done = ( isolate_total_count / n_total ) * 100
+            log_cp = int(floor(percent_done /10 ))
+            if log_cp > last_log_cp:
+                last_log_cp = log_cp
+                logging.info(f"{log_cp * 10 }% complete")
             if isolate_name in filter_except_patterns:
                 # this one should not be subjected to filtering - skip
                 isolate_exempt_count+=1
