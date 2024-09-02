@@ -398,11 +398,13 @@ class KrakenDbBuilder():
         else:
             new_flu_node_ids = self._new_flu_node_ids
             
-        flu_sequences = self._db.retrieve_all_flu_sequences()
+        flu_sequences = self._db.retrieve_all_flu_sequences(skip_excluded= True)
         for flu_sequence in flu_sequences:
             flu_name= flu_sequence['flu_name']
             flu_type= flu_sequence['flu_type']
             segment_number= flu_sequence['segment_number']
+            if not flu_name or not segment_number:
+                continue
             flu_a_h_subtype= flu_sequence['flu_a_h_subtype']
             flu_a_n_subtype= flu_sequence['flu_a_n_subtype']
             id= flu_sequence['id']

@@ -430,9 +430,13 @@ class Db():
         """
         return [ x['id'] for x in self._cur.execute(stmt)]
     
-    def retrieve_all_flu_sequences(self):
+    def retrieve_all_flu_sequences(self, skip_excluded:bool=False):
         """
-        Retrieve all sequences marked as flu.  
+        Retrieve all sequences marked as flu.
+        
+        Args:
+            skip_excluded: bool, optional, defaults to False
+                adds a filter "include=1" to the query
         
         Returns:
             list of rows
@@ -448,6 +452,8 @@ class Db():
         FROM sequences
         WHERE is_flu = 1
         """
+        if skip_excluded:
+            stmt+= ' AND include = 1'
         return self._cur.execute(stmt).fetchall()
     
     def mark_as_not_included(self, ids:list):
