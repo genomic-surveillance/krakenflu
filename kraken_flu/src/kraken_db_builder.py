@@ -367,6 +367,7 @@ class KrakenDbBuilder():
                         self._db.add_taxon( tax_id= new_tax_id, parent_tax_id= segment_parent_tax_id, name=f'Influenza {type} {subtype_str} segment {seg_num}' )
                         new_node_ids[type][subtype_str][seg_num] = new_tax_id
         self._new_flu_node_ids = new_node_ids
+        logging.info("created new taxonomy node for segmented flu genomes")
         return new_node_ids        
             
     def assign_flu_taxonomy_nodes(self):
@@ -398,7 +399,14 @@ class KrakenDbBuilder():
         else:
             new_flu_node_ids = self._new_flu_node_ids
             
+        logging.info("starting to assign flu genomes to new taxonomy nodes for segmented flu")
+        
         flu_sequences = self._db.retrieve_all_flu_sequences(skip_excluded= True)
+        n_records = len(flu_sequences)
+        n=0
+        last_log_cp = 0
+        logging.info(f"retrieved {n_records} flu sequence records from database")
+        
         for flu_sequence in flu_sequences:
             flu_name= flu_sequence['flu_name']
             flu_type= flu_sequence['flu_type']
@@ -408,9 +416,12 @@ class KrakenDbBuilder():
             flu_a_h_subtype= flu_sequence['flu_a_h_subtype']
             flu_a_n_subtype= flu_sequence['flu_a_n_subtype']
             id= flu_sequence['id']
-            if not flu_name and segment_number:
-                continue
-            
+            n+=1
+            percent_done = ( n / n_records ) * 100
+            log_cp = int(floor(percent_done /10 ))
+            if log_cp > last_log_cp:
+                last_log_cp = log_cp
+                logging.info(f"{log_cp * 10 }% complete")
             if segment_number==4 and flu_a_h_subtype:
                 subtype='H' + str(flu_a_h_subtype)
             elif segment_number==6 and flu_a_n_subtype:
@@ -438,6 +449,7 @@ class KrakenDbBuilder():
             # link the sequence record to the newly created taxonomy_node
             self._db.set_tax_id_and_mod_fasta_header_for_sequence(id=id, tax_id= new_tax_id, mod_fasta_header= mod_fasta_header)
             
+        logging.info("finished setting taxonomy IDs for segmented flu genomes")
         return True
 
     def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna' ):
