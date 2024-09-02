@@ -158,8 +158,8 @@ class KrakenDbBuilder():
         acc2tax_file_path = os.path.join(taxonomy_dir,'nucl_gb.accession2taxid')
         if os.path.isfile( acc2tax_file_path ):
             if no_acc2taxid:
-                acc2tax_file_path = None
                 logging.info(f"option no_acc2taxid in use: file {acc2tax_file_path} found in taxonomy dir but will be ignored" )
+                acc2tax_file_path = None
             else:
                 logging.info(f"found acc2txid file {acc2tax_file_path} in taxonomy dir - will load and use NCBI accession-to-taxid data. Use option --no-acc2taxid to avoid this.")
         else:
