@@ -118,7 +118,7 @@ class KrakenDbBuilder():
         
         return self._next_new_tax_id
         
-    def load_taxonomy_files(self, taxonomy_dir:str):
+    def load_taxonomy_files(self, taxonomy_dir:str, no_acc2taxid:bool=False):
         """
         Load taxonomy files from a directory that contains the NCBI taxonomy download.  
         The directory needs to contain files names.dmp and nodes.dmp and may also contain a file 
@@ -129,7 +129,16 @@ class KrakenDbBuilder():
                 Path to the directory of downloaded NCBI taxonomy files. Must contain files
                 * names.dmp 
                 * nodes.dmp  
-                If it contains a file "nucl_gb.accession2taxid" then this is also loaded into the DB.
+                If it contains a file "nucl_gb.accession2taxid" then this is also loaded into the DB unless option 
+                no_acc2taxid is in use.
+                
+            no_acc2taxid: bool, optional, defaults to False
+                if True, ignore any NCBI acc2taxid file in the taxonomy directory.  The file 
+                will not be loaded into the kraken_flu DB and no general linking of sequences to 
+                taxa will take place, ie only the special cases such as flu will end up hacing kraken:taxid tags 
+                in the final FASTA file and all other sequences need to be linked by the kraken2 
+                build process.  
+                
         """
         if not os.path.exists( taxonomy_dir) or not os.path.isdir( taxonomy_dir ):
             raise ValueError(f'path does not exist or is not a directory: {taxonomy_dir}')
@@ -142,10 +151,20 @@ class KrakenDbBuilder():
         if not os.path.exists(nodes_file_path) or not os.path.isfile(nodes_file_path):
             raise ValueError(f"cannot find file 'nodes.dmp' in taxonomy directory {taxonomy_dir}")
         
+        # The accession-to-taxid file is optional. If it is present, we will load it and use it to link
+        # all FASTA records to a taxid (like kraken2 build does). If it is not present or an option was used 
+        # to ignore it, we will skip this step. This will mean that only special cases, like flu, will have kraken:taxid 
+        # tags in the FASTA header at the end of the process. All other sequences must be linked by kraken2 build.
         acc2tax_file_path = os.path.join(taxonomy_dir,'nucl_gb.accession2taxid')
-        if not os.path.exists( acc2tax_file_path ) or not os.path.isfile( acc2tax_file_path ):
-            acc2tax_file_path = None
-            
+        if os.path.isfile( acc2tax_file_path ):
+            if no_acc2taxid:
+                acc2tax_file_path = None
+                logging.info(f"option no_acc2taxid in use: file {acc2tax_file_path} found in taxonomy dir but will be ignored" )
+            else:
+                logging.info(f"found acc2txid file {acc2tax_file_path} in taxonomy dir - will load and use NCBI accession-to-taxid data. Use option --no-acc2taxid to avoid this.")
+        else:
+            logging.info("could not find an NCBI accession-to-taxid file in taxonomy dir. Skipping the general linking of sequences to taxids. Check manual for further details.")
+                
         load_taxonomy(
             db= self._db,  
             names_file_path= names_file_path, 

@@ -39,6 +39,12 @@ def args_parser():
         help='path to the NCBI taxonomy directory that contains files nodes.dmp and names.dmp')
 
     parser.add_argument(
+        '--no-acc2taxid',
+        action = 'store_true',
+        help = 'ignore the NCBI acc2taxid file, even if present in the taxonomy path'        
+    )
+
+    parser.add_argument(
         '--fasta_path','-f',
         action = 'store',
         required = True,
@@ -94,7 +100,10 @@ def main():
     db_path = args.db_file or tempfile.NamedTemporaryFile(delete= not args.keep_db_file)
     
     kdb = KrakenDbBuilder(db_path= db_path)
-    kdb.load_taxonomy_files(args.taxonomy_path)
+    kdb.load_taxonomy_files(
+        taxonomy_dir= args.taxonomy_path, 
+        no_acc2taxid= args.no_acc2taxid
+    )
     
     # Load the bulk of the reference genomes from FASTA files.
     # These are loaded into the "sequences" table of the sqlite DB without a category value, 
