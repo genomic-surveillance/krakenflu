@@ -680,6 +680,8 @@ class Db():
                 PRIMARY KEY (id), 
                 FOREIGN KEY(tax_id) REFERENCES taxonomy_nodes (tax_id)
             );
+            CREATE INDEX idx_tax_name 
+                ON taxonomy_names (name);
 
             CREATE TABLE sequences (
                 id INTEGER NOT NULL, 
@@ -701,6 +703,8 @@ class Db():
                 PRIMARY KEY (id), 
                 FOREIGN KEY(tax_id) REFERENCES taxonomy_nodes (tax_id)
             );
+            CREATE INDEX idx_seq_flu_name 
+                ON sequences (flu_name);
         """
 
 class BulkInsertBuffer():
