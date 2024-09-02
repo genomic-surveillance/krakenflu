@@ -331,6 +331,8 @@ class KrakenDbBuilder():
         if self._new_flu_node_ids:
             return self._new_flu_node_ids
         
+        logging.info("starting to create new taxonomy node for segmented flu genomes")
+
         types = ['A','B','C','D']
         new_node_ids = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
         for type in types:
