@@ -411,7 +411,7 @@ class KrakenDbBuilder():
         logging.info(f"retrieved {n_records} flu sequence records from database")
         
         new_tax_id = self.next_new_tax_id()
-        with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id','mod_fasta_header'], buffer_size= 5000) as seq_update_buffer:
+        with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id','mod_fasta_header'], buffer_size= 50000) as seq_update_buffer:
 
             with self._db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as nodes_buffer:
                 with self._db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size= 50000) as names_buffer:
