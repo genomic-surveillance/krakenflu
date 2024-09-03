@@ -165,6 +165,7 @@ class KrakenDbBuilder():
                 logging.info(f"found acc2txid file {acc2tax_file_path} in taxonomy dir - will load and use NCBI accession-to-taxid data. Use option --no-acc2taxid to avoid this.")
         else:
             logging.info("could not find an NCBI accession-to-taxid file in taxonomy dir. Skipping the general linking of sequences to taxids. Check manual for further details.")
+            acc2tax_file_path= None
                 
         load_taxonomy(
             db= self._db,  
@@ -409,48 +410,87 @@ class KrakenDbBuilder():
         last_log_cp = 0
         logging.info(f"retrieved {n_records} flu sequence records from database")
         
-        for flu_sequence in flu_sequences:
-            flu_name= flu_sequence['flu_name']
-            flu_type= flu_sequence['flu_type']
-            segment_number= flu_sequence['segment_number']
-            if not flu_name or not segment_number:
-                continue
-            flu_a_h_subtype= flu_sequence['flu_a_h_subtype']
-            flu_a_n_subtype= flu_sequence['flu_a_n_subtype']
-            id= flu_sequence['id']
-            n+=1
-            percent_done = ( n / n_records ) * 100
-            log_cp = int(floor(percent_done /10 ))
-            if log_cp > last_log_cp:
-                last_log_cp = log_cp
-                logging.info(f"{log_cp * 10 }% complete")
-            if segment_number==4 and flu_a_h_subtype:
-                subtype='H' + str(flu_a_h_subtype)
-            elif segment_number==6 and flu_a_n_subtype:
-                subtype='N' + str(flu_a_n_subtype) 
-            else:
-                subtype= None
-                
-            # provide a unified alternative name for the sequence that will be written to the 
-            # final FASTA output file
-            mod_fasta_header = flu_name + ' segment ' + str(segment_number)
-                
-            # Get the tax_id of the matching parent node created by "create_segmented_flu_taxonomy_nodes"
-            parent_tax_id = new_flu_node_ids[flu_type][subtype][segment_number]
-            if not parent_tax_id:
-                raise ValueError(f"could not find the parent node for flu type: {flu_sequence['flu_type']}, subtype: {subtype}, segment: {flu_sequence['segment_number']}")    
-                
-            # create the new node/name records for the flu sequence and link it to the parent node
-            new_tax_id = self.next_new_tax_id()
-            self._db.add_taxon(
-                tax_id= new_tax_id,
-                parent_tax_id= parent_tax_id,
-                name= ' '.join([flu_name, 'segment',str(segment_number)])
-            )
-            
-            # link the sequence record to the newly created taxonomy_node
-            self._db.set_tax_id_and_mod_fasta_header_for_sequence(id=id, tax_id= new_tax_id, mod_fasta_header= mod_fasta_header)
-            
+        new_tax_id = self.next_new_tax_id()
+        with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id','mod_fasta_header'], buffer_size= 5000) as seq_update_buffer:
+
+            with self._db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as nodes_buffer:
+                with self._db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size= 50000) as names_buffer:
+                    for flu_sequence in flu_sequences:
+                        new_tax_id+=1
+                        flu_name= flu_sequence['flu_name']
+                        flu_type= flu_sequence['flu_type']
+                        segment_number= flu_sequence['segment_number']
+                        if not flu_name or not segment_number:
+                            continue
+                        flu_a_h_subtype= flu_sequence['flu_a_h_subtype']
+                        flu_a_n_subtype= flu_sequence['flu_a_n_subtype']
+                        id= flu_sequence['id']
+                        n+=1
+                        percent_done = ( n / n_records ) * 100
+                        log_cp = int(floor(percent_done /10 ))
+                        if log_cp > last_log_cp:
+                            last_log_cp = log_cp
+                            logging.info(f"{log_cp * 10 }% complete")
+                        if segment_number==4 and flu_a_h_subtype:
+                            subtype='H' + str(flu_a_h_subtype)
+                        elif segment_number==6 and flu_a_n_subtype:
+                            subtype='N' + str(flu_a_n_subtype) 
+                        else:
+                            subtype= None
+                            
+                        # provide a unified alternative name for the sequence that will be written to the 
+                        # final FASTA output file
+                        mod_fasta_header = flu_name + ' segment ' + str(segment_number)
+                            
+                        # Get the tax_id of the matching parent node created by "create_segmented_flu_taxonomy_nodes"
+                        parent_tax_id = new_flu_node_ids[flu_type][subtype][segment_number]
+                        if not parent_tax_id:
+                            raise ValueError(f"could not find the parent node for flu type: {flu_sequence['flu_type']}, subtype: {subtype}, segment: {flu_sequence['segment_number']}")    
+                            
+                        name= ' '.join([flu_name, 'segment',str(segment_number)])
+                        # create the new node/name records for the flu sequence and link it to the parent node
+                        n_inserted_nodes = nodes_buffer.add_row(
+                            {
+                                'tax_id': new_tax_id,
+                                'parent_tax_id':parent_tax_id,
+                                'rank': 'no rank',
+                                'embl_code': None,
+                                'division_id': 9,                   
+                                'inherited_div_flag': 1,            
+                                'genetic_code_id': 1,
+                                'inherited_GC_flag': 1,
+                                'mitochondrial_genetic_code_id': 0,
+                                'inherited_MGC_flag': 1,
+                                'GenBank_hidden_flag': 0,
+                                'hidden_subtree_root_flag': 0,
+                                'comments': 'kraken_flu added node'
+                            }
+                        )
+                        if n_inserted_nodes > 0:
+                            logging.info(f'flushed {n_inserted_nodes} nodes records to DB')
+
+                        n_inserted_names = names_buffer.add_row(
+                            {
+                                'tax_id': new_tax_id,
+                                'name': name,
+                                'unique_name': name,
+                                'name_class': 'scientific name'
+                            }
+                        )
+                        if n_inserted_names > 0:
+                            logging.info(f'flushed {n_inserted_names} names records to DB')
+                            
+                        # link sequence records to the newly inserted taxonomy nodes
+                        n_updated_seqs= seq_update_buffer.add_row(
+                            {
+                                'id': id,
+                                'tax_id': new_tax_id,
+                                'mod_fasta_header': mod_fasta_header,
+                            }
+                        )
+                        if n_updated_seqs > 0:
+                            logging.info(f'flushed {n_updated_seqs} sequence record updates to DB')
+        
         logging.info("finished setting taxonomy IDs for segmented flu genomes")
         return True
 

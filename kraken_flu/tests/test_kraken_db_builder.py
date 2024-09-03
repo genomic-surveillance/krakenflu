@@ -65,13 +65,13 @@ def test_load_fasta():
 def test_load_taxonomy():
     kdb = KrakenDbBuilder()
     assert not kdb.taxonomy_loaded, 'taxonomy_loaded returns False before we load anything'
-    kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR)
+    kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR, no_acc2taxid= True)
     assert kdb.taxonomy_loaded, 'after loading, taxonomy_loaded returns True'
     
 def test_db_ready():
     kdb = KrakenDbBuilder()
     assert not kdb.db_ready(), 'db_ready is False before we load the files into DB'
-    kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR)
+    kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR, no_acc2taxid= True)
     assert not kdb.db_ready(), 'db_ready is still False after loading just the taxonomy files into DB'
     kdb.load_fasta_file(file_path=SMALL_VIRUS_FILE)
     assert kdb.db_ready(), 'after also loading at least one FASTA file, db_ready is now True'

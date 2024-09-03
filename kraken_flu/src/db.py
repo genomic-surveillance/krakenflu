@@ -130,15 +130,104 @@ class Db():
         See class definition for BulkInsertBuffer in this module for details.
         
         Args:
+            table_name: str, required
+                The name of the table we are inserting into
+                
+            buffer_size: int, optional, defaults to 5000
+                The number of rows of data to hold in RAM before flushing to the DB
+            
+        """
+        return BulkInsertBuffer( db=self, table_name= table_name, buffer_size= buffer_size )
+        
+    def bulk_update(self, table_name:str, update_fields:list, id_field:str, field_data:list, id_field_values:list):
+        """
+        Performs a bulk update of several rows in a database table. 
+        Requires a list of list of update values and a list of ID field values to identify the rows 
+        to be updated.  
+        To illustrate how the params are used:
+        The statement for executemany is constructed as follows:
+        
+            UPDATE {table_name} SET {update_fields[0]} = ?, {update_fields[1]} = ? [...] WHERE {id_field} = ?
+        
+        The values for parameter substitution are taken from the two lists field_data and id_field_values.  
+        
+        Args:
+            table_name: str, required
+                Name of the table to insert into
+                
+            update_fields: list, required
+                List of field names to update. Must be in the same order as the order of 
+                field values in the field_data list of lists.  
+                
+            id_field: str, required
+                Name of the "id_field", which is used in the WHERE clause of the UPDATE statement to 
+                identify each row to be updated. Usually the PK but can be any field that can be used in a 
+                UPDATER statement WHERE clause.  
+                
+            field_data: list, required
+                List of lists of data for the table fields/columns. Order of data in lists must match 
+                the order of field provided in argument field_names
+                
+            id_field_values: list, required
+                List of values for the "id_field", which identifies the rows to be updated
+                
+        Returns:
+            True on success
+            
+        Side effects:
+            Insert data into table
+            
+        """
+        if not isinstance(field_data,list) or not isinstance(field_data[0],list):
+            raise ValueError("field_data must be a list of lists")
+        
+        # combine field update values and the WHERE clause ID field value into a single list
+        # with the id field value always the last item in the list
+        data = [ [*field_values,id_value] for field_values,id_value in zip(field_data, id_field_values)]
+
+        # build the SQL of the form
+        # UPDATE table_name SET field1 = ?, field2 = ? [...] WHERE id_field = ?
+        stmt = ' '.join( [
+            'UPDATE',
+            table_name,
+            'SET',
+            ', '.join([ f"{x} = ?" for x in update_fields ]),
+            'WHERE',
+            id_field,
+            '= ?'
+        ])
+
+        self._cur.executemany(stmt, data)        
+        self._con.commit()
+        return True
+
+    def bulk_update_buffer(self, table_name:str, id_field:str, update_fields:list, buffer_size= 5000):
+        """
+        Returns a context manager BulkUpdateBuffer object to manage buffered bulk updates.  
+        See class definition for BulkUpdateBuffer in this module for details.
+        
+        Args:
+        
         table_name: str, required
             The name of the table we are inserting into
+            
+        id_field: str, required
+            Name of the field that is used to identify the row that is to be updated.  
+            Usually the primary key of the table but doesn't have to be.
+            Each row of data has to provide a value for this field.  
+            
+        update_fields: list(str), required
+            List of the field names to update. All rows added to the buffer must provide 
+            values for all fields in this list, ie every update must be for the same set of 
+            field names. Do not include the name of the ID field in this list, it needs to be 
+            se in param "id_field" instead.  
             
         buffer_size: int, optional, defaults to 5000
             The number of rows of data to hold in RAM before flushing to the DB
             
         """
-        return BulkInsertBuffer( db=self, table_name= table_name, buffer_size= buffer_size )
-        
+        return BulkUpdateBuffer( db=self, table_name= table_name, id_field= id_field, update_fields= update_fields, buffer_size= buffer_size )
+
     def add_sequence( self, fasta_header:str,  dna_sequence:str, category:str, flu_type:str, ncbi_acc:str, original_taxid:int, is_flu:bool, isolate_name:str, segment_number:int, h_subtype:int, n_subtype:int ):
         """
         Add a sequence record to table "sequences" without a link to a taxon node (which will be provided later).  
@@ -221,6 +310,8 @@ class Db():
         
     def add_taxon(self, tax_id:int, parent_tax_id:int, name:str):
         """
+        TODO: not used in assign_flu_taxonomy_nodes now - is this still needed or can it be deleted?
+              Might still be useful in the future for small scale inserts but too slow for bulk operations.  
         Adds a new taxon to the DB, which consists of a new record in taxonomy_nodes and a linked 
         record in taxonomy_names.  
         This is meant to be used for the creation of new "artificial" taxa. Some field data needs to be 
@@ -508,7 +599,7 @@ class Db():
     def set_tax_id_and_mod_fasta_header_for_sequence(self, id:int, tax_id:int, mod_fasta_header:str):
         """
         Set the tax_id for a sequence record identified by its sequence.id  
-        
+        TODO: check if this is still needed (should be superseded by bulk_update)
         Args:
             id: int, required
                 id of the sequences record to be updated
@@ -724,9 +815,10 @@ class BulkInsertBuffer():
     
     Use with context manager like so:
     
+        >>> row_data = [{'name':'some name'},{'name':'some other name'}]
         >>> with BulkInsertBuffer('taxonomy_names') as b:
         >>>     for row in row_data:
-        >>>         b.add_row({'name':'some name', 'name_class': 'scientific name'})
+        >>>         b.add_row(row)
             
     At this point, all row data will have been committed to the DB, nothing else to do
         
@@ -738,7 +830,7 @@ class BulkInsertBuffer():
             The number of rows of data to hold in RAM before flushing to the DB
         
     """
-    def __init__(self, table_name:str, db=Db, buffer_size= 5000):
+    def __init__(self, table_name:str, db:Db, buffer_size= 5000):
         self._db = db
         self.table_name = table_name
         self.field_names = db.get_field_names(table_name)
@@ -793,5 +885,107 @@ class BulkInsertBuffer():
         """
         n = len(self.field_data)
         self._db.bulk_insert(self.table_name, self.field_names, self.field_data)
+        self.field_data = [] # reset the buffer
+        return n
+    
+class BulkUpdateBuffer():
+    """
+    Same as BulkInsertBuffer but for handling bulk UPDATE instead of INSERT operations.  
+    TODO: is it worth creating a common base class for this class and BulkInsertBuffer? 
+    
+    Use with context manager like so:
+    
+        >>> row_data = [{'tax_id': 123, 'name':'a new name'} ,{'tax_id': 345, 'name':'new name 2'}]
+        >>> with BulkUpdateBuffer(table_name='taxonomy_names', id_field='tax_id') as b:
+        >>>     for row in row_data:
+        >>>         b.add_row(row)
+            
+    At this point, all row data will have been committed to the DB, nothing else to do
+        
+    Args:
+        table_name: str, required
+            The name of the table we are inserting into
+            
+        id_field: str, required
+            Name of the field that is used to identify the row that is to be updated.  
+            Usually the primary key of the table but doesn't have to be.
+            Each row of data has to provide a value for this field.  
+            
+        update_fields: list(str), required
+            List of the field names to update. All rows added to the buffer must provide 
+            values for all fields in this list, ie every update must be for the same set of 
+            field names. Do not include the name of the ID field in this list, it needs to be 
+            se in param "id_field" instead.  
+            
+        buffer_size: int, optional, defaults to 5000
+            The number of rows of data to hold in RAM before flushing to the DB
+        
+    """
+    def __init__(self, table_name:str, db:Db, id_field:str, update_fields:list, buffer_size= 5000):
+        self._db = db
+        self.table_name = table_name
+        self.id_field = id_field
+        self.update_fields = update_fields
+        self.buffer_size = buffer_size
+        self.field_data = [] # a list of lists of row data populated when calling add_row
+        self.id_field_values = [] # list of the ID field values, used to identify the rows to update
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if self.field_data:
+            self._write_buffer()
+            
+    def add_row(self, data_dict:dict):
+        """
+        Adds a row of data to the buffer. When the buffer is full, triggers a DB UPDATE.
+        Keys are field names to be updates EXCEPT the id_field, which is used to identify the
+        row to be updated. A value must always be provided for the id_field
+        
+        Args:
+            dict of field names to field values
+            
+        Return:
+            number of flushed rows to DB, 0 when we are just buffering >0 when commit triggered
+
+        """
+        row_data = []
+        n=0
+        try:
+            id_value = data_dict[ self.id_field ]
+            n+=1
+        except KeyError:
+            raise ValueError(f"missing value for id_field '{self.id_field}'")
+        
+        for field_name in self.update_fields:
+            if field_name in data_dict:
+                row_data.append( data_dict[field_name])
+                n+=1
+            else:
+                raise ValueError(f"no data provided for field {field_name}")
+
+        if n < len(data_dict):
+            # if we are here, we have unused items in the kwargs dict, ie values for fields that don't exist
+            raise ValueError("field names provided to 'add_row' for field names not contained in the update_fields list")
+        
+        # add a row of update data with the id_field value last in the list
+        self.field_data.append( row_data )
+        self.id_field_values.append( id_value )
+        n_inserted = 0
+        if len( self.field_data ) >= self.buffer_size:
+            n_inserted = self._write_buffer()
+
+        return n_inserted
+        
+    def _write_buffer(self):
+        """
+        Commits the buffer to the database and empties it out. Called by add_row whenever we hit the 
+        max buffer size of rows and by __exit__ to empty out the remaining buffer before we lose the 
+        context.  
+        Returns number of rows inserted
+        """
+        n = len(self.field_data)
+        self._db.bulk_update(self.table_name, self.update_fields, self.id_field, self.field_data, self.id_field_values )
         self.field_data = [] # reset the buffer
         return n

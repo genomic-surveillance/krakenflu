@@ -118,7 +118,6 @@ def _load_acc2taxids(db:Db, acc2taxid_file_path:str):
     """
     logging.info( f'starting to upload acc2taxid records from {acc2taxid_file_path} data to DB')
     raise NotImplemented("this function is not yet implemented and needs an update to the Db class: need a table for this data")
-    logging.info( f'finish uploading {n} acc2taxid records to DB')
     
 def _read_tax_data_file_row( row ):
     """

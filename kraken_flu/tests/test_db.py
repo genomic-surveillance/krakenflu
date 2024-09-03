@@ -275,3 +275,30 @@ def test_bulk_insert_buffer_force_single(setup_db_with_real_world_fixture):
     
     rows = db._cur.execute("SELECT * FROM taxonomy_names WHERE name IN(?,?)",['bulk1','bulk2']).fetchall()
     assert len(rows) == 2, 'after we do the bulk insert, the 2 new rows exist in the table'
+    
+def test_bulk_update(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    
+    # get some sequences records from the fixtures
+    id_field_values = [4,5,7]
+    rows = db._cur.execute("SELECT id, tax_id, mod_fasta_header FROM sequences WHERE id IN(?,?,?) ORDER BY id",id_field_values).fetchall()
+    assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
+    assert [x['tax_id'] for x in rows ] == [None, None, None], 'before the bulk update, none of the records has a tax_id'
+    assert [x['mod_fasta_header'] for x in rows ] == [None, None, None], 'before the bulk update, none of the records has a mod_fasta_header'
+
+    field_data = [ [200,'new header 1'], [300,'new header 2'],[456,'another new header']]
+    
+    # do the bulk update
+    db.bulk_update(
+        table_name= 'sequences',
+        update_fields= ['tax_id', 'mod_fasta_header'],
+        id_field = 'id',
+        field_data= field_data,
+        id_field_values= id_field_values
+    )
+    
+    # query for the records again, they should now have been updated
+    rows = db._cur.execute("SELECT id, tax_id, mod_fasta_header FROM sequences WHERE id IN(?,?,?) ORDER BY id",id_field_values).fetchall()
+    assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
+    assert [x['tax_id'] for x in rows ] == [200, 300, 456], 'after the bulk update, the records have the expected new tax_id values'
+    assert [x['mod_fasta_header'] for x in rows ] == ['new header 1', 'new header 2', 'another new header'], 'before the bulk update, none of the records has a mod_fasta_header'
