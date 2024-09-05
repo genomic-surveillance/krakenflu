@@ -257,9 +257,10 @@ def test_bulk_insert_buffer(setup_db_with_real_world_fixture):
     assert len(rows) == 2, 'after we do the bulk insert, the 2 new rows exist in the table'
     
 def test_bulk_insert_buffer_force_single(setup_db_with_real_world_fixture):
-    # same as test_bulk_insert_buffer but set the buffer size to single row, so that each row will trigger one INSERT
-    db = setup_db_with_real_world_fixture
+    # same as test_bulk_insert_buffer but set the buffer size to single row, so that each row will trigger one INSERT, 
+    # thus testing the ability to buffer batches of data and flush to DB
     
+    db = setup_db_with_real_world_fixture
     rows = db._cur.execute("SELECT * FROM taxonomy_names WHERE name IN(?,?)",['bulk1','bulk2']).fetchall()
     assert not rows, 'before we do the bulk insert, the rows do not exist in the table'
 
@@ -287,7 +288,7 @@ def test_bulk_update(setup_db_with_real_world_fixture):
     assert [x['mod_fasta_header'] for x in rows ] == [None, None, None], 'before the bulk update, none of the records has a mod_fasta_header'
 
     field_data = [ [200,'new header 1'], [300,'new header 2'],[456,'another new header']]
-    
+
     # do the bulk update
     db.bulk_update(
         table_name= 'sequences',
@@ -296,6 +297,64 @@ def test_bulk_update(setup_db_with_real_world_fixture):
         field_data= field_data,
         id_field_values= id_field_values
     )
+    
+    # query for the records again, they should now have been updated
+    rows = db._cur.execute("SELECT id, tax_id, mod_fasta_header FROM sequences WHERE id IN(?,?,?) ORDER BY id",id_field_values).fetchall()
+    assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
+    assert [x['tax_id'] for x in rows ] == [200, 300, 456], 'after the bulk update, the records have the expected new tax_id values'
+    assert [x['mod_fasta_header'] for x in rows ] == ['new header 1', 'new header 2', 'another new header'], 'before the bulk update, none of the records has a mod_fasta_header'
+
+
+def test_bulk_update_buffer(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    id_field_values = [4,5,7]
+    rows = db._cur.execute("SELECT id, tax_id, mod_fasta_header FROM sequences WHERE id IN(?,?,?) ORDER BY id",id_field_values).fetchall()
+    assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
+    assert [x['tax_id'] for x in rows ] == [None, None, None], 'before the bulk update, none of the records has a tax_id'
+    assert [x['mod_fasta_header'] for x in rows ] == [None, None, None], 'before the bulk update, none of the records has a mod_fasta_header'
+
+    field_data= [
+        { 'id': 4, 'tax_id': 200, 'mod_fasta_header': 'new header 1'},
+        { 'id': 5, 'tax_id': 300, 'mod_fasta_header': 'new header 2'},
+        { 'id': 7, 'tax_id': 456, 'mod_fasta_header': 'another new header'}
+    ]
+    
+    # run the buffered updates
+    # the buffer size is 5000, so the three updates will all be carried out when the context manager
+    # loses focus while each add_row operation only adds to the data in memory and does not trigger a DB action
+    with db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields=['tax_id', 'mod_fasta_header'], buffer_size= 5000) as b:
+        for row in field_data:
+            n_updated = b.add_row(row)
+            assert n_updated==0, 'buffer size is 5000, so every add_row call just buffers (will flush to DB when losing context)'
+    
+    # query for the records again, they should now have been updated
+    rows = db._cur.execute("SELECT id, tax_id, mod_fasta_header FROM sequences WHERE id IN(?,?,?) ORDER BY id",id_field_values).fetchall()
+    assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
+    assert [x['tax_id'] for x in rows ] == [200, 300, 456], 'after the bulk update, the records have the expected new tax_id values'
+    assert [x['mod_fasta_header'] for x in rows ] == ['new header 1', 'new header 2', 'another new header'], 'before the bulk update, none of the records has a mod_fasta_header'
+
+def test_bulk_update_buffer_force_single(setup_db_with_real_world_fixture):
+    # same as test_bulk_update_buffer but set the buffer size to single row, so that each row will trigger one INSERT, 
+    # thus testing the ability to buffer batches of data and flush to DB
+    db = setup_db_with_real_world_fixture
+    id_field_values = [4,5,7]
+    rows = db._cur.execute("SELECT id, tax_id, mod_fasta_header FROM sequences WHERE id IN(?,?,?) ORDER BY id",id_field_values).fetchall()
+    assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
+    assert [x['tax_id'] for x in rows ] == [None, None, None], 'before the bulk update, none of the records has a tax_id'
+    assert [x['mod_fasta_header'] for x in rows ] == [None, None, None], 'before the bulk update, none of the records has a mod_fasta_header'
+
+    field_data= [
+        { 'id': 4, 'tax_id': 200, 'mod_fasta_header': 'new header 1'},
+        { 'id': 5, 'tax_id': 300, 'mod_fasta_header': 'new header 2'},
+        { 'id': 7, 'tax_id': 456, 'mod_fasta_header': 'another new header'}
+    ]
+    
+    # run the buffered updates
+    # the buffer size is 1, so this time, each of the add_row commands will trigger a DB update transaction
+    with db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields=['tax_id', 'mod_fasta_header'], buffer_size= 1) as b:
+        for row in field_data:
+            n_updated = b.add_row(row)
+            assert n_updated==1, 'buffer size is 1, so every add_row call flushes 1 update to the DB'
     
     # query for the records again, they should now have been updated
     rows = db._cur.execute("SELECT id, tax_id, mod_fasta_header FROM sequences WHERE id IN(?,?,?) ORDER BY id",id_field_values).fetchall()

@@ -972,11 +972,11 @@ class BulkUpdateBuffer():
         # add a row of update data with the id_field value last in the list
         self.field_data.append( row_data )
         self.id_field_values.append( id_value )
-        n_inserted = 0
+        n_updated = 0
         if len( self.field_data ) >= self.buffer_size:
-            n_inserted = self._write_buffer()
+            n_updated = self._write_buffer()
 
-        return n_inserted
+        return n_updated
         
     def _write_buffer(self):
         """
@@ -987,5 +987,8 @@ class BulkUpdateBuffer():
         """
         n = len(self.field_data)
         self._db.bulk_update(self.table_name, self.update_fields, self.id_field, self.field_data, self.id_field_values )
-        self.field_data = [] # reset the buffer
+        
+        # reset the buffer
+        self.field_data = []
+        self.id_field_values = []
         return n
