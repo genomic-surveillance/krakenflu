@@ -51,9 +51,6 @@ class Db():
 
         # connect and create a cursor (session)
         self._con = sqlite3.connect(db_path)
-
-         # Enable foreign key support
-        self._con.execute("PRAGMA foreign_keys = ON;")
         
         if debug:
             self._con.set_trace_callback(print)
