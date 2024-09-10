@@ -824,21 +824,16 @@ class Db():
                 PRIMARY KEY (id), 
                 FOREIGN KEY(tax_id) REFERENCES taxonomy_nodes (tax_id)
             );
-
-            CREATE TABLE seq2taxid (
-                id INTEGER NOT NULL,
-                ncbi_acc VARCHAR,
-                acc_version INTEGER,
-                tax_id INTEGER,
-                gi INTEGER,
-                PRIMARY KEY (id),
-                FOREIGN KEY(ncbi_acc) REFERENCES sequences (ncbi_acc),
-                FOREIGN KEY(tax_id) REFERENCES taxonomy_nodes (tax_id)
-            );
             CREATE INDEX idx_seq_flu_name 
                 ON sequences (flu_name);
             CREATE INDEX idx_seq_tax_id 
                 ON sequences (tax_id);
+                
+            CREATE TABLE acc2taxids (
+                accession VARCHAR,
+                tax_id INTEGER,
+                PRIMARY KEY (accession,tax_id)
+            );
         """
 
 class BulkInsertBuffer():

@@ -113,31 +113,41 @@ def _load_nodes(db:Db, nodes_file_path:str):
     logging.info( f'finished uploading nodes records to DB')
     return True
 
-def _load_seq2taxid(db:Db, acc2taxid_file_path:str):
+def _load_acc2taxids(db:Db, acc2taxid_file_path:str):
     """
-    Upload the accession to taxid file from NCBI to the DB
+    Upload the NCBI accession to taxid file nucl_gb.accession2taxid to the DB.  
+    In contrast to the other NCBI taxonomy files, this file is in simple tab-delimited format 
+    with a header with the following columns:
+        - accession
+        - accession.version
+        - taxid
+        - gi
+        
+    Accession can be any of the accession IDs used on NCBI, such as GenBank or RefSeq IDs.  
+    An accession ID can have a version number such as "NC_029549.1", where the acc ID is "NC_029549" 
+    and version is 1. Sequences in library files may or may not have an accession version, hence we 
+    create one row for each in the DB table thus allowing linkage on either format of the accession.  
+    The "gi" is not needed for our purposes and is not loaded into the table.
     """
-    logging.info( f'starting to upload names from {acc2taxid_file_path} data to DB')
-
-    d_rename = {
-        "accession":"ncbi_acc",
-        "taxid":"tax_id"
-    }
+    logging.info( f'starting to upload accession-to-taxid records from {acc2taxid_file_path} to DB')
 
     n=0
     with open(acc2taxid_file_path, 'r') as fh:
-        fd = csv.csv.DictReader(fh, delimiter="\t")(fh, delimiter="\t")
-        for row in fd:
-            row["version"] = row.pop("accession.version").split(".")[-1]
-            for prior, post in d_rename.items():
-                row[post] = row.pop(prior)
-
-            db.add_seq2taxid(**row)
-            
-            n+=1
-    logging.info( f'finish uploading {n} acc2taxid records to DB')
+        with db.bulk_insert_buffer(table_name='acc2taxids', buffer_size= 50000) as b:
+            fd = csv.DictReader(fh, delimiter="\t")
+            for row in fd:
+                for acc_field in ['accession','accession.version']:
+                    n_inserted = b.add_row(
+                        {
+                            'tax_id': int(row['taxid']),
+                            'accession': row[acc_field]
+                        }
+                    )
+                    if n_inserted > 0:
+                        logging.info(f'flushed {n_inserted} records to DB')
+    logging.info( f'finished uploading acc2taxid records to DB')
     return True
-    
+
 def _read_tax_data_file_row( row ):
     """
     Parses one row of data from names and nodes dmp file and returns as list
