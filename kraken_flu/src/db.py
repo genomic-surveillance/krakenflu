@@ -781,6 +781,8 @@ class Db():
             );
             CREATE INDEX idx_tax_name 
                 ON taxonomy_names (name);
+            CREATE INDEX idx_tax_id 
+                ON taxonomy_names (tax_id);
 
             CREATE TABLE sequences (
                 id INTEGER NOT NULL, 
@@ -804,6 +806,8 @@ class Db():
             );
             CREATE INDEX idx_seq_flu_name 
                 ON sequences (flu_name);
+            CREATE INDEX idx_seq_tax_id 
+                ON sequences (tax_id);
         """
 
 class BulkInsertBuffer():
