@@ -767,6 +767,8 @@ class Db():
                 PRIMARY KEY (tax_id), 
                 FOREIGN KEY(parent_tax_id) REFERENCES taxonomy_nodes (tax_id)
             );
+            CREATE INDEX idx_parent_tax_id
+                ON taxonomy_nodes (parent_tax_id);
 
             CREATE TABLE taxonomy_names (
                 id INTEGER NOT NULL, 
