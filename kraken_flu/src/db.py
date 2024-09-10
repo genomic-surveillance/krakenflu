@@ -405,7 +405,12 @@ class Db():
     def get_parent_tax_id(self, tax_id:int):
         """
         From a given node, identified by tax_id, find the parent tax_id.  
-        Returns None for the root taxonomy node, which has no tax_id
+        Returns None for the root taxonomy node, which has no parent.  
+        NOTE: in the conventional adjacency list pattern, the root node should 
+        have NULL in the parent_tax_id but the NCBI taxonomy root node has
+        tax_id=1 AND parent_tax_id=1
+        We generalise this here and assume it is the root node when the node
+        refers to itself as parent, ie tax_id==parent_tax_id
 
         Args:
             tax_id: int, required
@@ -415,13 +420,9 @@ class Db():
             parent_tax_id: int
         """
         stmt = """
-            SELECT tax_id
-            FROM taxonomy_nodes
-            WHERE tax_id = (
                 SELECT parent_tax_id 
                 FROM taxonomy_nodes 
                 WHERE tax_id = ?
-            )
         """
         rows= self._cur.execute(stmt,[tax_id]).fetchall()
         if not rows:
@@ -429,7 +430,12 @@ class Db():
         elif len(rows) > 1:
             raise ValueError(f"taxonomy node with tax_id {tax_id} has more than one parent, which should not be possible")
         else:
-            return rows[0]['tax_id']
+            parent_tax_id = rows[0]['parent_tax_id']
+            if not parent_tax_id or parent_tax_id == tax_id:
+                # referring to itself as parent is the hallmark of the root node in NCBI taxonomy
+                return None
+            else:
+                return parent_tax_id
         
     def get_flu_name_segment_data_dict(self):
         """
