@@ -65,13 +65,13 @@ def test_load_fasta():
 def test_load_taxonomy():
     kdb = KrakenDbBuilder()
     assert not kdb.taxonomy_loaded, 'taxonomy_loaded returns False before we load anything'
-    kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR)
+    kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR, no_acc2taxid= True)
     assert kdb.taxonomy_loaded, 'after loading, taxonomy_loaded returns True'
     
 def test_db_ready():
     kdb = KrakenDbBuilder()
     assert not kdb.db_ready(), 'db_ready is False before we load the files into DB'
-    kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR)
+    kdb.load_taxonomy_files(taxonomy_dir=TAX_DIR, no_acc2taxid= True)
     assert not kdb.db_ready(), 'db_ready is still False after loading just the taxonomy files into DB'
     kdb.load_fasta_file(file_path=SMALL_VIRUS_FILE)
     assert kdb.db_ready(), 'after also loading at least one FASTA file, db_ready is now True'
@@ -191,7 +191,8 @@ def test_assign_flu_taxonomy_nodes(setup_db_with_real_world_fixture):
     kdb = KrakenDbBuilder(db=db)
     stmt1 = """
         SELECT 
-            sequences.tax_id AS seq_tax_id, 
+            sequences.tax_id AS seq_tax_id,
+            sequences.mod_fasta_header AS mod_fasta_header,
             taxonomy_nodes.tax_id AS node_tax_id,
             taxonomy_nodes.parent_tax_id AS seq_parent_tax_id
         FROM sequences
@@ -219,6 +220,8 @@ def test_assign_flu_taxonomy_nodes(setup_db_with_real_world_fixture):
     assert fluA_puerto_rico_8_rows[0]['seq_tax_id'], '...after running assign_flu_taxonomy_nodes, the record now has a tax_id assigned'
     assert fluA_puerto_rico_8_rows[0]['node_tax_id'], '...there is also a taxonomy_nodes record associated with this sequence now'
     assert fluA_puerto_rico_8_rows[0]['seq_parent_tax_id'], '...the associated taxonomy node has a parent_tax_id'
+    assert fluA_puerto_rico_8_rows[0]['mod_fasta_header'] == 'A/Puerto Rico/8/1934(H1N1) segment 8', '...the sequences record has an alternative FASTA header assigned correctly'
+
     
     # retrieve the taxonomy node Inlfuenza A segment 8 and check that it is assigned as a parent 
     fluA_seg8_node = db._cur.execute(stmt2,['Influenza A segment 8']).fetchone()
@@ -246,3 +249,18 @@ def test_assign_flu_taxonomy_nodes(setup_db_with_real_world_fixture):
     assert fluA_seg8_node, 'found flu B segment 4 node'
     assert fluB_4_rows[0]['seq_parent_tax_id'] == fluB_seg4_node['tax_id'], '...the parent of this flu B segment 4 sequence is the new node "Influenza B segment 4"'
     
+def test_create_db_ready_dir(setup_db_with_real_world_fixture, tmp_path):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    out_dir = tmp_path / "kdb_out_dir"
+    exp_names_out_file = out_dir / 'taxonomy' / 'names.dmp'
+    assert not exp_names_out_file.is_file(), 'before we start, the expected file names.dmp does not exist'
+    
+    exp_lib_out_file = out_dir / 'library' / 'library.fna'
+    assert not exp_lib_out_file.is_file(), 'before we start, the expected file library.fna does not exist'
+    
+    kdb.create_db_ready_dir(path= out_dir)
+
+    assert exp_names_out_file.is_file(), 'after running create_db_ready_dir, the expected file taxonomy/names.dmp exists'
+    assert exp_lib_out_file.is_file(), 'after running create_db_ready_dir, the expected file library/library.fna exists'

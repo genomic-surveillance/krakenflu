@@ -2,7 +2,7 @@ import pytest
 import os.path
 from importlib_resources import files
 
-from kraken_flu.src.taxonomy_loader import load_taxonomy, _load_names, _load_nodes, _read_tax_data_file_row, load_seq2taxid
+from kraken_flu.src.taxonomy_loader import load_taxonomy, _load_names, _load_nodes, _read_tax_data_file_row, load_seq2taxid, _get_num_records
 from kraken_flu.src.db import Db
 
 FIXTURE_DIR = files('kraken_flu.tests.fixtures')
@@ -79,3 +79,7 @@ def test_load_taxonomy(setup_db):
         assert len(db._cur.execute("select * FROM seq2taxid").fetchall()) == 35, 'after running load_seq2taxids 20 accessions exist in the DB'
 
         #TODO complete test
+        
+def test__get_num_records():
+    assert _get_num_records(NAMES_FILE) == 52, 'there are 52 lines in the names file'
+    

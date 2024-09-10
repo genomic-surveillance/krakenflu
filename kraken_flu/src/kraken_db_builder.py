@@ -2,9 +2,12 @@ import os.path
 import logging
 from tempfile import NamedTemporaryFile
 from collections import defaultdict
+from math import floor
 
 from kraken_flu.src.fasta_loader import load_fasta
+from kraken_flu.src.fasta_writer import write_fasta
 from kraken_flu.src.taxonomy_loader import load_taxonomy
+from kraken_flu.src.taxonomy_writer import write_taxonomy
 from kraken_flu.src.db import Db
 
 logging.basicConfig( format='%(asctime)s %(message)s', level=logging.DEBUG )
@@ -116,7 +119,7 @@ class KrakenDbBuilder():
         
         return self._next_new_tax_id
         
-    def load_taxonomy_files(self, taxonomy_dir:str):
+    def load_taxonomy_files(self, taxonomy_dir:str, no_acc2taxid:bool=False):
         """
         Load taxonomy files from a directory that contains the NCBI taxonomy download.  
         The directory needs to contain files names.dmp and nodes.dmp and may also contain a file 
@@ -127,7 +130,16 @@ class KrakenDbBuilder():
                 Path to the directory of downloaded NCBI taxonomy files. Must contain files
                 * names.dmp 
                 * nodes.dmp  
-                If it contains a file "nucl_gb.accession2taxid" then this is also loaded into the DB.
+                If it contains a file "nucl_gb.accession2taxid" then this is also loaded into the DB unless option 
+                no_acc2taxid is in use.
+                
+            no_acc2taxid: bool, optional, defaults to False
+                if True, ignore any NCBI acc2taxid file in the taxonomy directory.  The file 
+                will not be loaded into the kraken_flu DB and no general linking of sequences to 
+                taxa will take place, ie only the special cases such as flu will end up hacing kraken:taxid tags 
+                in the final FASTA file and all other sequences need to be linked by the kraken2 
+                build process.  
+                
         """
         if not os.path.exists( taxonomy_dir) or not os.path.isdir( taxonomy_dir ):
             raise ValueError(f'path does not exist or is not a directory: {taxonomy_dir}')
@@ -140,10 +152,21 @@ class KrakenDbBuilder():
         if not os.path.exists(nodes_file_path) or not os.path.isfile(nodes_file_path):
             raise ValueError(f"cannot find file 'nodes.dmp' in taxonomy directory {taxonomy_dir}")
         
+        # The accession-to-taxid file is optional. If it is present, we will load it and use it to link
+        # all FASTA records to a taxid (like kraken2 build does). If it is not present or an option was used 
+        # to ignore it, we will skip this step. This will mean that only special cases, like flu, will have kraken:taxid 
+        # tags in the FASTA header at the end of the process. All other sequences must be linked by kraken2 build.
         acc2tax_file_path = os.path.join(taxonomy_dir,'nucl_gb.accession2taxid')
-        if not os.path.exists( acc2tax_file_path ) or not os.path.isfile( acc2tax_file_path ):
-            acc2tax_file_path = None
-            
+        if os.path.isfile( acc2tax_file_path ):
+            if no_acc2taxid:
+                logging.info(f"option no_acc2taxid in use: file {acc2tax_file_path} found in taxonomy dir but will be ignored" )
+                acc2tax_file_path = None
+            else:
+                logging.info(f"found acc2txid file {acc2tax_file_path} in taxonomy dir - will load and use NCBI accession-to-taxid data. Use option --no-acc2taxid to avoid this.")
+        else:
+            logging.info("could not find an NCBI accession-to-taxid file in taxonomy dir. Skipping the general linking of sequences to taxids. Check manual for further details.")
+            acc2tax_file_path= None
+                
         load_taxonomy(
             db= self._db,  
             names_file_path= names_file_path, 
@@ -184,8 +207,10 @@ class KrakenDbBuilder():
         Side effects:
             sets sequences.include field
         """
+        logging.info("started excluding unnamed and/or unsegmented influenza records from DB")
         unnamed_flu_sequence_ids = self._db.retrieve_unnamed_unsegmented_flu()
         self._db.mark_as_not_included( unnamed_flu_sequence_ids )
+        logging.info("finished excluding unnamed and/or unsegmented influenza records")
         return True
         
     def filter_incomplete_flu( self, filter_except_patterns:list = [] ):
@@ -228,12 +253,21 @@ class KrakenDbBuilder():
         logging.info( f'starting filter to remove incomplete flu genomes')
     
         flu_data = self._db.get_flu_name_segment_data_dict()
+        n_total = len(flu_data)
+        logging.info( f"found {n_total} distinct influenza isolate names in the DB - starting to analyse them for completeness")
+        
         sequence_ids_to_remove = []
         isolate_removal_count = 0
         isolate_total_count = 0
         isolate_exempt_count = 0
+        last_log_cp = 0
         for isolate_name, segment_data in flu_data.items():
             isolate_total_count+=1
+            percent_done = ( isolate_total_count / n_total ) * 100
+            log_cp = int(floor(percent_done /10 ))
+            if log_cp > last_log_cp:
+                last_log_cp = log_cp
+                logging.info(f"{log_cp * 10 }% complete")
             if isolate_name in filter_except_patterns:
                 # this one should not be subjected to filtering - skip
                 isolate_exempt_count+=1
@@ -298,6 +332,8 @@ class KrakenDbBuilder():
         if self._new_flu_node_ids:
             return self._new_flu_node_ids
         
+        logging.info("starting to create new taxonomy node for segmented flu genomes")
+
         types = ['A','B','C','D']
         new_node_ids = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
         for type in types:
@@ -334,6 +370,7 @@ class KrakenDbBuilder():
                         self._db.add_taxon( tax_id= new_tax_id, parent_tax_id= segment_parent_tax_id, name=f'Influenza {type} {subtype_str} segment {seg_num}' )
                         new_node_ids[type][subtype_str][seg_num] = new_tax_id
         self._new_flu_node_ids = new_node_ids
+        logging.info("created new taxonomy node for segmented flu genomes")
         return new_node_ids        
             
     def assign_flu_taxonomy_nodes(self):
@@ -345,6 +382,13 @@ class KrakenDbBuilder():
             - set the parent of this new node to one of the nodes created by  "create_segmented_flu_taxonomy_nodes"
             - set the tax_id of the sequence record to the tax_id of the new record in taxonomy_nodes
 
+        NOTE: The rationale for creating a new taxonomy node for each genome is that we provide multiple 
+        genomes for influenza. In order to make kraken2 assign reads to a specific genome, each genome must have its own 
+        node in the taxonomy. This is not the case for RefSeq sequences in the NCBI taxonomy, because there is usually 
+        only one genome for each species.  
+        For these reasons, every flu genome in our modified taxonomy has its own tax_id, whereas the flu A genome segments 
+        downloaded from NCBI all have the same tax_id, which is the tax_id of "Influenza A virus"
+        
         Returns:
             True on success
             
@@ -358,89 +402,101 @@ class KrakenDbBuilder():
         else:
             new_flu_node_ids = self._new_flu_node_ids
             
-        flu_sequences = self._db.retrieve_all_flu_sequences()
-        for flu_sequence in flu_sequences:
-            flu_name= flu_sequence['flu_name']
-            flu_type= flu_sequence['flu_type']
-            segment_number= flu_sequence['segment_number']
-            flu_a_h_subtype= flu_sequence['flu_a_h_subtype']
-            flu_a_n_subtype= flu_sequence['flu_a_n_subtype']
-            id= flu_sequence['id']
-            if not flu_name and segment_number:
-                continue
-            
-            if segment_number=='4' and flu_a_h_subtype:
-                subtype='H' + flu_a_h_subtype
-            elif segment_number=='6' and flu_a_n_subtype:
-                subtype='N' + flu_a_n_subtype 
-            else:
-                subtype= None
-                
-            # Get the tax_id of the matching parent node created by "create_segmented_flu_taxonomy_nodes"
-            parent_tax_id = new_flu_node_ids[flu_type][subtype][segment_number]
-            if not parent_tax_id:
-                raise ValueError(f"could not find the parent node for flu type: {flu_sequence['flu_type']}, subtype: {subtype}, segment: {flu_sequence['segment_number']}")    
-                
-            # create the new node/name records for the flu sequence and link it to the parent node
-            new_tax_id = self.next_new_tax_id()
-            self._db.add_taxon(
-                tax_id= new_tax_id,
-                parent_tax_id= parent_tax_id,
-                name= ' '.join([flu_name, 'segment',str(segment_number)])
-            )
-            
-            # link the sequence record to the newly created taxonomy_node
-            self._db.set_tax_id_for_sequence(id=id, tax_id= new_tax_id)
-            
+        logging.info("starting to assign flu genomes to new taxonomy nodes for segmented flu")
+        
+        flu_sequences = self._db.retrieve_all_flu_sequences(skip_excluded= True)
+        n_records = len(flu_sequences)
+        n=0
+        last_log_cp = 0
+        logging.info(f"retrieved {n_records} flu sequence records from database")
+        
+        new_tax_id = self.next_new_tax_id()
+        with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id','mod_fasta_header'], buffer_size= 50000) as seq_update_buffer:
+
+            with self._db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as nodes_buffer:
+                with self._db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size= 50000) as names_buffer:
+                    for flu_sequence in flu_sequences:
+                        new_tax_id+=1
+                        flu_name= flu_sequence['flu_name']
+                        flu_type= flu_sequence['flu_type']
+                        segment_number= flu_sequence['segment_number']
+                        if not flu_name or not segment_number:
+                            continue
+                        flu_a_h_subtype= flu_sequence['flu_a_h_subtype']
+                        flu_a_n_subtype= flu_sequence['flu_a_n_subtype']
+                        id= flu_sequence['id']
+                        n+=1
+                        percent_done = ( n / n_records ) * 100
+                        log_cp = int(floor(percent_done /10 ))
+                        if log_cp > last_log_cp:
+                            last_log_cp = log_cp
+                            logging.info(f"{log_cp * 10 }% complete")
+                        if segment_number==4 and flu_a_h_subtype:
+                            subtype='H' + str(flu_a_h_subtype)
+                        elif segment_number==6 and flu_a_n_subtype:
+                            subtype='N' + str(flu_a_n_subtype) 
+                        else:
+                            subtype= None
+                            
+                        # provide a unified alternative name for the sequence that will be written to the 
+                        # final FASTA output file
+                        mod_fasta_header = flu_name + ' segment ' + str(segment_number)
+                            
+                        # Get the tax_id of the matching parent node created by "create_segmented_flu_taxonomy_nodes"
+                        parent_tax_id = new_flu_node_ids[flu_type][subtype][segment_number]
+                        if not parent_tax_id:
+                            raise ValueError(f"could not find the parent node for flu type: {flu_sequence['flu_type']}, subtype: {subtype}, segment: {flu_sequence['segment_number']}")    
+                            
+                        name= ' '.join([flu_name, 'segment',str(segment_number)])
+                        # create the new node/name records for the flu sequence and link it to the parent node
+                        n_inserted_nodes = nodes_buffer.add_row(
+                            {
+                                'tax_id': new_tax_id,
+                                'parent_tax_id':parent_tax_id,
+                                'rank': 'no rank',
+                                'embl_code': None,
+                                'division_id': 9,                   
+                                'inherited_div_flag': 1,            
+                                'genetic_code_id': 1,
+                                'inherited_GC_flag': 1,
+                                'mitochondrial_genetic_code_id': 0,
+                                'inherited_MGC_flag': 1,
+                                'GenBank_hidden_flag': 0,
+                                'hidden_subtree_root_flag': 0,
+                                'comments': 'kraken_flu added node'
+                            }
+                        )
+                        if n_inserted_nodes > 0:
+                            logging.info(f'flushed {n_inserted_nodes} nodes records to DB')
+
+                        n_inserted_names = names_buffer.add_row(
+                            {
+                                'tax_id': new_tax_id,
+                                'name': name,
+                                'unique_name': name,
+                                'name_class': 'scientific name'
+                            }
+                        )
+                        if n_inserted_names > 0:
+                            logging.info(f'flushed {n_inserted_names} names records to DB')
+                            
+                        # link sequence records to the newly inserted taxonomy nodes
+                        n_updated_seqs= seq_update_buffer.add_row(
+                            {
+                                'id': id,
+                                'tax_id': new_tax_id,
+                                'mod_fasta_header': mod_fasta_header,
+                            }
+                        )
+                        if n_updated_seqs > 0:
+                            logging.info(f'flushed {n_updated_seqs} sequence record updates to DB')
+        
+        logging.info("finished setting taxonomy IDs for segmented flu genomes")
         return True
-                
-    # DELETE 
-    def link_tax_ids( self ):
-        """
-        This should be the last step in the building of the database. It assigns sequences to taxonomy 
-        nodes by setting the tax_id field.  
-        
-        
-        Paramters:
-            none
-            
-        Returns:
-            True on success
-            
-        Side effects:
-            - updates taxids in slef._fasta_handler.data
-            - sets self.tax_ids_update to True
-        """
-        if self.tax_ids_updated:
-            # already done this, nothing to do
-            return True
-                
-        logging.info( f'starting to assign new taxonomy IDs to sequence records')
-        
-        # trigger the cascade to create the new taxa
-        self._taxonomy_handler.create_influenza_isolate_segment_taxa()
-        
-        for fasta_record in self._fasta_handler.data:
-            # currently, we only make changes to flu sequences
-            if fasta_record.is_flu and fasta_record.flu_name and fasta_record.flu_seg_num:
-                try:
-                    taxid = self._taxonomy_handler.influenza_isolate_segment_tax_ids[ fasta_record.flu_name ][ fasta_record.flu_seg_num ]
-                    fasta_record.taxid = taxid
-                except KeyError:
-                    logging.info( f'found influenza record for isolate "{fasta_record.flu_name}" segment { fasta_record.flu_seg_num} in FASTA file but no corresponding entry in taxonomy - skipping')
 
-        logging.info( f'finished assigning new taxonomy IDs')
-
-        self.tax_ids_updated = True
-        return True
-
-    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna', filter_incomplete_flu:bool = True,  filter_except_patterns: list= [], drop_unparsed_flu:bool = True ):
+    def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna' ):
         """
-        Create a directory with all files needed to build a new kraken database. 
-        This method triggers the data acquisition from the FastaHandler and TaxonomyHandler, then runs the
-        changing of taxonomy IDs (delegating to the two handlers) before writing a new FASTA file with updated 
-        kraken:taxid tags as well as the names and nodes files of the NCBI taxonomy with the added taxa.
-        
+        Create a directory with all files needed to build a new kraken database.
         The FASTA file is named library.fna as per kraken2 convention but can be given a different name. The 
         NCBI taxonomy files names.dmp and nodes.dmp cannot be renamed as kraken2 relies on those names.
         
@@ -453,22 +509,8 @@ class KrakenDbBuilder():
                 if true, force overwrite whatever is already in the output dir. If not, will fail
                 if directory already exists
                 
-            filter_incomplete_flu: bool, optional, defaults to True
-                If True, runs the filter that removes incomplete influenza genomes. See FastaHandler for details
-                            
-            filter_except_patterns: list(str), optional
-                A list of strings that are used to exclude genomes from the Influenza "complete genome" filter.
-                Any genome where the FASTA header contains one of the strings in this list will not be subjected to 
-                the filter. This was required to ensure that the Goose Guandong H5N1 reference genome (which does not
-                have sequences for all 8 segments) is not filtered out.
-                
-            drop_unparsed_flu: bool, optional, defaults to True
-                If True, sequences whose name indicates that it is flu but where the name cannot be parsed
-                properly (we can't obtain an isolate name) will be dropped. Without this filter, such cases
-                would end up as flu whole genomes that are not segmented like the rest of the flu genomes.
-            
         Returns:
-            True if success
+            True on success
             
         Side effects:
             Writes files to path
@@ -478,47 +520,21 @@ class KrakenDbBuilder():
         taxonomy_path = os.path.join( path, 'taxonomy' )
         
         fasta_file_path = os.path.join( library_path, fasta_file_name )
-        names_file_path = os.path.join( taxonomy_path, 'names.dmp')
-        nodes_file_path = os.path.join( taxonomy_path, 'nodes.dmp')
 
         if os.path.exists( path ): 
             if not force:
                 raise ValueError(f'directory { path } exists already. Will not write into existing directory')
         else:
-            os.mkdir( path )
+            os.makedirs( path )
             
         if not os.path.exists( library_path ):
-            os.mkdir( library_path )
+            os.makedirs( library_path )
         if not os.path.exists( taxonomy_path ):
-            os.mkdir( taxonomy_path )
+            os.makedirs( taxonomy_path )
         
-        logging.info( f'found { self._fasta_handler.n_seq_total()} sequence records in {self.fasta_file_path}')
-        logging.info( f'{ self._fasta_handler.n_seq_flu()} sequence records identified as influenza')
-        
-        if filter_incomplete_flu or drop_unparsed_flu:
-            logging.info( f'starting to apply filters on influenza genomes')
-            n_seq_filtered = self._fasta_handler.n_seq_filtered() # should be 0 at this point
-            
-            if filter_incomplete_flu:
-                logging.info( f'starting to filter incomplete influenza genomes')
-                self._fasta_handler.remove_incomplete_flu( filter_except_patterns= filter_except_patterns )
-                n_seq_filtered = self._fasta_handler.n_seq_filtered() - n_seq_filtered
-                logging.info( f'{ n_seq_filtered} flu sequence records have been marked to be removed from output due to being incomplete')
-            if drop_unparsed_flu:
-                logging.info( f'starting to apply drop_unparsed_flu filter')
-                self._fasta_handler.remove_unparsed_flu()
-                n_seq_filtered = self._fasta_handler.n_seq_filtered() - n_seq_filtered
-                logging.info( f'{ n_seq_filtered } flu sequence records have been marked to be removed from output as unparsable')
-        
-            logging.info( f'after applying filters, { self._fasta_handler.n_seq_filtered()} flu sequence records have been marked to be removed from output')
-        
-        if not self.tax_ids_updated:
-            self.update_fasta_tax_ids()
-        
-        logging.info( f'writing output files')
-        self._fasta_handler.write_fasta( fasta_file_path )
-        self._taxonomy_handler.write_names_file( names_file_path )
-        self._taxonomy_handler.write_nodes_file( nodes_file_path )
-        logging.info( f'---- process complete ----')
+        logging.info( f'writing output files to {path}')
+        write_fasta(self._db, fasta_file_path)
+        write_taxonomy(self._db, taxonomy_path)
+        logging.info( 'output files completed')
         return True
 
