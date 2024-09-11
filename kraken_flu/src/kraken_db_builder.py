@@ -494,6 +494,40 @@ class KrakenDbBuilder():
         logging.info("finished setting taxonomy IDs for segmented flu genomes")
         return True
 
+    def link_all_unlinked_sequences_to_taxonomy_nodes(self):
+        """
+        For all sequences that do not yet have a tax_id set, this method attempts to set the tax_id using the 
+        data in the acc2taxids table, if one was created. The information in the acc2taxids table originates in the 
+        NCBI accession-to-taxid file and links GenBank or RefSeq accession IDs to taxonomy IDs.  
+        For a sequence to be linked successfully, it must have an NCBI accession ID that was successfully parsed 
+        from the FASTA header at the sequences import step and that accession must exist in the NCBI acc2taxid file.  
+        Sequences that were obtained from non-NCBI sources may not have an accession assigned and, hence, may not 
+        be linked by this method.  
+        The tax_id identified in the linkage process is written to the sequences.tax_id field and will therefore be 
+        used in the export of sequences to FASTA files.  
+        
+        Returns:
+            True on success
+            
+        Side-effects:
+            Updates sequences.tax_id field for some records
+        """
+        logging.info('Starting to link currently unlinked sequences to taxonomy')
+        n_linked= 0
+        seq2taxid_iterator = self._db.all_seq2taxid_iterator(unlinked_only= True)       
+        with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id'], buffer_size= 50000) as seq_update_buffer:
+            for row in seq2taxid_iterator:
+                n_updated_seqs= seq_update_buffer.add_row(
+                    {
+                        'id': row['id'],
+                        'tax_id': row['tax_id']
+                    }
+                )
+                if n_updated_seqs > 0:
+                    logging.info(f'flushed {n_updated_seqs} sequence record updates to DB')
+        logging.info(f'Linkage task completed: {n_linked} sequences have been linked to taxonomy nodes' )
+        return True
+
     def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna' ):
         """
         Create a directory with all files needed to build a new kraken database.

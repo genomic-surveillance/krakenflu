@@ -264,3 +264,34 @@ def test_create_db_ready_dir(setup_db_with_real_world_fixture, tmp_path):
 
     assert exp_names_out_file.is_file(), 'after running create_db_ready_dir, the expected file taxonomy/names.dmp exists'
     assert exp_lib_out_file.is_file(), 'after running create_db_ready_dir, the expected file library/library.fna exists'
+
+def test_link_all_unlinked_sequences_to_taxonomy_nodes(setup_db_with_real_world_fixture, tmp_path):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    stmt_base= """
+        SELECT 
+            sequences.id,
+            sequences.fasta_header,
+            sequences.tax_id,
+            taxonomy_names.name AS taxonomy_name
+        FROM sequences
+        LEFT OUTER JOIN taxonomy_names ON(taxonomy_names.tax_id = sequences.tax_id AND taxonomy_names.name_class='scientific name')
+    """
+    stmt_tax_id_not_set = stmt_base + ' WHERE sequences.tax_id IS NULL'
+    stmt_tax_id_set = stmt_base + ' WHERE sequences.tax_id IS NOT NULL'
+
+    rows = db._cur.execute(stmt_tax_id_not_set).fetchall()
+    assert len(rows) == 35, 'before running the linkage, all 35 sequences records have no tax_id set'
+    
+    # run the linkage on NCBI accession ID
+    # only two sequences will be linked because the fixture data only contains acc2taxid records for two sequences:
+    #   - 'NC_002205.1 Influenza B virus (B/Lee/1940) segment 2'
+    #   - 'NC_001803.1 Respiratory syncytial virus, complete genome'
+    kdb.link_all_unlinked_sequences_to_taxonomy_nodes()
+    rows = db._cur.execute(stmt_tax_id_not_set).fetchall()
+    assert len(rows) == 33, 'after running the linkage, 2 sequences have their tax_id set due to acc2taxid records in the fixtures while 33 sequences remain unlinked'
+    
+    rows = db._cur.execute(stmt_tax_id_set).fetchall()
+    assert len(rows) == 2, 'check with reverse logic that 2 sequences now have a tax_id'
+    assert [x for x in rows if x['id']==9 and x['tax_id']==12814], 'the resultset contains an expected association of sequences.id 9 with tax_id 12814'
