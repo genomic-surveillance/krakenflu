@@ -746,7 +746,43 @@ class Db():
         """
         return self._iterator(stmt)
 
-    
+    def all_seq2taxid_iterator(self, unlinked_only:bool=True):
+        """
+        An iterator over all records from a JOIN of sequences and acc2taxids
+        on NCBI accession ID. By default, will only include currenlty unlinked sequences,
+        ie those that don't have a tax_id set already.  
+        This is used to create linkages from sequence to taxonomy via the NCBI accession ID that 
+        is recorded with the sequence record and the NCBK acc2taxid data that is loaded into 
+        the acc2taxids table.  
+        NOTE that this query may return more than one result for a given sequences record if the 
+        sequence has a GenBank ID as well as a RefSeq ID and can be linked via both. This should 
+        be rare and should not be a problem because we should regard both linkages as valid. Most 
+        likely, both linkages are to the same tax_id.  
+        
+        Args:
+            unlinked_only: bool, optional, defaults to True
+                If True, a WHERE clause is added to limit the search for sequences that have an 
+                empty tax_id field. Otherwise, all sequences are retrieved.  
+                
+        Returns:
+            Iterator over results. 
+            Can be used like this:
+                >>> it = db.all_sequences_iterator()
+                >>> for row in it:
+                >>> # do something with row
+        """
+        stmt="""
+        SELECT 
+            sequences.id,
+            acc2taxids.tax_id
+        FROM
+            sequences
+        INNER JOIN acc2taxids ON(sequences.ncbi_acc = acc2taxids.accession)
+        """
+        if unlinked_only:
+            stmt+=" WHERE sequences.tax_id IS NULL"
+        return self._iterator(stmt)
+
     def _iterator(self, stmt):
         for row in self._con.execute(stmt):
             yield row
