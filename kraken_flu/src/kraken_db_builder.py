@@ -538,3 +538,12 @@ class KrakenDbBuilder():
         logging.info( 'output files completed')
         return True
 
+    def prune_db(self):
+        """
+        Remove unnecessary data from the DB at the end of the process.  
+        Just delegates to a method of the same name in the Db class. See there for more information.  
+        """
+        logging.info('starting to prune unnecessary data from the DB')
+        self._db.prune_db()
+        logging.info('finished DB prune')
+        return True

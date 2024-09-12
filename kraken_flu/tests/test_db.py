@@ -361,3 +361,11 @@ def test_bulk_update_buffer_force_single(setup_db_with_real_world_fixture):
     assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
     assert [x['tax_id'] for x in rows ] == [200, 300, 456], 'after the bulk update, the records have the expected new tax_id values'
     assert [x['mod_fasta_header'] for x in rows ] == ['new header 1', 'new header 2', 'another new header'], 'before the bulk update, none of the records has a mod_fasta_header'
+
+def test_prune_db(setup_db):
+    db = setup_db
+    rows = db._cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='acc2taxids'").fetchall()
+    assert len(rows)==1, 'the table acc2taxids exists before pruning'
+    assert db.prune_db(), 'method returns True'
+    rows = db._cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='acc2taxids'").fetchall()
+    assert not rows, 'the table acc2taxids no longer exists after pruning'

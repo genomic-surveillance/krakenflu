@@ -750,6 +750,22 @@ class Db():
         data= self._cur.execute(f"SELECT * FROM {table_name} LIMIT 1")
         return [c[0] for c in data.description]
     
+    def prune_db(self):
+        """
+        Remove unnecessary data from the DB at the end of the process.  
+        At present, this only removes the acc2taxids table, if one exists.  
+        This table is very large because it contains accession-to-taxid mappings for all records in NCBI 
+        and it is only loaded into the DB for the purpose of joining with sequences in order to populate 
+        the sequences.tax_id field. After this linkage step, the table is redundant. Deleting it removes 
+        around 30GB from the sqlite DB.  
+        TODO: add more pruning tasks. We should remove all taxonomy nodes that do not belong to a path with 
+        a sequence at the leaf node. The DB will contain taxonomy nodes for plants, fungi and animals that will 
+        never be used for our purposes. Removing taxonomy paths that do not end in a sequence will not change 
+        anything for kraken2 because such taxonomy paths can never have reads assigned to them anyway.  
+        """
+        self._cur.execute("DROP TABLE IF EXISTS acc2taxids")
+        return True
+    
     @property        
     def schema(self):
         """
