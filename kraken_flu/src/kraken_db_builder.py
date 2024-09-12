@@ -517,6 +517,7 @@ class KrakenDbBuilder():
         seq2taxid_iterator = self._db.all_seq2taxid_iterator(unlinked_only= True)       
         with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id'], buffer_size= 50000) as seq_update_buffer:
             for row in seq2taxid_iterator:
+                n_linked+=1
                 n_updated_seqs= seq_update_buffer.add_row(
                     {
                         'id': row['id'],
