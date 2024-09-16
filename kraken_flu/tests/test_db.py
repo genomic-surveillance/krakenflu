@@ -361,3 +361,21 @@ def test_bulk_update_buffer_force_single(setup_db_with_real_world_fixture):
     assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
     assert [x['tax_id'] for x in rows ] == [200, 300, 456], 'after the bulk update, the records have the expected new tax_id values'
     assert [x['mod_fasta_header'] for x in rows ] == ['new header 1', 'new header 2', 'another new header'], 'before the bulk update, none of the records has a mod_fasta_header'
+
+def test_retrieve_flu_a_wo_subtype_ids(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    ids = db.retrieve_ids_flu_a_wo_subtype()
+    assert not ids,'there are no cases of flu A without a subtype in the fixtures'
+    
+    # delete H subtype from one flu A genome in fixtures and re-retrieve
+    stmt="""
+    UPDATE sequences
+    SET flu_a_h_subtype = NULL
+    WHERE ncbi_acc = 'NC_002023.1'
+    """
+    db._cur.execute(stmt)
+    db._con.commit()
+    ids = db.retrieve_ids_flu_a_wo_subtype()
+    assert len(ids) == 1,'having deleted the H subtype of one flu sequence, the method now retrieves one sequences.id'
+    assert ids[0] == 1, 'the correct sequences.id is returned'
+    

@@ -264,3 +264,25 @@ def test_create_db_ready_dir(setup_db_with_real_world_fixture, tmp_path):
 
     assert exp_names_out_file.is_file(), 'after running create_db_ready_dir, the expected file taxonomy/names.dmp exists'
     assert exp_lib_out_file.is_file(), 'after running create_db_ready_dir, the expected file library/library.fna exists'
+
+def test_filter_flu_a_wo_subtype(setup_db_with_real_world_fixture, tmp_path):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    # retrieve data for a flu A sequence which is not filtered out at this point
+    rows = db._cur.execute("SELECT id, include FROM sequences WHERE ncbi_acc = 'NC_002023.1'").fetchall()
+    assert len(rows) == 1, 'a flu A sequence can be retrieved from the DB by NCBI acc'
+    assert rows[0]['include'] == 1, '... the sequence is set to be included'
+    
+    # run the filter - it should not affect any sequences at this point
+    kdb.filter_flu_a_wo_subtype()
+    rows = db._cur.execute("SELECT id, include FROM sequences WHERE ncbi_acc = 'NC_002023.1'").fetchall()
+    assert rows[0]['include'] == 1, 'after running filter_flu_a_wo_subtype, this sequence is unaffected because it has H/N subtypes'
+
+    # set the flu A H subtype of this sequence to NULL and re-run the filter
+    db._cur.execute("UPDATE sequences SET flu_a_h_subtype = NULL WHERE ncbi_acc = 'NC_002023.1'")
+    db._con.commit()
+    kdb.filter_flu_a_wo_subtype()
+    rows = db._cur.execute("SELECT id, include FROM sequences WHERE ncbi_acc = 'NC_002023.1'").fetchall()
+    assert rows[0]['include'] == 0, 'having set H subtype to NULL, this sequence is now filtered out by filter_flu_a_wo_subtype'
+    

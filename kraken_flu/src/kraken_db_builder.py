@@ -290,6 +290,33 @@ class KrakenDbBuilder():
         logging.info( f'Completed updating database')
         return True
     
+    def filter_flu_a_wo_subtype(self):
+        """
+        Exclude all flu A sequences where the H and N subtypes are not set.  
+        If we don't do this, flu A sequences will become linked to "Influenza A segment 4" 
+        and "Influenza A segment 6" nodes, thus bypassing the "Influenza A Hx segment 4" and 
+        "Influenza A Nx segment 4" level of taxonomy nodes created by create_segmented_flu_taxonomy_nodes.  
+        The main source of flu A genomes in this category are those that have a "mixed" subtype in the 
+        isolate name.   
+        TODO: investigate whether we should create nodes "Infleunza A mixed subtype segment 4" (and 6) 
+        and keep the mixed subtype sequences. They might be be valuable for the analysis but this will 
+        need some research.  
+        
+        Args:
+            none
+            
+        Side effects:
+            Sets sequences.include field for some flu A sequences
+            
+        Returns:
+            True on success
+        """
+        logging.info('starting to filter out flu A genomes without subtype (such as "mixed" subtypes)')
+        sequence_ids_to_remove = self._db.retrieve_ids_flu_a_wo_subtype()
+        self._db.mark_as_not_included(sequence_ids_to_remove)
+        logging.info(f'filtered out {len(sequence_ids_to_remove)} flu A genomes without a subtype')
+        return True
+    
     def create_segmented_flu_taxonomy_nodes(self, missing_parent_is_exception:bool=False):
         """
         Creates the new taxon nodes for flu and returns tax_ids datastructure.  

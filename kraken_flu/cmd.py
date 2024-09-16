@@ -117,6 +117,7 @@ def main():
         else:
             filter_except_list = []
         kdb.filter_incomplete_flu(filter_except_patterns= filter_except_list)
+        kdb.filter_flu_a_wo_subtype()
         
     kdb.create_segmented_flu_taxonomy_nodes()
     kdb.assign_flu_taxonomy_nodes()
