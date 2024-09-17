@@ -538,3 +538,8 @@ class KrakenDbBuilder():
         logging.info( 'output files completed')
         return True
 
+    def find_multiref_paths(self):
+        multiref_paths = self._db.find_multiref_paths()
+        for k, v in multiref_paths.items():
+            print(f"{k}: {v}")
+
