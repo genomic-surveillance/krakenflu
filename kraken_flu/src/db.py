@@ -374,6 +374,52 @@ class Db():
             
         return data
 
+    def find_multiref_paths(self):
+        seen = set()
+        multiref_paths = {}
+        all_paths = self.get_all_tax_ids_paths_root_to_leaf()
+
+        for path in all_paths:
+            multiref, ref_depth, seen = self._evaluate_path_for_refs(path, seen)
+            if multiref:
+                multiref_paths[path[-1]] = {"path": path, "ref_depth": ref_depth}
+
+        return multiref_paths
+
+    def _evaluate_path_for_refs(self, path: list, seen: set):
+        multiref = False
+        ref_depth = 0
+
+        stmt = """
+        SELECT 1
+        FROM sequences
+        WHERE tax_id = ?
+        """
+        parent = path[-2]
+        if (parent in seen) or (self._cur.execute(stmt,[parent]).fetchall() is not None):
+            multiref = True
+            ref_depth = 1
+            seen.add(parent)
+
+            return multiref, ref_depth, seen
+
+        elif any(taxid in seen for taxid in path[:-2]):
+            multiref = True
+            ref_depth = 2
+
+        else:
+            for idx, taxid in enumerate(path[::-1][2:]):
+                found = self._cur.execute(stmt,[taxid]).fetchall()
+                if not found:
+                    continue
+                else:
+                    multiref = True
+                    ref_depth = 2
+                    seen.add(taxid)
+                    break
+
+        return multiref, ref_depth, seen
+
     def get_tax_ids_path_root_to_node(self, starting_tax_id:int):
         """
         For a given node by tax_id, traverse the taxonomy from child to parent and collect 
