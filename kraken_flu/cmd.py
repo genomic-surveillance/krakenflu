@@ -123,5 +123,7 @@ def main():
     
     kdb.create_db_ready_dir(path = args.out_dir)
 
+    kdb.find_multiref_paths()
+
 if __name__ == "__main__":
     exit(main())
