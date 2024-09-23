@@ -16,7 +16,7 @@ class Db():
     │   unique_name  │    │      │    embl_code                      │         │  
     │   name_class   │    │      │    division_id                    │         │  
     └────────────────┘    │      │    inherited_div_flag             │         │  
-                        │      │    genetic_code_id                │         │  
+                          │      │    genetic_code_id                │         │  
     ┌──────────────────┐  │      │    inherited_GC_flag              │         │  
     │sequences         │  │      │    mitochondrial_genetic_code_id  │         │  
     ├──────────────────┤  │      │    inherited_MGC_flag             │         │  
