@@ -108,3 +108,8 @@ INSERT INTO taxonomy_nodes (tax_id,parent_tax_id,"rank",embl_code,division_id,in
 	 (518987,11520,'no rank','',9,1,1,1,0,1,1,0,''),
 	 (641809,114727,'no rank','',9,1,1,1,0,1,1,0,''),
 	 (2697049,694009,'no rank','',9,1,1,1,0,1,0,0,'');
+INSERT INTO  acc2taxids (accession,tax_id) VALUES 
+	('NC_002205',518987),
+	('NC_002205.1',518987),
+	('NC_001803.1',12814),
+	('NC_001803',12814);
