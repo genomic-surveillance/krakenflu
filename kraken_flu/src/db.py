@@ -5,31 +5,31 @@ from collections import defaultdict
 """
 This module contains the definitions of classes to handle the sqlite DB for kraken_flu
 The schema of the DB is as follows:
-
-  ┌────────────────┐           ┌───────────────────────────────────┐            
-  │taxonomy_names  │           │ taxonomy_nodes                    │            
-  ├────────────────┤           ├───────────────────────────────────┤            
-  │PK id           │    ┌─────►│ PK tax_id                         │▲───┐       
-  │FK tax_id       ├────┤      │ FK parent_tax_id                  ├────┘       
-  │   name_txt     │    │      │    rank                           │            
-  │   unique_name  │    │      │    embl_code                      │            
-  │   name_class   │    │      │    division_id                    │            
-  └────────────────┘    │      │    inherited_div_flag             │            
-                        │      │    genetic_code_id                │            
-  ┌──────────────────┐  │      │    inherited_GC_flag              │            
-  │sequences         │  │      │    mitochondrial_genetic_code_id  │            
-  ├──────────────────┤  │      │    inherited_MGC_flag             │            
-  │PK id             │  │      │    GenBank_hidden_flag            │            
-  │FK tax_id         ├──┘      │    hidden_subtree_root_flag       │            
-  │   fasta_header   │         │    comments                       │            
-  │   dna_sequence   │         └───────────────────────────────────┘            
-  │   seq_length     │                                                          
-  │   ncbi_acc       │                                                          
-  │   flu_name       │                                                          
-  │   flu_a_h_subtype│                                                          
-  │   flu_a_n_subtype│                                                          
-  │   include        │                                                          
-  └──────────────────┘                                                          
+                                                                                 
+ ┌────────────────┐           ┌───────────────────────────────────┐            
+ │taxonomy_names  │           │ taxonomy_nodes                    │            
+ ├────────────────┤           ├───────────────────────────────────┤            
+ │PK id           │    ┌─────►│ PK tax_id                         │▲───┬────┐  
+ │FK tax_id       ├────┤      │ FK parent_tax_id                  ├────┘    │  
+ │   name_txt     │    │      │    rank                           │         │  
+ │   unique_name  │    │      │    embl_code                      │         │  
+ │   name_class   │    │      │    division_id                    │         │  
+ └────────────────┘    │      │    inherited_div_flag             │         │  
+                       │      │    genetic_code_id                │         │  
+ ┌──────────────────┐  │      │    inherited_GC_flag              │         │  
+ │sequences         │  │      │    mitochondrial_genetic_code_id  │         │  
+ ├──────────────────┤  │      │    inherited_MGC_flag             │         │  
+ │PK id             │  │      │    GenBank_hidden_flag            │         │  
+ │FK tax_id         ├──┘      │    hidden_subtree_root_flag       │         │  
+ │   fasta_header   │         │    comments                       │         │  
+ │   dna_sequence   │         └───────────────────────────────────┘         │  
+ │   seq_length     │         ┌──────────────┐                              │  
+ │   ncbi_acc       │◄───┐    │ acc2taxids   │                              │  
+ │   flu_name       │    │    ├──────────────┤                              │  
+ │   flu_a_h_subtype│    └────┤ PK accession │                              │  
+ │   flu_a_n_subtype│         │ PK tax_id    ├──────────────────────────────┘  
+ │   include        │         │              │                                 
+ └──────────────────┘         └──────────────┘                                 
 
 """
 
