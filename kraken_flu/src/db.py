@@ -229,19 +229,6 @@ class Db():
         """
         return BulkUpdateBuffer( db=self, table_name= table_name, id_field= id_field, update_fields= update_fields, buffer_size= buffer_size )
 
-    def add_seq2taxid(self, ncbi_acc:str, acc_version:int, tax_id:int, gi:int,):
-        """
-        Add a sequence record into the "seq2taxid" table
-        """
-        self.insert_from_dict('seq2taxid',
-            {
-                "ncbi_acc":ncbi_acc,
-                "acc_version":acc_version,
-                "tax_id":tax_id,
-                "gi":gi
-            }
-        )
-
     def add_sequence( self, fasta_header:str,  dna_sequence:str, category:str, flu_type:str, ncbi_acc:str, original_taxid:int, is_flu:bool, isolate_name:str, segment_number:int, h_subtype:int, n_subtype:int ):
         """
         Add a sequence record to table "sequences" without a link to a taxon node (which will be provided later).  
