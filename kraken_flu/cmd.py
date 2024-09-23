@@ -91,7 +91,7 @@ def args_parser():
         type= str,
         help = 'one or more strings/patterns that are used to exclude genomes from the Influenza "complete genome" filter (if used)'
     )
-        
+
     parser.add_argument(
         '--do_full_linkage',
         action = 'store_true',
