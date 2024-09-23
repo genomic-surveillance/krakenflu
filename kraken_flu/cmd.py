@@ -91,6 +91,12 @@ def args_parser():
         type= str,
         help = 'one or more strings/patterns that are used to exclude genomes from the Influenza "complete genome" filter (if used)'
     )
+    
+    parser.add_argument(
+        '--do_full_linkage',
+        action = 'store_true',
+        help = 'run linkage of all sequences via NCBI accession ID to NCBI taxon ID for sequences that are not linked otherwise'        
+    )
 
     return parser
 
@@ -120,6 +126,9 @@ def main():
         
     kdb.create_segmented_flu_taxonomy_nodes()
     kdb.assign_flu_taxonomy_nodes()
+    
+    if args.do_full_linkage:
+        kdb.link_all_unlinked_sequences_to_taxonomy_nodes()
     
     kdb.create_db_ready_dir(path = args.out_dir)
 

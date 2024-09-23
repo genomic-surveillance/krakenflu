@@ -361,3 +361,36 @@ def test_bulk_update_buffer_force_single(setup_db_with_real_world_fixture):
     assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
     assert [x['tax_id'] for x in rows ] == [200, 300, 456], 'after the bulk update, the records have the expected new tax_id values'
     assert [x['mod_fasta_header'] for x in rows ] == ['new header 1', 'new header 2', 'another new header'], 'before the bulk update, none of the records has a mod_fasta_header'
+
+def test_all_seq2taxid_iterator(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+
+    acc2taxids_rows = db._cur.execute("SELECT accession,tax_id FROM acc2taxids").fetchall()
+    assert len(acc2taxids_rows) == 4, '4 rows of acc2taxids in fixtures'
+
+    it = db.all_seq2taxid_iterator()
+    rows=[]
+    for row in it:
+        rows.append(row)
+    # fixtures contains 4 rows of acc2taxids with two unique tax_ids, so in total we should link 
+    # 2 sequences via accession ID to tax_id
+    assert len(rows) == 2, 'all_seq2taxid_iterator retrieved all (2) rows linking sequences to tax IDs in acc2taxids table via NCBI accession'
+
+    # check row data for the expected associations of sequences (by sequences.id) to tax_id
+    # the first is for 'NC_001803.1 Respiratory syncytial virus, complete genome' which should be linked to tax_id 12814
+    assert [x for x in rows if x['id']==9 and x['tax_id']==12814], 'the resultset contains an expected association of sequences.id 9 with tax_id 12814'
+
+    # the second one is 'NC_002205.1 Influenza B virus (B/Lee/1940) segment 2', linked to tax_id 518987, sequences.id=21
+    assert [x for x in rows if x['id']==21 and x['tax_id']==518987], 'the resultset contains an expected association of sequences.id 21 with tax_id 518987'
+    
+    # setting a tax_id for one of the two sequences linked above will make it drop from the 
+    # resultset, which retrieves only unlinked (no tax_id yet) records by default
+    db._cur.execute("UPDATE sequences SET tax_id=7878787 WHERE id=21")
+    it = db.all_seq2taxid_iterator()
+    rows=[]
+    for row in it:
+        rows.append(row)
+    assert len(rows) == 1, 'after setting the tax_id field to a value for one of the previously returned sequences, it is no longer in the resultset'
+    assert [x for x in rows if x['id']==9 and x['tax_id']==12814], 'the resultset still contains a linkage for sequences.id 9'
+    assert not [x for x in rows if x['id']==21 and x['tax_id']==518987], 'sequences.id 21 no longer in the resultset because it already has a tax_id now'
+    
