@@ -394,6 +394,33 @@ def test_all_seq2taxid_iterator(setup_db_with_real_world_fixture):
     assert [x for x in rows if x['id']==9 and x['tax_id']==12814], 'the resultset still contains a linkage for sequences.id 9'
     assert not [x for x in rows if x['id']==21 and x['tax_id']==518987], 'sequences.id 21 no longer in the resultset because it already has a tax_id now'
     
+
+
+def test_prune_db(setup_db):
+    db = setup_db
+    rows = db._cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='acc2taxids'").fetchall()
+    assert len(rows)==1, 'the table acc2taxids exists before pruning'
+    assert db.prune_db(), 'method returns True'
+    rows = db._cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='acc2taxids'").fetchall()
+    assert not rows, 'the table acc2taxids no longer exists after pruning'
+
+def test_retrieve_flu_a_wo_subtype_ids(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    ids = db.retrieve_ids_flu_a_wo_subtype()
+    assert not ids,'there are no cases of flu A without a subtype in the fixtures'
+    
+    # delete H subtype from one flu A genome in fixtures and re-retrieve
+    stmt="""
+    UPDATE sequences
+    SET flu_a_h_subtype = NULL
+    WHERE ncbi_acc = 'NC_002023.1'
+    """
+    db._cur.execute(stmt)
+    db._con.commit()
+    ids = db.retrieve_ids_flu_a_wo_subtype()
+    assert len(ids) == 1,'having deleted the H subtype of one flu sequence, the method now retrieves one sequences.id'
+    assert ids[0] == 1, 'the correct sequences.id is returned'
+    
 def test_sequences_category_exists(setup_db_with_real_world_fixture):
     db = setup_db_with_real_world_fixture
     id=1
