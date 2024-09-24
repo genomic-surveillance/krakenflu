@@ -39,8 +39,10 @@ def load_fasta(db: Db, file_path:str, category:str=None):
     """
     n_seqs = _get_num_records(file_path)
     logging.info( f'starting to upload {n_seqs} FASTA sequence records from {file_path} data to DB')
+    if category:
+        logging.info(f'setting category to "{category}"')
     
-    with open( file_path ) as fh:
+    with open( file_path, encoding="utf-8" ) as fh:
         with db.bulk_insert_buffer(table_name='sequences', buffer_size= 10000) as b:
             for record in SeqIO.parse(fh, "fasta"):
                 header = record.description
