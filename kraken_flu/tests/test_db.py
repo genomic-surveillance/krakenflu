@@ -396,11 +396,9 @@ def test_all_seq2taxid_iterator(setup_db_with_real_world_fixture):
     
 def test_sequences_category_exists(setup_db_with_real_world_fixture):
     db = setup_db_with_real_world_fixture
-    
     id=1
     label='test label'
     assert not db.sequences_category_exists(label), 'there are no matching sequences with this label in the fixtures'
-    
     db._cur.execute("UPDATE sequences SET category= ? WHERE id= ?",[label, id])
-    db._con.commit() 
+    db._con.commit()
     assert db.sequences_category_exists(label), 'after the DB update, a sequence with the label exists in the DB and the method returns True'
