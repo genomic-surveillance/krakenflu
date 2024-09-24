@@ -840,6 +840,32 @@ class Db():
         self._cur.execute("DROP TABLE IF EXISTS acc2taxids")
         return True
     
+    def get_seq_ids_by_category_and_seq_lt(self, category:str, seq_len_lt:int ):
+        """
+        Retrieves sequences.id for sequences that match the given category label (sequences.category field) and 
+        where the sequence length is less than the parameter provided. This is used to remove incomplete RSV 
+        genomes (and could be used for other purposes).  
+
+        Args:
+            category: str, required
+                The category label to search for. Only records with exact matching sequences.category will 
+                be included
+                
+            seq_len_lt: int, required
+                "Sequence length less than" - only sequences with len < than this value will be included.  
+
+        Returns:
+            list(ids)
+        """
+        stmt="""
+        SELECT id
+        FROM sequences 
+        WHERE category = ?
+        AND seq_length < ?
+        """
+        rows = self._cur.execute(stmt, [category, seq_len_lt]).fetchall()
+        return [x['id'] for x in rows]
+    
     @property        
     def schema(self):
         """

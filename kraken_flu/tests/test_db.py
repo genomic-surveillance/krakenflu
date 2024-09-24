@@ -429,3 +429,18 @@ def test_sequences_category_exists(setup_db_with_real_world_fixture):
     db._cur.execute("UPDATE sequences SET category= ? WHERE id= ?",[label, id])
     db._con.commit()
     assert db.sequences_category_exists(label), 'after the DB update, a sequence with the label exists in the DB and the method returns True'
+
+def test_get_seq_ids_by_category_and_seq_lt(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    ids = db.get_seq_ids_by_category_and_seq_lt(category='test label', seq_len_lt=1000 )
+    assert not ids, 'before we make changes to the fixtures, no sequences match the criteria'
+    
+    update_ids=[3,5,7]
+    stmt="UPDATE sequences SET category = 'test label', seq_length = 900 WHERE id = ?"
+    for id in update_ids:
+        db._cur.execute(stmt,[id])
+    db._con.commit()
+    ids = db.get_seq_ids_by_category_and_seq_lt(category='test label', seq_len_lt=1000 )
+    assert sorted(ids) == sorted(update_ids), 'after setting cateogry and seq length in three sequences to match filter, the three ids are returned'
+    
+        
