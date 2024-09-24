@@ -547,7 +547,7 @@ class KrakenDbBuilder():
         if rsv_size_filter:
             self._apply_rsv_size_filter(categories=['RSV A','RSV B'])
             
-    def _apply_rsv_size_filter(self, categories:list=['RSV A','RSV B']):
+    def _apply_rsv_size_filter(self, categories:list=None):
         """
         Filter out (mark sequences.includee=0) all RSV genomes that do not meet the minimum length filter.  
         This currently relies on the sequences.cateogry label being set to 'RSV A' or 'RSV B', ie no filter 
@@ -567,6 +567,10 @@ class KrakenDbBuilder():
         Side effects:
             Sets sequences.include values
         """
+        # this is here rather than in the method defaults because of this: https://pylint.readthedocs.io/en/latest/user_guide/messages/warning/dangerous-default-value.html
+        if not categories:
+            categories= ['RSV A','RSV B']
+        
         logging.info( f'starting filter to remove incomplete RSV genomes')
 
         # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
