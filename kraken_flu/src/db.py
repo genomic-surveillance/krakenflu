@@ -786,6 +786,29 @@ class Db():
         """
         data= self._cur.execute(f"SELECT * FROM {table_name} LIMIT 1")
         return [c[0] for c in data.description]
+
+    def sequences_category_exists(self, label):
+        """
+        Returns True if at least one sequences record exists with a category that matches the search term exactly
+
+        Args:
+            label: str, required
+                The search term for the sequences.category field (must be exact match)
+
+        Returns:
+            True if at least one matching sequence record exists, False otherwise
+        """
+        stmt="""
+        SELECT id
+        FROM sequences
+        WHERE category = ?
+        LIMIT 1
+        """
+        rows = self._cur.execute(stmt,[label]).fetchall()
+        if rows:
+            return True
+        else:
+            return False
     
     @property        
     def schema(self):
@@ -851,6 +874,8 @@ class Db():
                 ON sequences (flu_name);
             CREATE INDEX idx_seq_tax_id 
                 ON sequences (tax_id);
+            CREATE INDEX idx_seq_cat 
+                ON sequences (category);   
                 
             CREATE TABLE acc2taxids (
                 accession VARCHAR,

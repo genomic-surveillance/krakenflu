@@ -5,7 +5,7 @@ from importlib_resources import files
 from kraken_flu.src.db import Db, BulkInsertBuffer
 
 # set this to True to make the tests print all executed SQL or False to stop that
-PRINT_SQL_TRACE=False
+PRINT_SQL_TRACE=True
 
 @pytest.fixture(scope='function')
 def setup_db( tmp_path ):
@@ -394,3 +394,13 @@ def test_all_seq2taxid_iterator(setup_db_with_real_world_fixture):
     assert [x for x in rows if x['id']==9 and x['tax_id']==12814], 'the resultset still contains a linkage for sequences.id 9'
     assert not [x for x in rows if x['id']==21 and x['tax_id']==518987], 'sequences.id 21 no longer in the resultset because it already has a tax_id now'
     
+def test_sequences_category_exists(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    
+    id=1
+    label='test label'
+    assert not db.sequences_category_exists(label), 'there are no matching sequences with this label in the fixtures'
+    
+    db._cur.execute("UPDATE sequences SET category= ? WHERE id= ?",[label, id])
+    db._con.commit() 
+    assert db.sequences_category_exists(label), 'after the DB update, a sequence with the label exists in the DB and the method returns True'
