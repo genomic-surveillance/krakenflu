@@ -2,40 +2,35 @@ import sqlite3
 import os
 from collections import defaultdict
 
-"""
-This module contains the definitions of classes to handle the sqlite DB for kraken_flu
-The schema of the DB is as follows:
-
-  ┌────────────────┐           ┌───────────────────────────────────┐            
-  │taxonomy_names  │           │ taxonomy_nodes                    │            
-  ├────────────────┤           ├───────────────────────────────────┤            
-  │PK id           │    ┌─────►│ PK tax_id                         │▲───┐       
-  │FK tax_id       ├────┤      │ FK parent_tax_id                  ├────┘       
-  │   name_txt     │    │      │    rank                           │            
-  │   unique_name  │    │      │    embl_code                      │            
-  │   name_class   │    │      │    division_id                    │            
-  └────────────────┘    │      │    inherited_div_flag             │            
-                        │      │    genetic_code_id                │            
-  ┌──────────────────┐  │      │    inherited_GC_flag              │            
-  │sequences         │  │      │    mitochondrial_genetic_code_id  │            
-  ├──────────────────┤  │      │    inherited_MGC_flag             │            
-  │PK id             │  │      │    GenBank_hidden_flag            │            
-  │FK tax_id         ├──┘      │    hidden_subtree_root_flag       │            
-  │   fasta_header   │         │    comments                       │            
-  │   dna_sequence   │         └───────────────────────────────────┘            
-  │   seq_length     │                                                          
-  │   ncbi_acc       │                                                          
-  │   flu_name       │                                                          
-  │   flu_a_h_subtype│                                                          
-  │   flu_a_n_subtype│                                                          
-  │   include        │                                                          
-  └──────────────────┘                                                          
-
-"""
-
 class Db():   
     """
     This class handles all interactions with the SQLite DB, including the DB session.
+    The schema of the DB is as follows:
+                                                                                    
+    ┌────────────────┐           ┌───────────────────────────────────┐            
+    │taxonomy_names  │           │ taxonomy_nodes                    │            
+    ├────────────────┤           ├───────────────────────────────────┤            
+    │PK id           │    ┌─────►│ PK tax_id                         │▲───┬────┐  
+    │FK tax_id       ├────┤      │ FK parent_tax_id                  ├────┘    │  
+    │   name_txt     │    │      │    rank                           │         │  
+    │   unique_name  │    │      │    embl_code                      │         │  
+    │   name_class   │    │      │    division_id                    │         │  
+    └────────────────┘    │      │    inherited_div_flag             │         │  
+                          │      │    genetic_code_id                │         │  
+    ┌──────────────────┐  │      │    inherited_GC_flag              │         │  
+    │sequences         │  │      │    mitochondrial_genetic_code_id  │         │  
+    ├──────────────────┤  │      │    inherited_MGC_flag             │         │  
+    │PK id             │  │      │    GenBank_hidden_flag            │         │  
+    │FK tax_id         ├──┘      │    hidden_subtree_root_flag       │         │  
+    │   fasta_header   │         │    comments                       │         │  
+    │   dna_sequence   │         └───────────────────────────────────┘         │  
+    │   seq_length     │         ┌──────────────┐                              │  
+    │   ncbi_acc       │◄───┐    │ acc2taxids   │                              │  
+    │   flu_name       │    │    ├──────────────┤                              │  
+    │   flu_a_h_subtype│    └────┤ PK accession │                              │  
+    │   flu_a_n_subtype│         │ PK tax_id    ├──────────────────────────────┘  
+    │   include        │         │              │                                 
+    └──────────────────┘         └──────────────┘                                 
 
     Parameters:
         db_path: str, required
@@ -51,6 +46,7 @@ class Db():
 
         # connect and create a cursor (session)
         self._con = sqlite3.connect(db_path)
+        
         if debug:
             self._con.set_trace_callback(print)
         
@@ -751,7 +747,43 @@ class Db():
         """
         return self._iterator(stmt)
 
-    
+    def all_seq2taxid_iterator(self, unlinked_only:bool=True):
+        """
+        An iterator over all records from a JOIN of sequences and acc2taxids
+        on NCBI accession ID. By default, will only include currenlty unlinked sequences,
+        ie those that don't have a tax_id set already.  
+        This is used to create linkages from sequence to taxonomy via the NCBI accession ID that 
+        is recorded with the sequence record and the NCBK acc2taxid data that is loaded into 
+        the acc2taxids table.  
+        NOTE that this query may return more than one result for a given sequences record if the 
+        sequence has a GenBank ID as well as a RefSeq ID and can be linked via both. This should 
+        be rare and should not be a problem because we should regard both linkages as valid. Most 
+        likely, both linkages are to the same tax_id.  
+        
+        Args:
+            unlinked_only: bool, optional, defaults to True
+                If True, a WHERE clause is added to limit the search for sequences that have an 
+                empty tax_id field. Otherwise, all sequences are retrieved.  
+                
+        Returns:
+            Iterator over results. 
+            Can be used like this:
+                >>> it = db.all_sequences_iterator()
+                >>> for row in it:
+                >>> # do something with row
+        """
+        stmt="""
+        SELECT 
+            sequences.id,
+            acc2taxids.tax_id
+        FROM
+            sequences
+        INNER JOIN acc2taxids ON(sequences.ncbi_acc = acc2taxids.accession)
+        """
+        if unlinked_only:
+            stmt+=" WHERE sequences.tax_id IS NULL"
+        return self._iterator(stmt)
+
     def _iterator(self, stmt):
         for row in self._con.execute(stmt):
             yield row
@@ -768,6 +800,22 @@ class Db():
         """
         data= self._cur.execute(f"SELECT * FROM {table_name} LIMIT 1")
         return [c[0] for c in data.description]
+    
+    def prune_db(self):
+        """
+        Remove unnecessary data from the DB at the end of the process.  
+        At present, this only removes the acc2taxids table, if one exists.  
+        This table is very large because it contains accession-to-taxid mappings for all records in NCBI 
+        and it is only loaded into the DB for the purpose of joining with sequences in order to populate 
+        the sequences.tax_id field. After this linkage step, the table is redundant. Deleting it removes 
+        around 30GB from the sqlite DB.  
+        TODO: add more pruning tasks. We should remove all taxonomy nodes that do not belong to a path with 
+        a sequence at the leaf node. The DB will contain taxonomy nodes for plants, fungi and animals that will 
+        never be used for our purposes. Removing taxonomy paths that do not end in a sequence will not change 
+        anything for kraken2 because such taxonomy paths can never have reads assigned to them anyway.  
+        """
+        self._cur.execute("DROP TABLE IF EXISTS acc2taxids")
+        return True
     
     @property        
     def schema(self):
@@ -833,6 +881,12 @@ class Db():
                 ON sequences (flu_name);
             CREATE INDEX idx_seq_tax_id 
                 ON sequences (tax_id);
+                
+            CREATE TABLE acc2taxids (
+                accession VARCHAR,
+                tax_id INTEGER,
+                PRIMARY KEY (accession,tax_id)
+            );
         """
 
 class BulkInsertBuffer():
