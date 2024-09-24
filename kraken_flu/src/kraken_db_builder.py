@@ -567,9 +567,18 @@ class KrakenDbBuilder():
         Side effects:
             Sets sequences.include values
         """
+        logging.info( f'starting filter to remove incomplete RSV genomes')
+
+        # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
+        # https://www.nature.com/articles/s41598-023-40760-y
+        # Using a cutoff of 15k
+        rsv_min_len = 15000
+        n_filtered= 0
         for label in categories:
-            rows = self._db.retrieve_sequences_by_category(label)
-            #######
+            sequence_ids_to_remove  = self._db.get_seq_ids_by_category_and_seq_lt(category= label, seq_len_lt= rsv_min_len)
+            self._db.mark_as_not_included(sequence_ids_to_remove)
+            n_filtered+= len(sequence_ids_to_remove)
+        logging.info( f'filtered out {n_filtered} RSV genomes as incomplete (<{rsv_min_len} bases)')
         return True
 
     def link_all_unlinked_sequences_to_taxonomy_nodes(self):

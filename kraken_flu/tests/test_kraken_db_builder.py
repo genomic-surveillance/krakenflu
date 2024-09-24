@@ -317,3 +317,30 @@ def test_filter_flu_a_wo_subtype(setup_db_with_real_world_fixture, tmp_path):
     rows = db._cur.execute("SELECT id, include FROM sequences WHERE ncbi_acc = 'NC_002023.1'").fetchall()
     assert rows[0]['include'] == 0, 'having set H subtype to NULL, this sequence is now filtered out by filter_flu_a_wo_subtype'
     
+def test__apply_rsv_size_filter(setup_db_with_real_world_fixture, tmp_path):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    # run the filter - it should not filter out any sequences because there are no
+    # sequences labelled as RSV A in the fixtures
+    kdb._apply_rsv_size_filter(categories=['RSV A'])
+    
+    update_ids=[3,5,7]
+    stmt1="SELECT id, include from sequences WHERE id IN (?,?,?)"
+    rows = db._cur.execute(stmt1,update_ids).fetchall()
+    excluded_ids = [x['id'] for x in rows if x['include']==0]
+    assert not excluded_ids, 'before we apply the RSV filter, none of the three randomly chosen sequences are marked as excluded'
+    
+    # label some random sequences as "RSV A" (doesn't matter what they really are) 
+    # and set their length to slightly below the cutoff so they should be filtered out by the RSB size filter
+    stmt2="UPDATE sequences SET category = 'RSV A', seq_length = 14500 WHERE id = ?"
+    for id in update_ids:
+        db._cur.execute(stmt2,[id])
+    db._con.commit()
+    
+    # apply the filter again - the three sequences should now be filtered out
+    kdb._apply_rsv_size_filter(categories=['RSV A'])
+    rows = db._cur.execute(stmt1,update_ids).fetchall()
+    excluded_ids = [x['id'] for x in rows if x['include']==0]
+    assert sorted(excluded_ids) == sorted(update_ids), 'having set the RSV A label and sequence length below cutoff for three randomly chosen sequences, these are now marked as excluded'
+    
