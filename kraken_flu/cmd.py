@@ -91,11 +91,17 @@ def args_parser():
         type= str,
         help = 'one or more strings/patterns that are used to exclude genomes from the Influenza "complete genome" filter (if used)'
     )
-    
+
     parser.add_argument(
         '--do_full_linkage',
         action = 'store_true',
         help = 'run linkage of all sequences via NCBI accession ID to NCBI taxon ID for sequences that are not linked otherwise'        
+    )
+
+    parser.add_argument(
+        '--prune_db',
+        action = 'store_true',
+        help = 'remove unnecessary data from the kraken-flu backend DB at the end of the process'        
     )
 
     return parser
@@ -131,6 +137,11 @@ def main():
         kdb.link_all_unlinked_sequences_to_taxonomy_nodes()
     
     kdb.create_db_ready_dir(path = args.out_dir)
+    
+    # if a DB prune is requested, carry it out but only if we are actually keeping the DB
+    # because it makes no sense to do this sort of housekeeping on a DB that is deleted anyway
+    if args.prune_db and args.keep_db_file:
+        kdb.prune_db()
 
 if __name__ == "__main__":
     exit(main())

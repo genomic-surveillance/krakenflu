@@ -394,3 +394,12 @@ def test_all_seq2taxid_iterator(setup_db_with_real_world_fixture):
     assert [x for x in rows if x['id']==9 and x['tax_id']==12814], 'the resultset still contains a linkage for sequences.id 9'
     assert not [x for x in rows if x['id']==21 and x['tax_id']==518987], 'sequences.id 21 no longer in the resultset because it already has a tax_id now'
     
+
+
+def test_prune_db(setup_db):
+    db = setup_db
+    rows = db._cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='acc2taxids'").fetchall()
+    assert len(rows)==1, 'the table acc2taxids exists before pruning'
+    assert db.prune_db(), 'method returns True'
+    rows = db._cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='acc2taxids'").fetchall()
+    assert not rows, 'the table acc2taxids no longer exists after pruning'
