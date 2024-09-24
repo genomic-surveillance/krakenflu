@@ -403,3 +403,21 @@ def test_prune_db(setup_db):
     assert db.prune_db(), 'method returns True'
     rows = db._cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='acc2taxids'").fetchall()
     assert not rows, 'the table acc2taxids no longer exists after pruning'
+
+def test_retrieve_flu_a_wo_subtype_ids(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    ids = db.retrieve_ids_flu_a_wo_subtype()
+    assert not ids,'there are no cases of flu A without a subtype in the fixtures'
+    
+    # delete H subtype from one flu A genome in fixtures and re-retrieve
+    stmt="""
+    UPDATE sequences
+    SET flu_a_h_subtype = NULL
+    WHERE ncbi_acc = 'NC_002023.1'
+    """
+    db._cur.execute(stmt)
+    db._con.commit()
+    ids = db.retrieve_ids_flu_a_wo_subtype()
+    assert len(ids) == 1,'having deleted the H subtype of one flu sequence, the method now retrieves one sequences.id'
+    assert ids[0] == 1, 'the correct sequences.id is returned'
+    

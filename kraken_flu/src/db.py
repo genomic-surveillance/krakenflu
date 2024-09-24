@@ -523,6 +523,25 @@ class Db():
         """
         return [ x['id'] for x in self._cur.execute(stmt)]
     
+    def retrieve_ids_flu_a_wo_subtype(self):
+        """
+        Identifies flu A sequences that don't have both Hx and Nx subtype set and returns IDs
+        
+        Args:
+            None
+        
+        Returns:
+            list of sequences.id
+        """
+        stmt="""
+        SELECT id
+        FROM sequences
+        WHERE is_flu = 1 
+            AND flu_type = 'A' 
+            AND (flu_a_h_subtype IS NULL OR flu_a_n_subtype IS NULL )
+        """
+        return [ x['id'] for x in self._cur.execute(stmt)]
+    
     def retrieve_all_flu_sequences(self, skip_excluded:bool=False):
         """
         Retrieve all sequences marked as flu.
