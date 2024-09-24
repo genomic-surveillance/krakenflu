@@ -123,7 +123,7 @@ class KrakenDbBuilder():
         """
         Load taxonomy files from a directory that contains the NCBI taxonomy download.  
         The directory needs to contain files names.dmp and nodes.dmp and may also contain a file 
-        of 
+        of accession to taxonomy ID mappings "nucl_gb.accession2taxid"
 
         Args:
             taxonomy_dir: str, required
@@ -178,7 +178,11 @@ class KrakenDbBuilder():
 
     def load_fasta_file(self, file_path:str, category:str=None):
         """
-        Uses the fasta_loader to load a FASTA file into the DB. For details, see fasta_loader module.
+        Uses the fasta_loader to load a FASTA file into the DB. For details, see fasta_loader module. 
+        This method is used for "generic" sequences that do not require a category label. This includes 
+        the general RefSeq FASTA as well as influenza data, where the FASTA headers are used to figure out 
+        which taxonomy node to link to.  
+        For sequences that require a category label (such as RSV A/B), use the load_labelled_fasta method instead.  
 
         Args:
             file_path: str, required
@@ -192,7 +196,7 @@ class KrakenDbBuilder():
         """
         load_fasta(db=self._db, file_path=file_path, category=category)
         self.fasta_files_loaded.append(file_path)
-        
+    
     def filter_unnamed_unsegmented_flu(self):
         """
         Marks all flu records as include=0 where the sequence name indicates flu but the isolate  
@@ -492,6 +496,53 @@ class KrakenDbBuilder():
                             logging.info(f'flushed {n_updated_seqs} sequence record updates to DB')
         
         logging.info("finished setting taxonomy IDs for segmented flu genomes")
+        return True
+
+    def create_rsv_taxonomy_from_files(self, rsv_size_filter:bool=False):
+        """
+        Discard RSV sequences except those that were explicitly loaded into the database as RSV A 
+        and RSV B genome sequences. These are labelled 'RSV A' and 'RSV B' in the sequences.category field.  
+        Only these explicitly loaded RSV A/B type sequences are linked to the respective hRSV A and B parent nodes. 
+        The parent nodes are identified by name.  
+        
+        An optional size filter can be used to remove incomplete genomes.  
+
+        Args:
+            rsv_size_filter: bool, defaults to False
+                If True, RSV sequences are filtered on size to keep only full-length or nearly 
+                full length genomes.  
+        """
+        for t in (['A','B']):
+            label = 'RSV ' + t
+            if not self._db.sequences_category_exists(label):
+                raise ValueError(f'method create_rsv_taxonomy_from_file called but no sequences loaded into DB with label "{label}"')
+        
+        if rsv_size_filter:
+            self._apply_rsv_size_filter(categories=['RSV A','RSV B'])
+            
+    def _apply_rsv_size_filter(self, categories:list=['RSV A','RSV B']):
+        """
+        Filter out (mark sequences.includee=0) all RSV genomes that do not meet the minimum length filter.  
+        This currently relies on the sequences.cateogry label being set to 'RSV A' or 'RSV B', ie no filter 
+        will be applied to RSV genomes that have been uploaded without an RSV label. This would include all 
+        sequences from RefSeq. This should not cause any issues because this filter is only run if we are creating 
+        a custom taxonomy for RSV and that means we will not be using any RefSeq or other RSV sequences that 
+        have not been loaded into the DB with an RSV label.  But it would make sense to implement a name-based 
+        filter that would need a regex to recognize RSV genomes (by full name and acronym).  
+
+        Args:
+            categories: list, optional, defaults to ['RSV A','RSV B']
+                A list of category labels of sequences to be filtered
+                
+        Return:
+            True on success
+            
+        Side effects:
+            Sets sequences.include values
+        """
+        for label in categories:
+            rows = self._db.retrieve_sequences_by_category(label)
+            #######
         return True
 
     def link_all_unlinked_sequences_to_taxonomy_nodes(self):
