@@ -98,12 +98,47 @@ def args_parser():
         help = 'run linkage of all sequences via NCBI accession ID to NCBI taxon ID for sequences that are not linked otherwise'        
     )
 
+    # RSV options:
+    # These three options depend on each other and have to be used in conjunction but there
+    # is no argparse functionality for this as of now, so the logic is implemented in "main"
+    parser.add_argument(
+        '--rsv_a_sequences',
+        action = 'store',
+        required = False,
+        metavar= 'FILE',
+        type= str,
+        help = 'file of known RSV A sequences. Must be used together with --rsv_b_sequences'
+    )
+    
+    parser.add_argument(
+        '--rsv_b_sequences',
+        action = 'store',
+        required = False,
+        metavar= 'FILE',
+        type= str,
+        help = 'file of known RSV B sequences. Must be used together with --rsv_a_sequences'
+    )
+
+    parser.add_argument(
+        '--rsv_size_filter',
+        action = 'store_true',
+        help = 'Must be used together with --rsv_a/b_sequences. Filters sequences in files for genome completeness (size)'        
+    )
+
     return parser
 
 def main():
     
     args = args_parser().parse_args()
     db_path = args.db_file or tempfile.NamedTemporaryFile(delete= not args.keep_db_file)
+    
+    # sanity checks for arguments
+    if args.rsv_size_filter:
+        if not args.rsv_a_sequences or not args.rsv_a_sequences:
+            raise ValueError('Option --rsv_size_filter must be used together with --rsv_a_sequence and --rsv_b_sequence')
+    n_rsv_file_args = sum(args.rsv_a_sequences, args.rsv_b_sequences )
+    if n_rsv_file_args > 0 and n_rsv_file_args != 2:
+        raise ValueError('parameters --rsv_a_sequences and --rsv_b_sequences must be used together')
     
     kdb = KrakenDbBuilder(db_path= db_path)
     kdb.load_taxonomy_files(
@@ -126,6 +161,11 @@ def main():
         
     kdb.create_segmented_flu_taxonomy_nodes()
     kdb.assign_flu_taxonomy_nodes()
+    
+    if args.rsv_a_sequences and args.rsv_b_sequences:
+        kdb.load_fasta_file(file_path= args.rsv_a_sequences, category= 'RSV A')
+        kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B')
+        kdb.create_rsv_taxonomy_from_files( rsv_size_filter= args.rsv_size_filter )
     
     if args.do_full_linkage:
         kdb.link_all_unlinked_sequences_to_taxonomy_nodes()
