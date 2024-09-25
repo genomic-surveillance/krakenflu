@@ -432,7 +432,27 @@ class Db():
                 return None
             else:
                 return parent_tax_id
-        
+            
+    def get_children_tax_ids(self, tax_id:int):
+        """
+        For a given taxonomy node, identified by tax_id, retrieve all tax_ids of its 
+        direct children.  
+
+        Args:
+            tax_id: int, required
+                The tax_id for the node for which we want to find children
+                
+        Returns:
+            List of child node tax_ids
+        """
+        stmt = """
+            SELECT tax_id 
+            FROM taxonomy_nodes 
+            WHERE parent_tax_id = ?
+        """
+        rows= self._cur.execute(stmt,[tax_id]).fetchall()
+        return [x['tax_id'] for x in rows]
+
     def get_flu_name_segment_data_dict(self):
         """
         Returns a dictionary of all flu names with segment lengths for all records in sequences that
@@ -866,6 +886,32 @@ class Db():
         rows = self._cur.execute(stmt, [category, seq_len_lt]).fetchall()
         return [x['id'] for x in rows]
     
+    def get_sequence_ids_linked_to_taxon(self, tax_id:int, include_children:bool=True):
+        """
+        For a given taxon, identified by its tax_id, identify all sequences that are linked 
+        to this taxon and (optional) all the children of this taxon.  
+
+        Args:
+            tax_id: int, required
+                identifies the taxon to examine
+                
+            include_children: bool, optional, defaults to True
+                If True, traverse all children and their children of the starting taxon and 
+                retrieve their linked sequences IDs as well. If False, only the taxon 
+                identified by tax_id is examined.  
+
+        Returns:
+            list of sequences.id
+        """
+        start_taxon_stmt = "SELECT id FROM taxonomy_nodes WHERE tax_id = ?"
+        if not self._cur.execute(start_taxon_stmt).fetchall():
+            raise ValueError(f'taxonomy node with tax_id {tax_id} does not exist')
+        linked_seq_rows_stmt = "SELECT id FROM sequences where tax_id = ?"
+        linked_seq_rows = self._cur.execute(linked_seq_rows_stmt,[tax_id]).fetchall()
+        linked_seq_ids = [x['id'] for x in linked_seq_rows]
+        
+        child_taxon_ids = self.get_children_tax_ids(tax_id = tax_id)
+        
     @property        
     def schema(self):
         """

@@ -443,4 +443,8 @@ def test_get_seq_ids_by_category_and_seq_lt(setup_db_with_real_world_fixture):
     ids = db.get_seq_ids_by_category_and_seq_lt(category='test label', seq_len_lt=1000 )
     assert sorted(ids) == sorted(update_ids), 'after setting cateogry and seq length in three sequences to match filter, the three ids are returned'
     
-        
+def test_get_children_tax_ids(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    child_tax_ids = db.get_children_tax_ids(tax_id= 11250)
+    assert sorted(child_tax_ids)==[208893,208895,410233], 'found the expected child tax_ids for taxonomy node 11250'
+    
