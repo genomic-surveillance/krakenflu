@@ -37,7 +37,7 @@ def test__write_nodes_file(setup_db_with_real_world_fixture, tmp_path):
     assert _write_nodes_file(db=db, path= out_file)
     
     out_file_rows  = [line.rstrip() for line in open( out_file ) ]
-    assert len(out_file_rows) == 20, 'all 20 nodes records from fixture are written to out file'
+    assert len(out_file_rows) == 23, 'all 23 nodes records from fixture are written to out file'
     
     a_node_row = "11250\t|\t3049954\t|\tno rank\t|\t\t|\t9\t|\t1\t|\t1\t|\t1\t|\t0\t|\t1\t|\t1\t|\t0\t|\tcode compliant; specified\t|"
     assert a_node_row in out_file_rows, 'a correctly formatted row of fixture data is found in output file'
@@ -49,7 +49,7 @@ def test__write_names_file(setup_db_with_real_world_fixture, tmp_path):
     assert not out_file.is_file(), 'before we start, the output file does not exist'
     assert _write_names_file(db=db, path= out_file)
     out_file_rows  = [line.rstrip() for line in open( out_file ) ]
-    assert len(out_file_rows) == 52, 'all 52 names records from fixture are written to out file'
+    assert len(out_file_rows) == 53, 'all 53 names records from fixture are written to out file'
     
     a_name_row = "11250\t|\tHRSV\t|\tHRSV <Human orthopneumovirus>\t|\tacronym\t|"
     assert a_name_row in out_file_rows, 'a correctly formatted row of fixture data is found in output file'

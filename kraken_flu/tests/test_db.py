@@ -448,3 +448,9 @@ def test_get_children_tax_ids(setup_db_with_real_world_fixture):
     child_tax_ids = db.get_children_tax_ids(tax_id= 11250)
     assert sorted(child_tax_ids)==[208893,208895,410233], 'found the expected child tax_ids for taxonomy node 11250'
     
+def test_get_sequence_ids_linked_to_taxon(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 11250)
+    assert not seq_ids, 'before we make changes to the fixtures, no sequences are linked to taxon 11250 or any node in the sub-tree rooted at this taxon'
+    
+    
