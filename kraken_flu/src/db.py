@@ -886,10 +886,14 @@ class Db():
         rows = self._cur.execute(stmt, [category, seq_len_lt]).fetchall()
         return [x['id'] for x in rows]
     
-    def get_sequence_ids_linked_to_taxon(self, tax_id:int, include_children:bool=True):
+    def get_sequence_ids_linked_to_taxon(self, tax_id:int, include_children:bool=True, check_input:bool= True):
         """
         For a given taxon, identified by its tax_id, identify all sequences that are linked 
         to this taxon and (optional) all the children of this taxon.  
+        When include_children is used, the method is recursive and follows the taxonomy tree 
+        until no more children are found.  
+        Results are returned as a flat list, ie it does not reflect the relationship between the 
+        nodes. TODO: if useful, we could add an option to return a graph.  
 
         Args:
             tax_id: int, required
@@ -899,18 +903,28 @@ class Db():
                 If True, traverse all children and their children of the starting taxon and 
                 retrieve their linked sequences IDs as well. If False, only the taxon 
                 identified by tax_id is examined.  
+                
+            check_input: bool, optional, defaults to True
+                If True, check the input tax_id and make sure there is a matching taxonomy node.  
+                There is no point in doing this during the recursive execution of this method 
+                since all tax_ids have been returned from queries anyway, hence the option to skip.  
 
         Returns:
             list of sequences.id
         """
-        start_taxon_stmt = "SELECT id FROM taxonomy_nodes WHERE tax_id = ?"
-        if not self._cur.execute(start_taxon_stmt).fetchall():
-            raise ValueError(f'taxonomy node with tax_id {tax_id} does not exist')
+        if check_input:
+            if not self._cur.execute("SELECT tax_id FROM taxonomy_nodes WHERE tax_id = ?",[tax_id]).fetchall():
+                raise ValueError(f'no taxonomy node with tax_id {tax_id} exists')
         linked_seq_rows_stmt = "SELECT id FROM sequences where tax_id = ?"
         linked_seq_rows = self._cur.execute(linked_seq_rows_stmt,[tax_id]).fetchall()
         linked_seq_ids = [x['id'] for x in linked_seq_rows]
         
-        child_taxon_ids = self.get_children_tax_ids(tax_id = tax_id)
+        if include_children:
+            child_taxon_ids = self.get_children_tax_ids(tax_id = tax_id)
+            for child_taxon_id in child_taxon_ids:
+                child_linked_seq_ids = self.get_sequence_ids_linked_to_taxon(tax_id= child_taxon_id, include_children= True, check_input= False)
+                linked_seq_ids.extend(child_linked_seq_ids)
+        return linked_seq_ids
         
     @property        
     def schema(self):

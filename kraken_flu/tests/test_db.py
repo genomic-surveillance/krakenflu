@@ -450,7 +450,40 @@ def test_get_children_tax_ids(setup_db_with_real_world_fixture):
     
 def test_get_sequence_ids_linked_to_taxon(setup_db_with_real_world_fixture):
     db = setup_db_with_real_world_fixture
-    seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 11250)
-    assert not seq_ids, 'before we make changes to the fixtures, no sequences are linked to taxon 11250 or any node in the sub-tree rooted at this taxon'
+    seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 2955291, include_children= True)
+    assert not seq_ids, 'before we make changes to the fixtures, no sequences are linked to taxon 2955291 or any node in the sub-tree rooted at this taxon'
     
+    # The relationships between the taxa in the fixtures are:                    
+    #           2955291         
+    #             │            
+    #             │            
+    #         ┌──11320─────┐    
+    #         ▼            ▼    
+    # ┌───114727─┐     119210  
+    # │          │        │    
+    # ▼          ▼        ▼    
+    # 641809    211044    335341 
+    #
+    # We are linking sequences as follows:
+    # tax_id    sequences.id
+    # 11320     1
+    # 114727    2
+    # 211044    3
+    # 641809    4
+    # 335341    5
+    # None of these are actually sequences of those taxa but this doesn't matter for the purpose of the test
+    
+    update_data = [
+        [11320,1],
+        [114727,2],
+        [211044,3],
+        [641809,4],
+        [335341,6]
+    ]
+    db._cur.executemany("UPDATE sequences SET tax_id = ? WHERE id = ?", update_data)
+    db._con.commit()
+    
+    # querying for sequence ids from taxon 2955291 "downwards" should now return the 5 sequence IDs from the update data
+    seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 2955291, include_children= True)
+    assert sorted(seq_ids)==[1,2,3,4,6], 'having now linked 5 sequences to taxa in the sub-tree from 2955291, we return all 5 sequences.id'
     
