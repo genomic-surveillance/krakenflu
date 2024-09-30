@@ -264,3 +264,41 @@ def test_create_db_ready_dir(setup_db_with_real_world_fixture, tmp_path):
 
     assert exp_names_out_file.is_file(), 'after running create_db_ready_dir, the expected file taxonomy/names.dmp exists'
     assert exp_lib_out_file.is_file(), 'after running create_db_ready_dir, the expected file library/library.fna exists'
+
+def test_find_multiref_paths(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+
+    ## mae first call to method
+    multiref_paths, seen = kdb.find_multiref_paths()
+    ## output should be a dict
+    assert isinstance(multiref_paths, dict)
+    ## output should be empty
+    assert len(multiref_paths) == 0
+
+    update_stmt = """
+    UPDATE sequences
+    SET tax_id = 11250
+    WHERE original_tax_id = 11250
+    """
+    db._cur.execute(update_stmt)
+    db._con.commit()
+
+    test_stmt = """
+    SELECT tax_id
+    FROM sequences
+    WHERE original_tax_id = 11250
+    """
+
+    ## confirm that the update statement worked
+    data = db._cur.execute(test_stmt).fetchall()
+    for i in data:
+        taxid_found = i[0]
+    assert taxid_found == 11250
+
+    ## second call to method
+    multiref_paths_now, seen = kdb.find_multiref_paths()
+    ## output should be a dict
+    assert isinstance(multiref_paths_now, dict)
+    ## output should contain 3 paths
+    assert len(multiref_paths_now) == 3
