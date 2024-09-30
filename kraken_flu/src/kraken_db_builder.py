@@ -533,6 +533,16 @@ class KrakenDbBuilder():
         The parent nodes are identified by name.  
         
         An optional size filter can be used to remove incomplete genomes.  
+        
+        Rationale for this method:
+        RSV sequences in RefSeq are currently not sufficient for our purposes. For this reason, it was decided 
+        that we would obtain RSV sequences classified as A or B from Nextstrain instead. We obtain these as 
+        separate downloads, which can be loaded into the kraken-flu database with labels "RSV A" and "RSV B" 
+        which are stored in the sequences.category field. The aim of this method is to replace the existing hRSV 
+        taxonomy bny removing all sequences that are linked to the hRSV parent taxonomy node, then replacing them 
+        with the Nextstrain (or other authority) typed sequences based on the category labels in the database.  
+        If we would skip the removal of existing hRSV sequences, we would end up with sequences that are directly 
+        linked to the hRSV parent node, which bypasses our A/B type classification.  
 
         Args:
             rsv_size_filter: bool, defaults to False
@@ -546,6 +556,43 @@ class KrakenDbBuilder():
         
         if rsv_size_filter:
             self._apply_rsv_size_filter(categories=['RSV A','RSV B'])
+        
+        hrsv_parent_tax_id = self._db.retrieve_tax_id_by_node_scientific_name('human respiratory syncytial virus')
+        if not hrsv_parent_tax_id:
+            raise ValueError('could not find taxonomy node for "human respiratory syncytial virus" in database')
+        
+        hrsv_a_parent_tax_id = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus A')
+        if not hrsv_a_parent_tax_id:
+            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus A" in database')
+        
+        hrsv_b_parent_tax_id = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus B')
+        if not hrsv_b_parent_tax_id:
+            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus B" in database')
+            
+        # Remove all sequences that are currently linked to the parent hRSV node and all nodes below it.  
+        # We want to replace the existing RSV sequences with the ones labelled specifically as A or B type and
+        # if we would leave the existing sequences in the taxonomy tree, kraken2 would map reads to them which would 
+        # greatly reduce the number of useful matches that are directly assigned to RSV A or B
+        self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= hrsv_parent_tax_id)
+            
+    def filter_out_sequences_linked_to_taxonomy_sub_tree(self, tax_id:int):
+        """
+        Filter out (set sequences.include=0) all sequences linked to a taxonomy sub-tree, starting at a
+        parent taxonomy node, identified by a tax_id.  
+        The method traverses the sub-tree recursively and identifies all sequences that have a tax_id linkage 
+        to any of the nodes in the sub-tree. These are filtered by setting the include field.  
+
+        Args:
+            tax_id: int, required
+                The tax_id of the parent node of the sub-tree from which we want to filter out linked 
+                sequences. All sequences linked to this node or any of its children are filtered.  
+                
+        Returns:
+            list of sequences.id for the sequences that were removed
+        """
+        sequence_ids_to_remove = self._db.get_sequence_ids_linked_to_taxon(tax_id= tax_id, include_children= True)
+        self._db.mark_as_not_included(sequence_ids_to_remove)
+        return sequence_ids_to_remove
             
     def _apply_rsv_size_filter(self, categories:list=None):
         """

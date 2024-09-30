@@ -344,3 +344,45 @@ def test__apply_rsv_size_filter(setup_db_with_real_world_fixture, tmp_path):
     excluded_ids = [x['id'] for x in rows if x['include']==0]
     assert sorted(excluded_ids) == sorted(update_ids), 'having set the RSV A label and sequence length below cutoff for three randomly chosen sequences, these are now marked as excluded'
     
+def test_filter_out_sequences_linked_to_taxonomy_sub_tree(setup_db_with_real_world_fixture):
+    """
+    TODO: This is highly repetetive with the test test_db.py::test_get_sequence_ids_linked_to_taxon
+    because the method here is just applying two Db class methods to retrieve, then filter out the
+    sequences that are linked to a sub-tree. It would be better to have some fixtures for this that 
+    can be shared instead of manipulating the fixtures in the same way here and in the test_db.py method.  
+    For details on the fixtures UPDATE see test_db.py::test_get_sequence_ids_linked_to_taxon
+    """
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    excluded_seq_stmt = """
+        SELECT id
+        FROM sequences 
+        WHERE id IN (1,2,3,4,6) AND include = 0
+    """
+    seq_ids = kdb.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= 2955291)
+    assert not seq_ids, 'before we make changes to the fixtures, no sequences are linked to taxon 2955291 or any node in the sub-tree rooted at this taxon, so none are removed'
+    assert not db._cur.execute(excluded_seq_stmt).fetchall(), '... and none of the sequences with ids 1,2,3,4 and 6 are marked include=0'
+    
+    update_data = [
+        [11320,1],
+        [114727,2],
+        [211044,3],
+        [641809,4],
+        [335341,6]
+    ]
+    db._cur.executemany("UPDATE sequences SET tax_id = ? WHERE id = ?", update_data)
+    db._con.commit()
+    
+    # All of the 5 sequences should now be removed by the method because they are now linked to the
+    # tree with root tax_id 2955291
+    seq_ids = kdb.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= 2955291)
+    assert sorted(seq_ids) == [1,2,3,4,6], 'after linking 5 sequences to the sub-tree, they are all removed by the method no and their ids are returned'
+    rows = db._cur.execute(excluded_seq_stmt).fetchall()
+    assert len(rows) == 5, '... and all of the sequences with ids 1,2,3,4 and 6 are marked include=0'
+    
+
+
+def test_create_rsv_taxonomy_from_files(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    raise NotImplementedError('implement the actual test here')
