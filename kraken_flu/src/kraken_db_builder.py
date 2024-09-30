@@ -538,8 +538,97 @@ class KrakenDbBuilder():
         logging.info( 'output files completed')
         return True
 
-    def find_multiref_paths(self):
-        multiref_paths = self._db.find_multiref_paths()
+    def find_multiref_paths(self, VIRUSES_TAXID:int = None):
+        """Find paths in the kraken_flu taxonomy DB where any non-leaf nodes are associated with reference sequences
+
+        Args:
+            VIRUSES_TAXID (int, optional): TaxID of the taxon "Virus".
+            If specified, only paths containing this tax_id will be analysed. Defaults to None.
+
+        Returns:
+            multiref_paths (dict): A dict describing any multiref paths found, where
+                                    Key = leaf node of path
+                                    Value = Dict(
+                                                    Keys = "path", "ref_depth"
+                                                    Values = path(list), ref_depth(int)
+                                                )
+        """
+        # VIRUSES_TAXID = 10239
+        seen = set()
+        multiref_paths = {}
+        all_paths = self._db.get_all_tax_ids_paths_root_to_leaf()
+
+        for path in all_paths:
+            if VIRUSES_TAXID and not VIRUSES_TAXID in path:
+                continue
+            multiref, ref_depth, seen = self._evaluate_path_for_refs(path, seen)
+            if multiref:
+                multiref_paths[path[-1]] = {"path": path, "ref_depth": ref_depth}
+
         for k, v in multiref_paths.items():
             print(f"{k}: {v}")
 
+        return multiref_paths, seen
+
+    def _evaluate_path_for_refs(self, path: list, seen: set):
+        """Analyse a path for being multiref
+
+        Args:
+            path (list): Path represented as a list of tax_ids
+            seen (set): Cache, non-leaf tax_ids already observed to have associated sequences
+
+        Returns:
+            multiref (bool): Whether the input path is a multiref path
+            ref_depth (int): Where in the path the extra reference sequence is.
+                                If subterminal has sequence, ref_depth = 1
+                                Else ref_depth = 2
+        """
+        multiref = False
+        ref_depth = 0
+
+        parent = path[-2]
+        if (parent in seen) or (self._db._is_in_db_sequences(parent)):
+            multiref = True
+            ref_depth = 1
+            seen.add(parent)
+
+            return multiref, ref_depth, seen
+
+        elif any(taxid in seen for taxid in path[:-2]):
+            multiref = True
+            ref_depth = 2
+
+        else:
+            for taxid in path[::-1][2:]:
+                found = self._db._is_in_db_sequences(taxid)
+                if not found:
+                    continue
+                else:
+                    multiref = True
+                    ref_depth = 2
+                    seen.add(taxid)
+                    break
+
+        return multiref, ref_depth, seen
+
+    def examine_multiref_path(self, path: list, seen: set = None):
+        if not seen:
+            seen = set()
+        bool_list = []
+        for tax_id in path[::-1]:
+            if self._db._is_in_db_sequences(tax_id) or tax_id in seen:
+                bool_list.append(True)
+                if not tax_id in seen:
+                    seen.add(tax_id)
+            else:
+                bool_list.append(False)
+
+        return
+
+    def _fix_subterminal_multiref(self, path:list):
+        ##TODO
+        return
+
+    def _fix_complex_multiref(self, path:list):
+        ##TODO
+        return
