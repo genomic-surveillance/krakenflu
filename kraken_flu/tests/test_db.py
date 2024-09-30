@@ -487,3 +487,18 @@ def test_get_sequence_ids_linked_to_taxon(setup_db_with_real_world_fixture):
     seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 2955291, include_children= True)
     assert sorted(seq_ids)==[1,2,3,4,6], 'having now linked 5 sequences to taxa in the sub-tree from 2955291, we return all 5 sequences.id'
     
+def test_get_seq_ids_and_fasta_headers_by_category(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    data = db.get_seq_ids_and_fasta_headers_by_category(category='test label')
+    assert not data, 'before we make changes to the fixtures, no sequences match the criteria'
+    
+    update_ids=[3,5,7]
+    stmt="UPDATE sequences SET category = 'test label', fasta_header='test header' WHERE id = ?"
+    for id in update_ids:
+        db._cur.execute(stmt,[id])
+    db._con.commit()
+    data = db.get_seq_ids_and_fasta_headers_by_category(category='test label')
+    assert isinstance(data, list), 'a list is returned'
+    assert len(data) == 3, 'there are three items of data'
+    assert {'id': 3, 'fasta_header': 'test header'} in data, 'returned data contains an expected sequence ID and FASTA header'
+    

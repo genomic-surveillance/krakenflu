@@ -886,6 +886,26 @@ class Db():
         rows = self._cur.execute(stmt, [category, seq_len_lt]).fetchall()
         return [x['id'] for x in rows]
     
+    def get_seq_ids_and_fasta_headers_by_category(self, category:str ):
+        """
+        Retrieves id and FASTA header for sequences that match the given category label.  
+
+        Args:
+            category: str, required
+                The category label to search for. Only records with exact matching sequences.category will 
+                be included
+                
+        Returns:
+            list of dicts with keys 'id', 'fasta_header'
+        """
+        stmt="""
+        SELECT id, fasta_header
+        FROM sequences 
+        WHERE category = ?
+        """
+        rows = self._cur.execute(stmt, [category]).fetchall()
+        return [{'id': x['id'], 'fasta_header': x['fasta_header']} for x in rows]
+    
     def get_sequence_ids_linked_to_taxon(self, tax_id:int, include_children:bool=True, check_input:bool= True):
         """
         For a given taxon, identified by its tax_id, identify all sequences that are linked 
