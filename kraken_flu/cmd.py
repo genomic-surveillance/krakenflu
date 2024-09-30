@@ -120,10 +120,11 @@ def main():
         
     kdb.create_segmented_flu_taxonomy_nodes()
     kdb.assign_flu_taxonomy_nodes()
-    
-    kdb.create_db_ready_dir(path = args.out_dir)
 
-    kdb.find_multiref_paths()
+
+    multiref_paths, seen = kdb.find_multiref_paths(VIRUSES_TAXID = 10239)
+
+    kdb.create_db_ready_dir(path = args.out_dir)
 
 if __name__ == "__main__":
     exit(main())
