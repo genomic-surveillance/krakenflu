@@ -122,7 +122,8 @@ def main():
     kdb.assign_flu_taxonomy_nodes()
 
 
-    multiref_paths, seen = kdb.find_multiref_paths(VIRUSES_TAXID = 10239)
+    multiref_paths, seen, multiref_data = kdb.find_multiref_paths(root_taxid = 10239)
+    kdb.repair_multiref_paths(multiref_paths, seen)
 
     kdb.create_db_ready_dir(path = args.out_dir)
 
