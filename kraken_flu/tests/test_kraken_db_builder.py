@@ -270,9 +270,9 @@ def test_find_multiref_paths(setup_db_with_real_world_fixture):
     kdb = KrakenDbBuilder(db=db)
 
     ## mae first call to method
-    multiref_paths, seen = kdb.find_multiref_paths()
+    multiref_paths, seen, multiref_data = kdb.find_multiref_paths()
     ## output should be a dict
-    assert isinstance(multiref_paths, dict)
+    assert isinstance(multiref_paths, list)
     ## output should be empty
     assert len(multiref_paths) == 0
 
@@ -297,8 +297,38 @@ def test_find_multiref_paths(setup_db_with_real_world_fixture):
     assert taxid_found == 11250
 
     ## second call to method
-    multiref_paths_now, seen = kdb.find_multiref_paths()
+    multiref_paths_now, seen, multiref_data_now = kdb.find_multiref_paths()
+    for k, v in multiref_data_now.items():
+            print(f"{k}: {v}")
     ## output should be a dict
-    assert isinstance(multiref_paths_now, dict)
-    ## output should contain 3 paths
+    assert isinstance(multiref_paths_now, list)
+    ## added the taxid "11250" to the tax_id field in the sequences table
+    ## there are 3 paths in the fixture DB where "11250" is the parent node
+    ## output should therefore contain 3 paths
     assert len(multiref_paths_now) == 3
+
+def test_repair_multiref_paths(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    update_stmt_subterminal = """
+    UPDATE sequences
+    SET tax_id = 11250
+    WHERE original_tax_id = 11250
+    """
+
+    update_stmt_complex = """
+    UPDATE sequences
+    SET tax_id = 2955465
+    WHERE original_tax_id = 518987
+    """
+    db._cur.execute(update_stmt_subterminal)
+    db._cur.execute(update_stmt_complex)
+    db._con.commit()
+
+    multiref_paths, seen, multiref_data = kdb.find_multiref_paths()
+    assert len(multiref_paths) == 4
+
+    kdb.repair_multiref_paths(multiref_paths, seen)
+
+    multiref_paths_now, seen, multiref_data_now = kdb.find_multiref_paths()
+    assert len(multiref_paths_now) == 0
