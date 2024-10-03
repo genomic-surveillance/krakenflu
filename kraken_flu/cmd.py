@@ -107,6 +107,14 @@ def args_parser():
         help = 'Repair cases where a given path in the taxonomy contains sequences at any non-leaf nodes.'
     )
 
+    parser.add_argument(
+        '--root_tax_id',
+        type = int,
+        default = 10239, #viruses
+        required= False,
+        help = 'The expected taxid of the root taxon. Defaults to 10239 (the taxid for "Viruses")'
+    )
+
     return parser
 
 def main():
@@ -136,7 +144,7 @@ def main():
     kdb.create_segmented_flu_taxonomy_nodes()
     kdb.assign_flu_taxonomy_nodes()
 
-    multiref_paths, seen, multiref_data = kdb.find_multiref_paths(root_taxid = 10239)
+    multiref_paths, seen, multiref_data = kdb.find_multiref_paths(root_taxid = args.root_tax_id)
     if not args.repair_subterminal_multirefs and not args.repair_all_multirefs:
         logging.info("Paths with sequences attached to non-leaf nodes will not be fixed.")
     if args.repair_subterminal_multirefs and not args.repair_all_multirefs:
