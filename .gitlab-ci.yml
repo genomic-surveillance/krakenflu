@@ -1,0 +1,39 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /-draft$/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "push"
+      when: always
+    - if: $CI_PIPELINE_SOURCE == "merge"
+      when: always
+
+stages:
+   - build
+   - test
+
+default:
+  image: python:3.10
+  before_script:
+      - python3 --version ; pip --version
+      - pip install virtualenv
+      - virtualenv venv
+      - source venv/bin/activate
+      - pip install .
+
+lint_code:
+  stage: build
+  tags:
+    - autoscale
+  script:
+    - flake8 . --exclude venv --count --select=E9,F63,F7 --show-source --statistics --exit-zero
+    - flake8 . --exclude venv --count --max-complexity=10 --max-line-length=127 --statistics --exit-zero
+
+run_tests:
+  stage: test
+  tags:
+    - autoscale
+  script:
+    - pip install .
+    - pytest
+  artifacts:
+    expire_in: "5 mins"
