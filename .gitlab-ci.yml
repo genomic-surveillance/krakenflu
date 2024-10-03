@@ -34,6 +34,7 @@ run_tests:
     - autoscale
   script:
     - pip install .
+    - pip install flake8
     - pytest
   artifacts:
     expire_in: "5 mins"
