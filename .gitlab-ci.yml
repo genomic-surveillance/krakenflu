@@ -19,6 +19,7 @@ default:
       - virtualenv venv
       - source venv/bin/activate
       - pip install .
+      - pip install flake8
 
 lint_code:
   stage: build
@@ -34,7 +35,6 @@ run_tests:
     - autoscale
   script:
     - pip install .
-    - pip install flake8
     - pytest
   artifacts:
     expire_in: "5 mins"
