@@ -146,6 +146,9 @@ def main():
     if n_rsv_file_args > 0 and n_rsv_file_args != 2:
         raise ValueError('parameters --rsv_a_sequences and --rsv_b_sequences must be used together')
     
+    # TODO: move the rest into a single function in KrakenDbBuilder, perhaps called "build"
+    # We need to run some integration tests and this would be difficult in the current setup
+    
     kdb = KrakenDbBuilder(db_path= db_path)
     kdb.load_taxonomy_files(
         taxonomy_dir= args.taxonomy_path, 
@@ -172,10 +175,18 @@ def main():
     if args.rsv_a_sequences and args.rsv_b_sequences:
         kdb.load_fasta_file(file_path= args.rsv_a_sequences, category= 'RSV A')
         kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B')
-        kdb.create_rsv_taxonomy_from_files( rsv_size_filter= args.rsv_size_filter )
+        kdb.create_rsv_taxonomy( rsv_size_filter= args.rsv_size_filter )
     
     if args.do_full_linkage:
         kdb.link_all_unlinked_sequences_to_taxonomy_nodes()
+        
+        # If we are creating a custom RSV tree and doing the full linkage, we can end up with 
+        # RefSeq sequences being linked again to high-level RSV taxonomy nodes via the Genabk acc lookup
+        # and the taxonomy assigned to the sequence on NCBI.  
+        # THis call will remove all RSV sequences linked to higher-order RSV taxa except for those linked 
+        # to hRSV A/B
+        if args.rsv_a_sequences or args.rsv_b_sequences:
+            kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
     
     kdb.create_db_ready_dir(path = args.out_dir)
     

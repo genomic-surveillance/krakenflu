@@ -347,10 +347,9 @@ def test__apply_rsv_size_filter(setup_db_with_real_world_fixture, tmp_path):
 def test_filter_out_sequences_linked_to_taxonomy_sub_tree(setup_db_with_real_world_fixture):
     """
     TODO: This is highly repetetive with the test test_db.py::test_get_sequence_ids_linked_to_taxon
-    because the method here is just applying two Db class methods to retrieve, then filter out the
+    because the method tested here is just applying two Db class methods to retrieve, then filter out the
     sequences that are linked to a sub-tree. It would be better to have some fixtures for this that 
     can be shared instead of manipulating the fixtures in the same way here and in the test_db.py method.  
-    For details on the fixtures UPDATE see test_db.py::test_get_sequence_ids_linked_to_taxon
     """
     db = setup_db_with_real_world_fixture
     kdb = KrakenDbBuilder(db=db)
@@ -363,6 +362,7 @@ def test_filter_out_sequences_linked_to_taxonomy_sub_tree(setup_db_with_real_wor
     assert not seq_ids, 'before we make changes to the fixtures, no sequences are linked to taxon 2955291 or any node in the sub-tree rooted at this taxon, so none are removed'
     assert not db._cur.execute(excluded_seq_stmt).fetchall(), '... and none of the sequences with ids 1,2,3,4 and 6 are marked include=0'
     
+    # For details on these fixture UPDATEs see test_db.py::test_get_sequence_ids_linked_to_taxon
     update_data = [
         [11320,1],
         [114727,2],
@@ -382,7 +382,13 @@ def test_filter_out_sequences_linked_to_taxonomy_sub_tree(setup_db_with_real_wor
     
 
 
-def test_create_rsv_taxonomy_from_files(setup_db_with_real_world_fixture):
+def test_create_rsv_taxonomy(setup_db_with_real_world_fixture):
     db = setup_db_with_real_world_fixture
     kdb = KrakenDbBuilder(db=db)
-    raise NotImplementedError('implement the actual test here')
+    
+    # assert that the data, before we apply the RSV taxonomy modifications, is in a state similar to what 
+    # we would have from a default NCBI RefSeq data build 
+    
+    
+    assert create_rsv_taxonomy(rsv_size_filter=True), 'method returns True'
+    raise NotImplementedError

@@ -470,7 +470,7 @@ def test_get_sequence_ids_linked_to_taxon(setup_db_with_real_world_fixture):
     # 114727    2
     # 211044    3
     # 641809    4
-    # 335341    5
+    # 335341    6
     # None of these are actually sequences of those taxa but this doesn't matter for the purpose of the test
     
     update_data = [
@@ -487,6 +487,11 @@ def test_get_sequence_ids_linked_to_taxon(setup_db_with_real_world_fixture):
     seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 2955291, include_children= True)
     assert sorted(seq_ids)==[1,2,3,4,6], 'having now linked 5 sequences to taxa in the sub-tree from 2955291, we return all 5 sequences.id'
     
+    # repeat, but exclude taxon id 119210 and its children, which should result in sequence ID 6 not 
+    # being in the resultset because it is linked to a child of 119210
+    seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 2955291, include_children= True, skip_tax_ids=[119210])
+    assert sorted(seq_ids)==[1,2,3,4], 'having now linked 5 sequences to taxa in the sub-tree from 2955291, we return all 5 sequences.id'
+
 def test_get_seq_ids_and_fasta_headers_by_category(setup_db_with_real_world_fixture):
     db = setup_db_with_real_world_fixture
     data = db.get_seq_ids_and_fasta_headers_by_category(category='test label')

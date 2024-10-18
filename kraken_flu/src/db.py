@@ -906,7 +906,7 @@ class Db():
         rows = self._cur.execute(stmt, [category]).fetchall()
         return [{'id': x['id'], 'fasta_header': x['fasta_header']} for x in rows]
     
-    def get_sequence_ids_linked_to_taxon(self, tax_id:int, include_children:bool=True, check_input:bool= True):
+    def get_sequence_ids_linked_to_taxon(self, tax_id:int, include_children:bool=True, check_input:bool= True, skip_tax_ids:list=None):
         """
         For a given taxon, identified by its tax_id, identify all sequences that are linked 
         to this taxon and (optional) all the children of this taxon.  
@@ -928,10 +928,20 @@ class Db():
                 If True, check the input tax_id and make sure there is a matching taxonomy node.  
                 There is no point in doing this during the recursive execution of this method 
                 since all tax_ids have been returned from queries anyway, hence the option to skip.  
+                
+            skip_tax_ids: list, optional
+                If a list of tax_ids is provided, matching taxonomy nodes and all their children are skipped 
+                and their tax IDs are not part of the output.  
 
         Returns:
             list of sequences.id
         """
+        if skip_tax_ids is None:
+            skip_tax_ids = []
+            
+        if tax_id in skip_tax_ids:
+            return []
+            
         if check_input:
             if not self._cur.execute("SELECT tax_id FROM taxonomy_nodes WHERE tax_id = ?",[tax_id]).fetchall():
                 raise ValueError(f'no taxonomy node with tax_id {tax_id} exists')
@@ -942,7 +952,7 @@ class Db():
         if include_children:
             child_taxon_ids = self.get_children_tax_ids(tax_id = tax_id)
             for child_taxon_id in child_taxon_ids:
-                child_linked_seq_ids = self.get_sequence_ids_linked_to_taxon(tax_id= child_taxon_id, include_children= True, check_input= False)
+                child_linked_seq_ids = self.get_sequence_ids_linked_to_taxon(tax_id= child_taxon_id, include_children= True, check_input= False, skip_tax_ids= skip_tax_ids)
                 linked_seq_ids.extend(child_linked_seq_ids)
         return linked_seq_ids
         
