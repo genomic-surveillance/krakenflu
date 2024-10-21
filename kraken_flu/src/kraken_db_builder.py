@@ -176,7 +176,7 @@ class KrakenDbBuilder():
         
         self.taxonomy_loaded= True        
 
-    def load_fasta_file(self, file_path:str, category:str=None, enforce_ncbi_acc:bool = False)):
+    def load_fasta_file(self, file_path:str, category:str=None, enforce_ncbi_acc:bool = False):
         """
         Uses the fasta_loader to load a FASTA file into the DB. For details, see fasta_loader module. 
         This method is used for "generic" sequences that do not require a category label. This includes 
