@@ -176,7 +176,7 @@ class KrakenDbBuilder():
         
         self.taxonomy_loaded= True        
 
-    def load_fasta_file(self, file_path:str, category:str=None):
+    def load_fasta_file(self, file_path:str, category:str=None, enforce_ncbi_acc:bool = False)):
         """
         Uses the fasta_loader to load a FASTA file into the DB. For details, see fasta_loader module. 
         This method is used for "generic" sequences that do not require a category label. This includes 
@@ -193,8 +193,11 @@ class KrakenDbBuilder():
                 table, which can be used later to create associations with taxonomy nodes.  
                 This is used for cases where we load a specific FASTA file for a known virus 
                 (type) and we want to save a hint in the DB for the taxonomy association later. 
+                
+            enforce_ncbi_acc: bool, optional, defaults to False
+                If True, an exception is thrown if an NCBI acc ID cannot be found
         """
-        load_fasta(db=self._db, file_path=file_path, category=category)
+        load_fasta(db=self._db, file_path=file_path, category=category, enforce_ncbi_acc= enforce_ncbi_acc)
         self.fasta_files_loaded.append(file_path)
     
     def filter_unnamed_unsegmented_flu(self):
