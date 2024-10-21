@@ -588,7 +588,7 @@ class KrakenDbBuilder():
         if not hrsv_nodes_tax_id['RSV B']:
             raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus B" in database')
         
-        # create new nodes for the RSV genomes that were uploaded from files
+        # create new nodes for the RSV genomes that were uploaded from files and link to taxonomy
         # TODO: this block is very similar to the one in "assign_flu_taxonomy_nodes", might be worth factoring out 
         # into a common method.  There are important differences though so might not be worth it.  
         new_tax_id = self.next_new_tax_id()
