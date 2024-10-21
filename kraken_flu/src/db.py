@@ -886,7 +886,7 @@ class Db():
         rows = self._cur.execute(stmt, [category, seq_len_lt]).fetchall()
         return [x['id'] for x in rows]
     
-    def get_seq_ids_and_fasta_headers_by_category(self, category:str ):
+    def get_seq_ids_and_fasta_headers_by_category(self, category:str, included_only:bool=False ):
         """
         Retrieves id and FASTA header for sequences that match the given category label.  
 
@@ -894,6 +894,9 @@ class Db():
             category: str, required
                 The category label to search for. Only records with exact matching sequences.category will 
                 be included
+                
+            included_only: bool, optional, deaults to False
+                Only return results where sequences.include = 1
                 
         Returns:
             list of dicts with keys 'id', 'fasta_header'
@@ -903,6 +906,8 @@ class Db():
         FROM sequences 
         WHERE category = ?
         """
+        if included_only:
+            stmt += ' AND include = 1'
         rows = self._cur.execute(stmt, [category]).fetchall()
         return [{'id': x['id'], 'fasta_header': x['fasta_header']} for x in rows]
     
