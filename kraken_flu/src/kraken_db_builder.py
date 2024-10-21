@@ -444,13 +444,11 @@ class KrakenDbBuilder():
         last_log_cp = 0
         logging.info(f"retrieved {n_records} flu sequence records from database")
         
-        new_tax_id = self.next_new_tax_id()
         with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id','mod_fasta_header'], buffer_size= 50000) as seq_update_buffer:
-
             with self._db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as nodes_buffer:
                 with self._db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size= 50000) as names_buffer:
                     for flu_sequence in flu_sequences:
-                        new_tax_id+=1
+                        new_tax_id = self.next_new_tax_id()
                         flu_name= flu_sequence['flu_name']
                         flu_type= flu_sequence['flu_type']
                         segment_number= flu_sequence['segment_number']
@@ -594,7 +592,6 @@ class KrakenDbBuilder():
         # create new nodes for the RSV genomes that were uploaded from files and link to taxonomy
         # TODO: this block is very similar to the one in "assign_flu_taxonomy_nodes", might be worth factoring out 
         # into a common method.  There are important differences though so might not be worth it.  
-        new_tax_id = self.next_new_tax_id()
         with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id'], buffer_size= 50000) as seq_update_buffer:
 
             with self._db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as nodes_buffer:
@@ -602,7 +599,7 @@ class KrakenDbBuilder():
                     for category, parent_tax_id in hrsv_nodes_tax_id.items():
                         category_sequences = self._db.get_seq_ids_and_fasta_headers_by_category(category, included_only= True)
                         for sequence in category_sequences:
-                            new_tax_id+=1
+                            new_tax_id = self.next_new_tax_id()
                             id= sequence['id']
                             fasta_header = sequence['fasta_header']
                             
