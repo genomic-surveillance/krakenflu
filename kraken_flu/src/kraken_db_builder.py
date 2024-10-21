@@ -528,23 +528,20 @@ class KrakenDbBuilder():
     def create_rsv_taxonomy(self, rsv_size_filter:bool=False):
         """
         Builds a custom-made RSV taxonomy based on known RSV A and B isolates. The method relies on sequences 
-        loaded into the sequences table with a category label "RSV A" or "RSV B", see cmd.py for the "pipeline".  
-        These pre-labelled sequences will be the only hRSV sequences in the final kraken2 database.  Any existing 
-        hRSV sequences (e.g. from NCBI RefSeq) are removed. If sequences from RefSeq should be in the final DB, they 
-        must be present in the pre-labelled RSV sequences used by kraken-flu.  
+        loaded into the sequences table with a category label "RSV A" or "RSV B". These sequences must exist already 
+        in the DB before running this method.  See "load_fasta_file" on how to load FASTA with labels.   
         In contrast to the custom-built flu taxonomy, this method does not create any new parental taxonomy nodes.  
         It only creates new nodes for the isolates loaded from the pre-labelled files and links those to the existing 
         hRSV parental nodes "Human respiratory syncytial virus A" and "Human respiratory syncytial virus B"
         
         The method performs the following tasks:
-            - applies a size filter to remove incomplete hRSV sequences
-            - links the pre-labelled RSV A/B sequences to the hRSV A/B taxonomy nodes
-        
-        NOTE: this method does not handle the FASTA ingest. This is done in the CLI cmd.py module using 
-        fasta_loader:load_fasta. 
+            - applies a size filter to remove incomplete hRSV sequences (can be skipped)
+            - for all sequences in the DB labelled RSV A/B:
+                - creates a node in the taxonomy for each isolate
+                - links this node to the hRSV A or B parent node according to its label
         
         Further details on rationale for this method:
-        RSV sequences in RefSeq are currently not sufficient for our purposes. For this reason, it was decided 
+        RSV sequences in RefSeq are currently not sufficient for our purposes (more details below). For this reason, it was decided 
         that we would obtain RSV sequences classified as A or B from Nextstrain instead. We obtain these as 
         separate downloads, which can be loaded into the kraken-flu database with labels "RSV A" and "RSV B" 
         which are stored in the sequences.category field. The aim of this method is to replace the existing hRSV 
@@ -563,7 +560,11 @@ class KrakenDbBuilder():
         - tax_id 208895 Human respiratory syncytial virus B 
         Instead, they are linked to tax_id 11250 (Human orthopneumovirus), the parental node of hRSV A/B or 11250, 
         which is the parent ot 11250. Thus, the data from NCBI does not provide the database structure we need, where 
-        hRSV sequences are assigned to nodes Human respiratory syncytial virus A/B
+        hRSV sequences are assigned to nodes Human respiratory syncytial virus A/B.  
+        
+        To complete the RSV taxonomy, we also need to remove any sequences that would otherwise link to higher-level 
+        RSV taxonomy nodes (e.g. from RefSeq). This cannot be done here, because it must be done after the full linkage 
+        of all sequences to the taxonomy. See "filter_out_sequences_linked_to_high_level_rsv_nodes" for details.  
 
         Args:
             rsv_size_filter: bool, defaults to False
@@ -588,14 +589,6 @@ class KrakenDbBuilder():
             raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus B" in database')
         
         # create new nodes for the RSV genomes that were uploaded from files
-        # NOTE: if we use curated sets of Genbank data, there ARE nodes in the taxonomy 
-        # already from NCBI. We are ignoring those here and just create new ones.  In the final 
-        # DB, the default RSV isolates nodes will be orphaned and they will never have any reads 
-        # assigned because there are no sequences linked to them (we removed them in the above step).  
-        # We COULD also skip creating new taxonomy nodes and just link the sequences directly to the 
-        # RSV parent nodes but this would break with the conventions in the NCBI taxonomy because those are 
-        # not S (species) rank (or below) and hence should not have sequences directly attached.  In the 
-        # viral taxonomy, isolates are treated as something like a sub-species and hence get their own taxonomy nodes.  
         # TODO: this block is very similar to the one in "assign_flu_taxonomy_nodes", might be worth factoring out 
         # into a common method.  There are important differences though so might not be worth it.  
         new_tax_id = self.next_new_tax_id()
