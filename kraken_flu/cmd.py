@@ -142,8 +142,7 @@ def main():
     if args.rsv_size_filter:
         if not args.rsv_a_sequences or not args.rsv_a_sequences:
             raise ValueError('Option --rsv_size_filter must be used together with --rsv_a_sequence and --rsv_b_sequence')
-    n_rsv_file_args = sum(args.rsv_a_sequences, args.rsv_b_sequences )
-    if n_rsv_file_args > 0 and n_rsv_file_args != 2:
+    if (args.rsv_a_sequences and not args.rsv_b_sequences) or (args.rsv_b_sequences and not args.rsv_a_sequences)
         raise ValueError('parameters --rsv_a_sequences and --rsv_b_sequences must be used together')
     
     # TODO: move the rest into a single function in KrakenDbBuilder, perhaps called "build"
