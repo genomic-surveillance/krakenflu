@@ -558,8 +558,8 @@ class KrakenDbBuilder():
         None of the three RefSeq hRSV sequences is linked to the hRSV A/B type nodes, which are
         - tax_id 208893 Human respiratory syncytial virus A
         - tax_id 208895 Human respiratory syncytial virus B 
-        Instead, they are linked to tax_id 11250 (Human orthopneumovirus), the parental node of hRSV A/B or 11250, 
-        which is the parent ot 11250. Thus, the data from NCBI does not provide the database structure we need, where 
+        Instead, they are linked to tax_id 11250 (Human orthopneumovirus), the parental node of hRSV A/B or 12814, 
+        which is bovine RSV. Thus, the data from NCBI does not provide the database structure we need, where 
         hRSV sequences are assigned to nodes Human respiratory syncytial virus A/B.  
         
         To complete the RSV taxonomy, we also need to remove any sequences that would otherwise link to higher-level 
@@ -597,7 +597,7 @@ class KrakenDbBuilder():
             with self._db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as nodes_buffer:
                 with self._db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size= 50000) as names_buffer:
                     for category, parent_tax_id in hrsv_nodes_tax_id.items():
-                        category_sequences = self._db.get_seq_ids_and_fasta_headers_by_category(category)
+                        category_sequences = self._db.get_seq_ids_and_fasta_headers_by_category(category, included_only= True)
                         for sequence in category_sequences:
                             new_tax_id+=1
                             id= sequence['id']
