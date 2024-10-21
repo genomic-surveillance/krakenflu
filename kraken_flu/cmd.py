@@ -157,7 +157,7 @@ def main():
     # Load the bulk of the reference genomes from FASTA files.
     # These are loaded into the "sequences" table of the sqlite DB without a category value, 
     for fasta_path in args.fasta_path:
-        kdb.load_fasta_file(fasta_path)
+        kdb.load_fasta_file(file_path= fasta_path,  enforce_ncbi_acc= True)
         
     if args.filter_flu:
         kdb.filter_unnamed_unsegmented_flu()
@@ -172,8 +172,8 @@ def main():
     kdb.assign_flu_taxonomy_nodes()
     
     if args.rsv_a_sequences and args.rsv_b_sequences:
-        kdb.load_fasta_file(file_path= args.rsv_a_sequences, category= 'RSV A')
-        kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B')
+        kdb.load_fasta_file(file_path= args.rsv_a_sequences, category= 'RSV A', enforce_ncbi_acc= False)
+        kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B', enforce_ncbi_acc= False)
         kdb.create_rsv_taxonomy( rsv_size_filter= args.rsv_size_filter )
     
     if args.do_full_linkage:

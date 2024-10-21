@@ -13,7 +13,7 @@ from kraken_flu.src.db import Db
 This module contains the functionality for loading sequence data from FASTA into the sqlite database    
 """
 
-def load_fasta(db: Db, file_path:str, category:str=None):
+def load_fasta(db: Db, file_path:str, category:str=None, enforce_ncbi_acc:bool = False):
     """
     Main function. Orchestrates the loading of a FASTA sequence file into the database.
 
@@ -29,6 +29,9 @@ def load_fasta(db: Db, file_path:str, category:str=None):
             table, which can be used later to create associations with taxonomy nodes.  
             This is used for cases where we load a specific FASTA file for a known virus 
             (type) and we want to save a hint in the DB for the taxonomy association later. 
+            
+        enforce_ncbi_acc: bool, optional, defaults to False
+            If True, an exception is thrown if an NCBI acc ID cannot be found
             
     Returns:
         True on success
@@ -47,7 +50,7 @@ def load_fasta(db: Db, file_path:str, category:str=None):
             for record in SeqIO.parse(fh, "fasta"):
                 header = record.description
                 sequence = record.seq
-                flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype = _parse_header(header)
+                flu_type, ncbi_acc, kraken_taxid, is_flu, is_fluA, isolate_name, segment_number, h_subtype, n_subtype = _parse_header(header, enforce_ncbi_acc = enforce_ncbi_acc)
                 
                 # For the DB, we just want to store the integer of the H and N subtype
                 h_subtype = h_subtype and h_subtype.replace('H', '')
@@ -76,13 +79,16 @@ def load_fasta(db: Db, file_path:str, category:str=None):
     logging.info( f'finished uploading sequence records to DB')
     return True
 
-def _parse_header(header:str):
+def _parse_header(header:str, enforce_ncbi_acc:bool= False):
     """
     Parse a FASTA header
     
     Parameters:
         header: str, required
             the FASTA header string
+            
+        enforce_ncbi_acc: bool, optional, defaults to False
+            If True, an exception is thrown if an NCBI acc ID cannot be found
             
     Returns tuple of:
         ncbi_acc (str), 
@@ -99,8 +105,10 @@ def _parse_header(header:str):
         ncbi_acc = NCBI_ACC_REGEX.search( header ).group(0)
         ncbi_acc = re.sub(r'^gb\|', '', ncbi_acc)
     except AttributeError:
-        # an NCBI accession ID is required
-        raise ValueError(f"could not parse NCBI acc ID from FASTA header '{header}'")
+        if enforce_ncbi_acc:
+            raise ValueError(f"could not parse NCBI acc ID from FASTA header '{header}' - use enforce_ncbi_acc=False to ignore this error")
+        else:
+            ncbi_acc = None
 
     if (match := KRAKEN_TAX_ID_REGEX.search( header )) is not None:
         kraken_taxid = int(match.group(1))
