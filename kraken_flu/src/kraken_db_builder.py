@@ -572,6 +572,8 @@ class KrakenDbBuilder():
                 If True, RSV sequences are filtered on size to keep only full-length or nearly 
                 full length genomes.  
         """
+        logging.info("starting to build custom RSV taxonomy")
+        
         for t in (['A','B']):
             label = 'RSV ' + t
             if not self._db.sequences_category_exists(label):
