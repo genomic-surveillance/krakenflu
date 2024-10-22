@@ -50,6 +50,18 @@ def setup_db_with_rsv_fixture( setup_db ):
     db._cur.executescript(file_content)
     yield db
 
+# TODO need to clean up this duplication of fixture definitions
+@pytest.fixture(scope='function')
+def setup_db_with_rsv_fixture_for_filter( setup_db ):
+    db = setup_db
+    fixture_dir = files('kraken_flu.tests.fixtures')
+    db_fixture_file = fixture_dir.joinpath(os.path.join('rsv','rsv_db_fixture2.sql'))
+    with open(db_fixture_file, 'r') as file:
+        file_content = file.read()
+    db._cur.executescript(file_content)
+    yield db
+
+
 def test_init_no_patht():
     kdb = KrakenDbBuilder()
     assert kdb
@@ -424,38 +436,34 @@ def test_create_rsv_taxonomy(setup_db_with_rsv_fixture):
     assert len(rows) == 1, 'having built the RSV taxonomy, there is now 1 sequence linked to hRSV B'
 
 
-def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_fixture):
-    db = setup_db_with_rsv_fixture
+def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_fixture_for_filter):
+    db = setup_db_with_rsv_fixture_for_filter
     kdb = KrakenDbBuilder(db=db)
     
-    # assert that the data, before we apply the RSV taxonomy modifications, is in a state similar to what 
-    # we would have from a default NCBI RefSeq data build 
-    stmt1 = """
+    stmt = """
         SELECT
-            taxonomy_names.tax_id as tax_id,
-            taxonomy_names.name as tax_name,
-            fasta_header,
+            tax_id,
             include
-        FROM taxonomy_names 
-        INNER JOIN sequences ON(taxonomy_names.tax_id = sequences.tax_id)
-        WHERE taxonomy_names.name = ?
+        FROM sequences 
+        WHERE fasta_header IN (
+            'Human orthopneumovirus Subgroup B',
+            'Human orthopneumovirus Subgroup A',
+            'Respiratory syncytial virus, complete genome',
+            'known RSV A',
+            'known RSV A 2',
+            'known RSV B',
+            'short RSV A'
+        )
     """
-    rows = db._cur.execute(stmt1, ['Human orthopneumovirus']).fetchall()
-    assert len(rows) == 2, 'in the fixtures there are 2 RSV RefSeq records directly linked to Human orthopneumovirus'
-    assert len([x for x in rows if x['include']==1]) ==2 ,'... and they are not marked for exclusion'
-    
-    rows = db._cur.execute(stmt1, ['Respiratory syncytial virus']).fetchall()
-    assert len(rows) == 1, 'in the fixtures there is 1 RSV RefSeq record directly linked to (bovine) Respiratory syncytial virus'
-    assert len([x for x in rows if x['include']==1]) ==1 ,'... and it is not marked for exclusion'
+    rows = db._cur.execute(stmt).fetchall()
+    assert len(rows) == 7, 'there are 7 RSV sequences in total in the fixtures'
+    assert len([x for x in rows if x['include']==1]) ==7 ,'before the filter is run, all are marked as included'
 
     n_removed = kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
     
+    # only the 3 RefSeq sequence should be removed by the filter
     assert n_removed == 3, 'filter returns correct number of sequences removed'
     
-    rows = db._cur.execute(stmt1, ['Human orthopneumovirus']).fetchall()
-    assert len(rows) == 2, 'still 2 records linked to Human orthopneumovirus'
-    assert len([x for x in rows if x['include']==1]) ==0 ,'... but they are now marked for exclusion'
-    
-    rows = db._cur.execute(stmt1, ['Respiratory syncytial virus']).fetchall()
-    assert len(rows) == 1, 'still 1 record directly linked to (bovine) Respiratory syncytial virus'
-    assert len([x for x in rows if x['include']==1]) ==0 ,'... but it is now marked for exclusion'
+    rows = db._cur.execute(stmt).fetchall()
+    assert len(rows) == 7, 'the filter has not changed the number of RSV sequence records'
+    assert len([x for x in rows if x['include']==1]) ==4 ,'after the filter, only the 4 pre-labelled RSV sequences linked to hRSV A/B remain included'

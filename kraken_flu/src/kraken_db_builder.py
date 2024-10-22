@@ -695,6 +695,8 @@ class KrakenDbBuilder():
             tax_id = self._db.retrieve_tax_id_by_node_scientific_name(name)
             if not tax_id:
                 raise ValueError(f'could not find taxonomy node for "{name}" in database')
+            else:
+                skip_tax_ids.append(tax_id)
             
         seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= start_tax_id, skip_tax_ids= skip_tax_ids)
         logging.info(f'removed {len(seq_ids)} sequences from high-level RSV taxonomy nodes (not including hRSV A/B)')
