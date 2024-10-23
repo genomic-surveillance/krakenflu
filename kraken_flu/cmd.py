@@ -104,12 +104,49 @@ def args_parser():
         help = 'remove unnecessary data from the kraken-flu backend DB at the end of the process'        
     )
 
+    # RSV options:
+    # These three options depend on each other and have to be used in conjunction but there
+    # is no argparse functionality for this as of now, so the logic is implemented in "main"
+    parser.add_argument(
+        '--rsv_a_sequences',
+        action = 'store',
+        required = False,
+        metavar= 'FILE',
+        type= str,
+        help = 'file of known RSV A sequences. Must be used together with --rsv_b_sequences'
+    )
+    
+    parser.add_argument(
+        '--rsv_b_sequences',
+        action = 'store',
+        required = False,
+        metavar= 'FILE',
+        type= str,
+        help = 'file of known RSV B sequences. Must be used together with --rsv_a_sequences'
+    )
+
+    parser.add_argument(
+        '--rsv_size_filter',
+        action = 'store_true',
+        help = 'Must be used together with --rsv_a/b_sequences. Filters sequences in files for genome completeness (size)'        
+    )
+
     return parser
 
 def main():
     
     args = args_parser().parse_args()
     db_path = args.db_file or tempfile.NamedTemporaryFile(delete= not args.keep_db_file)
+    
+    # sanity checks for arguments
+    if args.rsv_size_filter:
+        if not args.rsv_a_sequences or not args.rsv_a_sequences:
+            raise ValueError('Option --rsv_size_filter must be used together with --rsv_a_sequence and --rsv_b_sequence')
+    if (args.rsv_a_sequences and not args.rsv_b_sequences) or (args.rsv_b_sequences and not args.rsv_a_sequences):
+        raise ValueError('parameters --rsv_a_sequences and --rsv_b_sequences must be used together')
+    
+    # TODO: move the rest into a single function in KrakenDbBuilder, perhaps called "build"
+    # We need to run some integration tests and this would be difficult in the current setup
     
     kdb = KrakenDbBuilder(db_path= db_path)
     kdb.load_taxonomy_files(
@@ -120,7 +157,7 @@ def main():
     # Load the bulk of the reference genomes from FASTA files.
     # These are loaded into the "sequences" table of the sqlite DB without a category value, 
     for fasta_path in args.fasta_path:
-        kdb.load_fasta_file(fasta_path)
+        kdb.load_fasta_file(file_path= fasta_path,  enforce_ncbi_acc= True)
         
     if args.filter_flu:
         kdb.filter_unnamed_unsegmented_flu()
@@ -134,8 +171,21 @@ def main():
     kdb.create_segmented_flu_taxonomy_nodes()
     kdb.assign_flu_taxonomy_nodes()
     
+    if args.rsv_a_sequences and args.rsv_b_sequences:
+        kdb.load_fasta_file(file_path= args.rsv_a_sequences, category= 'RSV A', enforce_ncbi_acc= False)
+        kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B', enforce_ncbi_acc= False)
+        kdb.create_rsv_taxonomy( rsv_size_filter= args.rsv_size_filter )
+    
     if args.do_full_linkage:
         kdb.link_all_unlinked_sequences_to_taxonomy_nodes()
+        
+        # If we are creating a custom RSV tree and doing the full linkage, we can end up with 
+        # RefSeq sequences being linked again to high-level RSV taxonomy nodes via the Genabk acc lookup
+        # and the taxonomy assigned to the sequence on NCBI.  
+        # THis call will remove all RSV sequences linked to higher-order RSV taxa except for those linked 
+        # to hRSV A/B
+        if args.rsv_a_sequences or args.rsv_b_sequences:
+            kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
     
     kdb.create_db_ready_dir(path = args.out_dir)
     

@@ -432,7 +432,27 @@ class Db():
                 return None
             else:
                 return parent_tax_id
-        
+            
+    def get_children_tax_ids(self, tax_id:int):
+        """
+        For a given taxonomy node, identified by tax_id, retrieve all tax_ids of its 
+        direct children.  
+
+        Args:
+            tax_id: int, required
+                The tax_id for the node for which we want to find children
+                
+        Returns:
+            List of child node tax_ids
+        """
+        stmt = """
+            SELECT tax_id 
+            FROM taxonomy_nodes 
+            WHERE parent_tax_id = ?
+        """
+        rows= self._cur.execute(stmt,[tax_id]).fetchall()
+        return [x['tax_id'] for x in rows]
+
     def get_flu_name_segment_data_dict(self):
         """
         Returns a dictionary of all flu names with segment lengths for all records in sequences that
@@ -800,6 +820,29 @@ class Db():
         """
         data= self._cur.execute(f"SELECT * FROM {table_name} LIMIT 1")
         return [c[0] for c in data.description]
+
+    def sequences_category_exists(self, label):
+        """
+        Returns True if at least one sequences record exists with a category that matches the search term exactly
+
+        Args:
+            label: str, required
+                The search term for the sequences.category field (must be exact match)
+
+        Returns:
+            True if at least one matching sequence record exists, False otherwise
+        """
+        stmt="""
+        SELECT id
+        FROM sequences
+        WHERE category = ?
+        LIMIT 1
+        """
+        rows = self._cur.execute(stmt,[label]).fetchall()
+        if rows:
+            return True
+        else:
+            return False
     
     def prune_db(self):
         """
@@ -817,6 +860,107 @@ class Db():
         self._cur.execute("DROP TABLE IF EXISTS acc2taxids")
         return True
     
+    def get_seq_ids_by_category_and_seq_lt(self, category:str, seq_len_lt:int ):
+        """
+        Retrieves sequences.id for sequences that match the given category label (sequences.category field) and 
+        where the sequence length is less than the parameter provided. This is used to remove incomplete RSV 
+        genomes (and could be used for other purposes).  
+
+        Args:
+            category: str, required
+                The category label to search for. Only records with exact matching sequences.category will 
+                be included
+                
+            seq_len_lt: int, required
+                "Sequence length less than" - only sequences with len < than this value will be included.  
+
+        Returns:
+            list(ids)
+        """
+        stmt="""
+        SELECT id
+        FROM sequences 
+        WHERE category = ?
+        AND seq_length < ?
+        """
+        rows = self._cur.execute(stmt, [category, seq_len_lt]).fetchall()
+        return [x['id'] for x in rows]
+    
+    def get_seq_ids_and_fasta_headers_by_category(self, category:str, included_only:bool=False ):
+        """
+        Retrieves id and FASTA header for sequences that match the given category label.  
+
+        Args:
+            category: str, required
+                The category label to search for. Only records with exact matching sequences.category will 
+                be included
+                
+            included_only: bool, optional, deaults to False
+                Only return results where sequences.include = 1
+                
+        Returns:
+            list of dicts with keys 'id', 'fasta_header'
+        """
+        stmt="""
+        SELECT id, fasta_header
+        FROM sequences 
+        WHERE category = ?
+        """
+        if included_only:
+            stmt += ' AND include = 1'
+        rows = self._cur.execute(stmt, [category]).fetchall()
+        return [{'id': x['id'], 'fasta_header': x['fasta_header']} for x in rows]
+    
+    def get_sequence_ids_linked_to_taxon(self, tax_id:int, include_children:bool=True, check_input:bool= True, skip_tax_ids:list=None):
+        """
+        For a given taxon, identified by its tax_id, identify all sequences that are linked 
+        to this taxon and (optional) all the children of this taxon.  
+        When include_children is used, the method is recursive and follows the taxonomy tree 
+        until no more children are found.  
+        Results are returned as a flat list, ie it does not reflect the relationship between the 
+        nodes. TODO: if useful, we could add an option to return a graph.  
+
+        Args:
+            tax_id: int, required
+                identifies the taxon to examine
+                
+            include_children: bool, optional, defaults to True
+                If True, traverse all children and their children of the starting taxon and 
+                retrieve their linked sequences IDs as well. If False, only the taxon 
+                identified by tax_id is examined.  
+                
+            check_input: bool, optional, defaults to True
+                If True, check the input tax_id and make sure there is a matching taxonomy node.  
+                There is no point in doing this during the recursive execution of this method 
+                since all tax_ids have been returned from queries anyway, hence the option to skip.  
+                
+            skip_tax_ids: list, optional
+                If a list of tax_ids is provided, matching taxonomy nodes and all their children are skipped 
+                and their tax IDs are not part of the output.  
+
+        Returns:
+            list of sequences.id
+        """
+        if skip_tax_ids is None:
+            skip_tax_ids = []
+            
+        if tax_id in skip_tax_ids:
+            return []
+            
+        if check_input:
+            if not self._cur.execute("SELECT tax_id FROM taxonomy_nodes WHERE tax_id = ?",[tax_id]).fetchall():
+                raise ValueError(f'no taxonomy node with tax_id {tax_id} exists')
+        linked_seq_rows_stmt = "SELECT id FROM sequences where tax_id = ?"
+        linked_seq_rows = self._cur.execute(linked_seq_rows_stmt,[tax_id]).fetchall()
+        linked_seq_ids = [x['id'] for x in linked_seq_rows]
+        
+        if include_children:
+            child_taxon_ids = self.get_children_tax_ids(tax_id = tax_id)
+            for child_taxon_id in child_taxon_ids:
+                child_linked_seq_ids = self.get_sequence_ids_linked_to_taxon(tax_id= child_taxon_id, include_children= True, check_input= False, skip_tax_ids= skip_tax_ids)
+                linked_seq_ids.extend(child_linked_seq_ids)
+        return linked_seq_ids
+        
     @property        
     def schema(self):
         """
@@ -881,6 +1025,8 @@ class Db():
                 ON sequences (flu_name);
             CREATE INDEX idx_seq_tax_id 
                 ON sequences (tax_id);
+            CREATE INDEX idx_seq_cat 
+                ON sequences (category);   
                 
             CREATE TABLE acc2taxids (
                 accession VARCHAR,

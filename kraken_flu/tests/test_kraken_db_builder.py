@@ -39,6 +39,28 @@ def setup_db_with_real_world_fixture( setup_db ):
         file_content = file.read()
     db._cur.executescript(file_content)
     yield db
+    
+@pytest.fixture(scope='function')
+def setup_db_with_rsv_fixture( setup_db ):
+    db = setup_db
+    fixture_dir = files('kraken_flu.tests.fixtures')
+    db_fixture_file = fixture_dir.joinpath(os.path.join('rsv','rsv_db_fixture1.sql'))
+    with open(db_fixture_file, 'r') as file:
+        file_content = file.read()
+    db._cur.executescript(file_content)
+    yield db
+
+# TODO need to clean up this duplication of fixture definitions
+@pytest.fixture(scope='function')
+def setup_db_with_rsv_fixture_for_filter( setup_db ):
+    db = setup_db
+    fixture_dir = files('kraken_flu.tests.fixtures')
+    db_fixture_file = fixture_dir.joinpath(os.path.join('rsv','rsv_db_fixture2.sql'))
+    with open(db_fixture_file, 'r') as file:
+        file_content = file.read()
+    db._cur.executescript(file_content)
+    yield db
+
 
 def test_init_no_patht():
     kdb = KrakenDbBuilder()
@@ -317,3 +339,131 @@ def test_filter_flu_a_wo_subtype(setup_db_with_real_world_fixture, tmp_path):
     rows = db._cur.execute("SELECT id, include FROM sequences WHERE ncbi_acc = 'NC_002023.1'").fetchall()
     assert rows[0]['include'] == 0, 'having set H subtype to NULL, this sequence is now filtered out by filter_flu_a_wo_subtype'
     
+def test__apply_rsv_size_filter(setup_db_with_real_world_fixture, tmp_path):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    # run the filter - it should not filter out any sequences because there are no
+    # sequences labelled as RSV A in the fixtures
+    kdb._apply_rsv_size_filter(categories=['RSV A'])
+    
+    update_ids=[3,5,7]
+    stmt1="SELECT id, include from sequences WHERE id IN (?,?,?)"
+    rows = db._cur.execute(stmt1,update_ids).fetchall()
+    excluded_ids = [x['id'] for x in rows if x['include']==0]
+    assert not excluded_ids, 'before we apply the RSV filter, none of the three randomly chosen sequences are marked as excluded'
+    
+    # label some random sequences as "RSV A" (doesn't matter what they really are) 
+    # and set their length to slightly below the cutoff so they should be filtered out by the RSB size filter
+    stmt2="UPDATE sequences SET category = 'RSV A', seq_length = 14500 WHERE id = ?"
+    for id in update_ids:
+        db._cur.execute(stmt2,[id])
+    db._con.commit()
+    
+    # apply the filter again - the three sequences should now be filtered out
+    kdb._apply_rsv_size_filter(categories=['RSV A'])
+    rows = db._cur.execute(stmt1,update_ids).fetchall()
+    excluded_ids = [x['id'] for x in rows if x['include']==0]
+    assert sorted(excluded_ids) == sorted(update_ids), 'having set the RSV A label and sequence length below cutoff for three randomly chosen sequences, these are now marked as excluded'
+    
+def test_filter_out_sequences_linked_to_taxonomy_sub_tree(setup_db_with_real_world_fixture):
+    """
+    TODO: This is highly repetetive with the test test_db.py::test_get_sequence_ids_linked_to_taxon
+    because the method tested here is just applying two Db class methods to retrieve, then filter out the
+    sequences that are linked to a sub-tree. It would be better to have some fixtures for this that 
+    can be shared instead of manipulating the fixtures in the same way here and in the test_db.py method.  
+    """
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    excluded_seq_stmt = """
+        SELECT id
+        FROM sequences 
+        WHERE id IN (1,2,3,4,6) AND include = 0
+    """
+    seq_ids = kdb.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= 2955291)
+    assert not seq_ids, 'before we make changes to the fixtures, no sequences are linked to taxon 2955291 or any node in the sub-tree rooted at this taxon, so none are removed'
+    assert not db._cur.execute(excluded_seq_stmt).fetchall(), '... and none of the sequences with ids 1,2,3,4 and 6 are marked include=0'
+    
+    # For details on these fixture UPDATEs see test_db.py::test_get_sequence_ids_linked_to_taxon
+    update_data = [
+        [11320,1],
+        [114727,2],
+        [211044,3],
+        [641809,4],
+        [335341,6]
+    ]
+    db._cur.executemany("UPDATE sequences SET tax_id = ? WHERE id = ?", update_data)
+    db._con.commit()
+    
+    # All of the 5 sequences should now be removed by the method because they are now linked to the
+    # tree with root tax_id 2955291
+    seq_ids = kdb.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= 2955291)
+    assert sorted(seq_ids) == [1,2,3,4,6], 'after linking 5 sequences to the sub-tree, they are all removed by the method no and their ids are returned'
+    rows = db._cur.execute(excluded_seq_stmt).fetchall()
+    assert len(rows) == 5, '... and all of the sequences with ids 1,2,3,4 and 6 are marked include=0'
+    
+
+
+def test_create_rsv_taxonomy(setup_db_with_rsv_fixture):
+    db = setup_db_with_rsv_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    # assert that the data, before we apply the RSV taxonomy modifications, is in a state similar to what 
+    # we would have from a default NCBI RefSeq data build 
+    stmt1 = """
+        SELECT
+            fasta_header,
+            parent_tax_id,
+            parent_tax_names.name AS parent_taxon_name
+        FROM sequences
+        INNER JOIN taxonomy_nodes ON(taxonomy_nodes.tax_id = sequences.tax_id)
+        INNER JOIN taxonomy_names AS parent_tax_names ON(parent_tax_names.tax_id = taxonomy_nodes.parent_tax_id)
+        WHERE parent_tax_names.name = ?
+    """
+    rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus A']).fetchall()
+    assert not rows, 'before we start, no sequences are linked to hRSV A'
+    
+    rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus B']).fetchall()
+    assert not rows, 'before we start, no sequences are linked to hRSV B'
+    
+    # run the RSV creation
+    assert kdb.create_rsv_taxonomy(rsv_size_filter=True), 'method returns True'
+    
+    rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus A']).fetchall()
+    assert  len(rows) == 2, 'having built the RSV taxonomy, there are now 2 sequences linked to hRSV A'
+    
+    rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus B']).fetchall()
+    assert len(rows) == 1, 'having built the RSV taxonomy, there is now 1 sequence linked to hRSV B'
+
+
+def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_fixture_for_filter):
+    db = setup_db_with_rsv_fixture_for_filter
+    kdb = KrakenDbBuilder(db=db)
+    
+    stmt = """
+        SELECT
+            tax_id,
+            include
+        FROM sequences 
+        WHERE fasta_header IN (
+            'Human orthopneumovirus Subgroup B',
+            'Human orthopneumovirus Subgroup A',
+            'Respiratory syncytial virus, complete genome',
+            'known RSV A',
+            'known RSV A 2',
+            'known RSV B',
+            'short RSV A'
+        )
+    """
+    rows = db._cur.execute(stmt).fetchall()
+    assert len(rows) == 7, 'there are 7 RSV sequences in total in the fixtures'
+    assert len([x for x in rows if x['include']==1]) ==7 ,'before the filter is run, all are marked as included'
+
+    n_removed = kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
+    
+    # only the 3 RefSeq sequence should be removed by the filter
+    assert n_removed == 3, 'filter returns correct number of sequences removed'
+    
+    rows = db._cur.execute(stmt).fetchall()
+    assert len(rows) == 7, 'the filter has not changed the number of RSV sequence records'
+    assert len([x for x in rows if x['include']==1]) ==4 ,'after the filter, only the 4 pre-labelled RSV sequences linked to hRSV A/B remain included'
