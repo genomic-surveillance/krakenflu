@@ -108,11 +108,11 @@ def args_parser():
     )
 
     parser.add_argument(
-        '--root_tax_id',
+        '--multiref_root_tax_id',
         type = int,
         default = 10239, #viruses
         required= False,
-        help = 'The expected taxid of the root taxon. Defaults to 10239 (the taxid for "Viruses")'
+        help = 'The taxid expected to be in all paths of interest. Only paths containing this tax_id will be examined for multi-references and fixed. Defaults to 10239 (the taxid for "Viruses")'
     )
 
     return parser
@@ -144,7 +144,7 @@ def main():
     kdb.create_segmented_flu_taxonomy_nodes()
     kdb.assign_flu_taxonomy_nodes()
 
-    multiref_paths, seen, multiref_data = kdb.find_multiref_paths(root_taxid = args.root_tax_id)
+    multiref_paths, seen, multiref_data = kdb.find_multiref_paths(root_taxid = args.multiref_root_tax_id)
     if not args.repair_subterminal_multirefs and not args.repair_all_multirefs:
         logging.info("Paths with sequences attached to non-leaf nodes will not be fixed.")
     if args.repair_subterminal_multirefs and not args.repair_all_multirefs:
