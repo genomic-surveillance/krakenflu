@@ -625,8 +625,9 @@ class KrakenDbBuilder():
             which (str): Which type of multiref paths to fix - only subterminal cases or all cases.
                             Deafults to "all"
         """
+        which = which.lower()
         try:
-            assert which.lower() in ["subterminal", "all"]
+            assert which in ["subterminal", "all"]
         except AssertionError as ae:
             raise ValueError("Type of multiref path to repair must be either 'subterminal' or 'all'")
 
@@ -645,7 +646,10 @@ class KrakenDbBuilder():
             if bool_list[2:].count(True) >= 1 or len(path) == 2:
                 bool_list.reverse()
                 logging.info(f"Treating {path} as a case of complex multiref path\n")
-                self._fix_complex_multiref(path, bool_list)
+                if which == "all":
+                    self._fix_complex_multiref(path, bool_list)
+                else:
+                    logging.info(f"{path} is a complex multiref path, but not fixed\n")
 
             else:
                 logging.info(f"Treating {path} as a case of subterminal multiref path\n")
