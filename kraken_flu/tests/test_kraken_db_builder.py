@@ -298,8 +298,6 @@ def test_find_multiref_paths(setup_db_with_real_world_fixture):
 
     ## second call to method
     multiref_paths_now, seen, multiref_data_now = kdb.find_multiref_paths()
-    for k, v in multiref_data_now.items():
-            print(f"{k}: {v}")
     ## output should be a dict
     assert isinstance(multiref_paths_now, list)
     ## added the taxid "11250" to the tax_id field in the sequences table
