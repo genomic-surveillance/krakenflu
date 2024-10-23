@@ -304,6 +304,8 @@ def test_find_multiref_paths(setup_db_with_real_world_fixture):
     ## there are 3 paths in the fixture DB where "11250" is the parent node
     ## output should therefore contain 3 paths
     assert len(multiref_paths_now) == 3
+    for path in multiref_paths_now:
+        assert 11250 in path
 
 def test_repair_multiref_paths(setup_db_with_real_world_fixture):
     db = setup_db_with_real_world_fixture
