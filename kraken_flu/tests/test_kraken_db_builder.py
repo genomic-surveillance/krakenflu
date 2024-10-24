@@ -467,3 +467,71 @@ def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_f
     rows = db._cur.execute(stmt).fetchall()
     assert len(rows) == 7, 'the filter has not changed the number of RSV sequence records'
     assert len([x for x in rows if x['include']==1]) ==4 ,'after the filter, only the 4 pre-labelled RSV sequences linked to hRSV A/B remain included'
+
+def test_find_multiref_paths(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+
+    ## mae first call to method
+    multiref_paths, seen, multiref_data = kdb.find_multiref_paths()
+    ## output should be a dict
+    assert isinstance(multiref_paths, list)
+    ## output should be empty
+    assert len(multiref_paths) == 0
+
+    update_stmt = """
+    UPDATE sequences
+    SET tax_id = 11250
+    WHERE original_tax_id = 11250
+    """
+    db._cur.execute(update_stmt)
+    db._con.commit()
+
+    test_stmt = """
+    SELECT tax_id
+    FROM sequences
+    WHERE original_tax_id = 11250
+    """
+
+    ## confirm that the update statement worked
+    data = db._cur.execute(test_stmt).fetchall()
+    for i in data:
+        taxid_found = i[0]
+    assert taxid_found == 11250
+
+    ## second call to method
+    multiref_paths_now, seen, multiref_data_now = kdb.find_multiref_paths()
+    ## output should be a dict
+    assert isinstance(multiref_paths_now, list)
+    ## added the taxid "11250" to the tax_id field in the sequences table
+    ## there are 3 paths in the fixture DB where "11250" is the parent node
+    ## output should therefore contain 3 paths
+    assert len(multiref_paths_now) == 3
+    for path in multiref_paths_now:
+        assert 11250 in path
+
+def test_repair_multiref_paths(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    update_stmt_subterminal = """
+    UPDATE sequences
+    SET tax_id = 11250
+    WHERE original_tax_id = 11250
+    """
+
+    update_stmt_complex = """
+    UPDATE sequences
+    SET tax_id = 2955465
+    WHERE original_tax_id = 518987
+    """
+    db._cur.execute(update_stmt_subterminal)
+    db._cur.execute(update_stmt_complex)
+    db._con.commit()
+
+    multiref_paths, seen, multiref_data = kdb.find_multiref_paths()
+    assert len(multiref_paths) == 4
+
+    kdb.repair_multiref_paths(multiref_paths, seen)
+
+    multiref_paths_now, seen, multiref_data_now = kdb.find_multiref_paths()
+    assert len(multiref_paths_now) == 0

@@ -1035,6 +1035,49 @@ class Db():
             );
         """
 
+    def _is_in_db_sequences(self, taxid: int):
+        """Check whether specified taxid is in "sequences" table in
+        the kraken_flu backend DB
+        """
+
+        stmt = """
+        SELECT 1
+        FROM sequences
+        WHERE tax_id = ?
+        AND include = 1
+        """
+
+        return self._cur.execute(stmt,[taxid]).fetchall()
+
+    def _repair_update_parent_taxid(self, common_parent: int, terminal:int):
+        """Edit the taxonomy such that the "common_parent" taxid is
+        used as the new parent_tax_id for the "terminal" taxid in the
+        table "taxonomy_nodes" in the kraken_flu backend DB
+        """
+
+        update_parent_stmt = f"""
+                                UPDATE taxonomy_nodes
+                                SET parent_tax_id = {common_parent}
+                                WHERE tax_id = {terminal}
+                                """
+        self._cur.execute(update_parent_stmt)
+        self._con.commit()
+
+    def _repair_delink_sequences(self, taxid:int):
+        """Set the "include" field in the "sequences" table to 0,
+        in order to exclude using the corresponding nucleotide sequences
+        for kraken DB building
+        """
+
+        remove_sequence_linkages_stmt = """
+                                        UPDATE sequences
+                                        SET include = 0
+                                        WHERE tax_id = ?
+                                        """
+        self._cur.execute(remove_sequence_linkages_stmt, [taxid])
+        self._con.commit()
+
+
 class BulkInsertBuffer():
     """
     This class provides a buffer for INSERT statements into a single table, with the 

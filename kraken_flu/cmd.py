@@ -1,6 +1,7 @@
 import argparse
 import os
-import tempfile 
+import tempfile
+import logging
 
 from kraken_flu.src.kraken_db_builder import KrakenDbBuilder
 
@@ -131,6 +132,28 @@ def args_parser():
         help = 'Must be used together with --rsv_a/b_sequences. Filters sequences in files for genome completeness (size)'        
     )
 
+    parser.add_argument(
+        '--repair_subterminal_multirefs',
+        action='store_true',
+        required= False,
+        help = 'Repair cases where a given path in the taxonomy contains sequences at subterminal nodes.'
+    )
+
+    parser.add_argument(
+        '--repair_all_multirefs',
+        action='store_true',
+        required= False,
+        help = 'Repair cases where a given path in the taxonomy contains sequences at any non-leaf nodes.'
+    )
+
+    parser.add_argument(
+        '--multiref_root_tax_id',
+        type = int,
+        default = 10239, #viruses
+        required= False,
+        help = 'The taxid expected to be in all paths of interest. Only paths containing this tax_id will be examined for multi-references and fixed. Defaults to 10239 (the taxid for "Viruses")'
+    )
+
     return parser
 
 def main():
@@ -153,7 +176,7 @@ def main():
         taxonomy_dir= args.taxonomy_path, 
         no_acc2taxid= args.no_acc2taxid
     )
-    
+
     # Load the bulk of the reference genomes from FASTA files.
     # These are loaded into the "sequences" table of the sqlite DB without a category value, 
     for fasta_path in args.fasta_path:
@@ -170,7 +193,7 @@ def main():
         
     kdb.create_segmented_flu_taxonomy_nodes()
     kdb.assign_flu_taxonomy_nodes()
-    
+
     if args.rsv_a_sequences and args.rsv_b_sequences:
         kdb.load_fasta_file(file_path= args.rsv_a_sequences, category= 'RSV A', enforce_ncbi_acc= False)
         kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B', enforce_ncbi_acc= False)
@@ -187,6 +210,16 @@ def main():
         if args.rsv_a_sequences or args.rsv_b_sequences:
             kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
     
+    multiref_paths, seen, multiref_data = kdb.find_multiref_paths(root_taxid = args.multiref_root_tax_id)
+    if not args.repair_subterminal_multirefs and not args.repair_all_multirefs:
+        logging.info("Paths with sequences attached to non-leaf nodes will not be fixed.")
+    if args.repair_subterminal_multirefs and not args.repair_all_multirefs:
+        logging.info("Repairing only subterminal multiref cases.")
+        kdb.repair_multiref_paths(multiref_paths, seen, "subterminal")
+    if args.repair_all_multirefs:
+        logging.info("Repairing all multiref cases.")
+        kdb.repair_multiref_paths(multiref_paths, seen, "all")
+
     kdb.create_db_ready_dir(path = args.out_dir)
     
     # if a DB prune is requested, carry it out but only if we are actually keeping the DB
