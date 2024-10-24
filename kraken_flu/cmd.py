@@ -182,7 +182,7 @@ def main():
         kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B', enforce_ncbi_acc= False)
         kdb.create_rsv_taxonomy( rsv_size_filter= args.rsv_size_filter )
     
-    if arg.dedup:
+    if args.dedup:
         kdb.deduplicate_sequences()
     
     if args.do_full_linkage:
