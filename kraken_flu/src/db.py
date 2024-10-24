@@ -961,6 +961,27 @@ class Db():
                 linked_seq_ids.extend(child_linked_seq_ids)
         return linked_seq_ids
         
+    def get_duplicate_sequence_data(self):
+        """
+        Returns a resultset of sequences grouped by the dba_sequence value with three columns: 
+            - count: number of identical sequences in this group
+            - min_id: lowest sequences.id in the group
+            - ids: list of all ids in the group, comma delimited string
+
+        Returns:
+            
+        """
+        stmt = """
+            SELECT 
+                COUNT(id) AS count, 
+                GROUP_CONCAT(id) AS ids,
+                MIN(id) AS min_id
+            FROM sequences
+            GROUP BY dna_sequence 
+            HAVING count > 1 
+        """
+        return self._cur.execute(stmt).fetchall()
+        
     @property        
     def schema(self):
         """
