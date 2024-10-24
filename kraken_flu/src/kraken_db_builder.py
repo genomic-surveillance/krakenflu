@@ -802,6 +802,39 @@ class KrakenDbBuilder():
         logging.info(f'Linkage task completed: {n_linked} sequences have been linked to taxonomy nodes' )
         return True
 
+    def deduplicate_sequences(self):
+        """
+        Identify groups of identical sequences and filter out (set include=0) all but the first record (lowest 
+        sequences.id).  
+        Duplicate sequences cause issues with kraken2 because reads that map to one of a group of duplicates will 
+        map to all of them, forcing kraken2 to assign the read to the last common ancestor instead of the actual 
+        sequence/isolate. 
+        In fact, the more common an isolate is (especially true for flu), the more likely that we will have many 
+        duplicates in the sequence data.
+        
+        Args:
+            None
+            
+        Returns:
+            list of sequences.id for the sequences that were removed
+            
+        Side effects:
+            Sets sequences.include 
+        """
+        logging.info(f'Starting to de-duplicate on DNA sequence' )
+        duplicate_data = self._db.get_duplicate_sequence_data()
+        sequence_ids_to_remove = []
+        for row in duplicate_data:
+            # TODO perhaps better to let the Db method return the data as int and list of ints directly?
+            min_id = int(row['min_id'])
+            ids = list(map(int, row['ids'].split(',') ))
+            ids.remove(min_id)
+            sequence_ids_to_remove.extend( ids )
+
+        self._db.mark_as_not_included(sequence_ids_to_remove)
+        logging.info(f'De-duplication of sequences complete, filtered out {len(sequence_ids_to_remove)} sequence records' )
+        return sequence_ids_to_remove
+
     def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna' ):
         """
         Create a directory with all files needed to build a new kraken database.
