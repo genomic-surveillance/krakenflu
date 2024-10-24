@@ -130,6 +130,12 @@ def args_parser():
         action = 'store_true',
         help = 'Must be used together with --rsv_a/b_sequences. Filters sequences in files for genome completeness (size)'        
     )
+    
+    parser.add_argument(
+        '--dedup',
+        action = 'store_true',
+        help = 'de-duplicate sequences and keep only a single record for every group'        
+    )
 
     return parser
 
@@ -175,6 +181,9 @@ def main():
         kdb.load_fasta_file(file_path= args.rsv_a_sequences, category= 'RSV A', enforce_ncbi_acc= False)
         kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B', enforce_ncbi_acc= False)
         kdb.create_rsv_taxonomy( rsv_size_filter= args.rsv_size_filter )
+    
+    if arg.dedup:
+        kdb.deduplicate_sequences()
     
     if args.do_full_linkage:
         kdb.link_all_unlinked_sequences_to_taxonomy_nodes()
