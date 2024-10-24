@@ -132,7 +132,7 @@ def args_parser():
     )
     
     parser.add_argument(
-        '--dedup',
+        '--deduplicate',
         action = 'store_true',
         help = 'de-duplicate sequences and keep only a single record for every group'        
     )
