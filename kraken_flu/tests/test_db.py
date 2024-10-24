@@ -5,7 +5,7 @@ from importlib_resources import files
 from kraken_flu.src.db import Db, BulkInsertBuffer
 
 # set this to True to make the tests print all executed SQL or False to stop that
-PRINT_SQL_TRACE=False
+PRINT_SQL_TRACE=True
 
 @pytest.fixture(scope='function')
 def setup_db( tmp_path ):
@@ -361,3 +361,149 @@ def test_bulk_update_buffer_force_single(setup_db_with_real_world_fixture):
     assert len(rows)==3, '3 rows of sequecnces data have been retrieved'
     assert [x['tax_id'] for x in rows ] == [200, 300, 456], 'after the bulk update, the records have the expected new tax_id values'
     assert [x['mod_fasta_header'] for x in rows ] == ['new header 1', 'new header 2', 'another new header'], 'before the bulk update, none of the records has a mod_fasta_header'
+
+def test_all_seq2taxid_iterator(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+
+    acc2taxids_rows = db._cur.execute("SELECT accession,tax_id FROM acc2taxids").fetchall()
+    assert len(acc2taxids_rows) == 4, '4 rows of acc2taxids in fixtures'
+
+    it = db.all_seq2taxid_iterator()
+    rows=[]
+    for row in it:
+        rows.append(row)
+    # fixtures contains 4 rows of acc2taxids with two unique tax_ids, so in total we should link 
+    # 2 sequences via accession ID to tax_id
+    assert len(rows) == 2, 'all_seq2taxid_iterator retrieved all (2) rows linking sequences to tax IDs in acc2taxids table via NCBI accession'
+
+    # check row data for the expected associations of sequences (by sequences.id) to tax_id
+    # the first is for 'NC_001803.1 Respiratory syncytial virus, complete genome' which should be linked to tax_id 12814
+    assert [x for x in rows if x['id']==9 and x['tax_id']==12814], 'the resultset contains an expected association of sequences.id 9 with tax_id 12814'
+
+    # the second one is 'NC_002205.1 Influenza B virus (B/Lee/1940) segment 2', linked to tax_id 518987, sequences.id=21
+    assert [x for x in rows if x['id']==21 and x['tax_id']==518987], 'the resultset contains an expected association of sequences.id 21 with tax_id 518987'
+    
+    # setting a tax_id for one of the two sequences linked above will make it drop from the 
+    # resultset, which retrieves only unlinked (no tax_id yet) records by default
+    db._cur.execute("UPDATE sequences SET tax_id=7878787 WHERE id=21")
+    it = db.all_seq2taxid_iterator()
+    rows=[]
+    for row in it:
+        rows.append(row)
+    assert len(rows) == 1, 'after setting the tax_id field to a value for one of the previously returned sequences, it is no longer in the resultset'
+    assert [x for x in rows if x['id']==9 and x['tax_id']==12814], 'the resultset still contains a linkage for sequences.id 9'
+    assert not [x for x in rows if x['id']==21 and x['tax_id']==518987], 'sequences.id 21 no longer in the resultset because it already has a tax_id now'
+    
+
+
+def test_prune_db(setup_db):
+    db = setup_db
+    rows = db._cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='acc2taxids'").fetchall()
+    assert len(rows)==1, 'the table acc2taxids exists before pruning'
+    assert db.prune_db(), 'method returns True'
+    rows = db._cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='acc2taxids'").fetchall()
+    assert not rows, 'the table acc2taxids no longer exists after pruning'
+
+def test_retrieve_flu_a_wo_subtype_ids(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    ids = db.retrieve_ids_flu_a_wo_subtype()
+    assert not ids,'there are no cases of flu A without a subtype in the fixtures'
+    
+    # delete H subtype from one flu A genome in fixtures and re-retrieve
+    stmt="""
+    UPDATE sequences
+    SET flu_a_h_subtype = NULL
+    WHERE ncbi_acc = 'NC_002023.1'
+    """
+    db._cur.execute(stmt)
+    db._con.commit()
+    ids = db.retrieve_ids_flu_a_wo_subtype()
+    assert len(ids) == 1,'having deleted the H subtype of one flu sequence, the method now retrieves one sequences.id'
+    assert ids[0] == 1, 'the correct sequences.id is returned'
+    
+def test_sequences_category_exists(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    id=1
+    label='test label'
+    assert not db.sequences_category_exists(label), 'there are no matching sequences with this label in the fixtures'
+    db._cur.execute("UPDATE sequences SET category= ? WHERE id= ?",[label, id])
+    db._con.commit()
+    assert db.sequences_category_exists(label), 'after the DB update, a sequence with the label exists in the DB and the method returns True'
+
+def test_get_seq_ids_by_category_and_seq_lt(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    ids = db.get_seq_ids_by_category_and_seq_lt(category='test label', seq_len_lt=1000 )
+    assert not ids, 'before we make changes to the fixtures, no sequences match the criteria'
+    
+    update_ids=[3,5,7]
+    stmt="UPDATE sequences SET category = 'test label', seq_length = 900 WHERE id = ?"
+    for id in update_ids:
+        db._cur.execute(stmt,[id])
+    db._con.commit()
+    ids = db.get_seq_ids_by_category_and_seq_lt(category='test label', seq_len_lt=1000 )
+    assert sorted(ids) == sorted(update_ids), 'after setting cateogry and seq length in three sequences to match filter, the three ids are returned'
+    
+def test_get_children_tax_ids(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    child_tax_ids = db.get_children_tax_ids(tax_id= 11250)
+    assert sorted(child_tax_ids)==[208893,208895,410233], 'found the expected child tax_ids for taxonomy node 11250'
+    
+def test_get_sequence_ids_linked_to_taxon(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 2955291, include_children= True)
+    assert not seq_ids, 'before we make changes to the fixtures, no sequences are linked to taxon 2955291 or any node in the sub-tree rooted at this taxon'
+    
+    # The relationships between the taxa in the fixtures are:                    
+    #           2955291         
+    #             │            
+    #             │            
+    #         ┌──11320─────┐    
+    #         ▼            ▼    
+    # ┌───114727─┐     119210  
+    # │          │        │    
+    # ▼          ▼        ▼    
+    # 641809    211044    335341 
+    #
+    # We are linking sequences as follows:
+    # tax_id    sequences.id
+    # 11320     1
+    # 114727    2
+    # 211044    3
+    # 641809    4
+    # 335341    6
+    # None of these are actually sequences of those taxa but this doesn't matter for the purpose of the test
+    
+    update_data = [
+        [11320,1],
+        [114727,2],
+        [211044,3],
+        [641809,4],
+        [335341,6]
+    ]
+    db._cur.executemany("UPDATE sequences SET tax_id = ? WHERE id = ?", update_data)
+    db._con.commit()
+    
+    # querying for sequence ids from taxon 2955291 "downwards" should now return the 5 sequence IDs from the update data
+    seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 2955291, include_children= True)
+    assert sorted(seq_ids)==[1,2,3,4,6], 'having now linked 5 sequences to taxa in the sub-tree from 2955291, we return all 5 sequences.id'
+    
+    # repeat, but exclude taxon id 119210 and its children, which should result in sequence ID 6 not 
+    # being in the resultset because it is linked to a child of 119210
+    seq_ids = db.get_sequence_ids_linked_to_taxon(tax_id= 2955291, include_children= True, skip_tax_ids=[119210])
+    assert sorted(seq_ids)==[1,2,3,4], 'having now linked 5 sequences to taxa in the sub-tree from 2955291, we return all 5 sequences.id'
+
+def test_get_seq_ids_and_fasta_headers_by_category(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    data = db.get_seq_ids_and_fasta_headers_by_category(category='test label')
+    assert not data, 'before we make changes to the fixtures, no sequences match the criteria'
+    
+    update_ids=[3,5,7]
+    stmt="UPDATE sequences SET category = 'test label', fasta_header='test header' WHERE id = ?"
+    for id in update_ids:
+        db._cur.execute(stmt,[id])
+    db._con.commit()
+    data = db.get_seq_ids_and_fasta_headers_by_category(category='test label')
+    assert isinstance(data, list), 'a list is returned'
+    assert len(data) == 3, 'there are three items of data'
+    assert {'id': 3, 'fasta_header': 'test header'} in data, 'returned data contains an expected sequence ID and FASTA header'
+    

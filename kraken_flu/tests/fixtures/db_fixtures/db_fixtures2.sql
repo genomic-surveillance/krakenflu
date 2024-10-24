@@ -86,7 +86,8 @@ INSERT INTO taxonomy_names (id,tax_id,name,name_class,unique_name) VALUES
 	 (49,119210,'H3N2 subtype','scientific name',''),
 	 (50,11520,'Influenza B virus','scientific name',''),
 	 (51,11320,'influenza A virus','equivalent name',''),
-	 (52,11320,'Influenza A virus','scientific name','');
+	 (52,11320,'Influenza A virus','scientific name',''),
+	 (53,2955291,'Alphainfluenzavirus influenzae','scientific name','');
 INSERT INTO taxonomy_nodes (tax_id,parent_tax_id,"rank",embl_code,division_id,inherited_div_flag,genetic_code_id,inherited_GC_flag,mitochondrial_genetic_code_id,inherited_MGC_flag,GenBank_hidden_flag,hidden_subtree_root_flag,comments) VALUES
 	 (11250,3049954,'no rank','',9,1,1,1,0,1,1,0,'code compliant; specified'),
 	 (11320,2955291,'no rank','',9,1,1,1,0,1,0,0,'code compliant; specified'),
@@ -107,4 +108,12 @@ INSERT INTO taxonomy_nodes (tax_id,parent_tax_id,"rank",embl_code,division_id,in
 	 (437607,211044,'no rank','',9,1,1,1,0,1,1,0,''),
 	 (518987,11520,'no rank','',9,1,1,1,0,1,1,0,''),
 	 (641809,114727,'no rank','',9,1,1,1,0,1,1,0,''),
-	 (2697049,694009,'no rank','',9,1,1,1,0,1,0,0,'');
+	 (2697049,694009,'no rank','',9,1,1,1,0,1,0,0,''),
+	 (114727,11320,'no rank','',9,1,1,1,0,1,1,0,''),
+	 (119210,11320,'no rank','',9,1,1,1,0,1,1,0,''),
+	 (2955291,197911,'no rank','',9,1,1,1,0,1,1,0,'');
+INSERT INTO  acc2taxids (accession,tax_id) VALUES 
+	('NC_002205',518987),
+	('NC_002205.1',518987),
+	('NC_001803.1',12814),
+	('NC_001803',12814);

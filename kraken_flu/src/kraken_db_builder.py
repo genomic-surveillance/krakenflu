@@ -123,7 +123,7 @@ class KrakenDbBuilder():
         """
         Load taxonomy files from a directory that contains the NCBI taxonomy download.  
         The directory needs to contain files names.dmp and nodes.dmp and may also contain a file 
-        of 
+        of accession to taxonomy ID mappings "nucl_gb.accession2taxid"
 
         Args:
             taxonomy_dir: str, required
@@ -176,9 +176,13 @@ class KrakenDbBuilder():
         
         self.taxonomy_loaded= True        
 
-    def load_fasta_file(self, file_path:str, category:str=None):
+    def load_fasta_file(self, file_path:str, category:str=None, enforce_ncbi_acc:bool = False):
         """
-        Uses the fasta_loader to load a FASTA file into the DB. For details, see fasta_loader module.
+        Uses the fasta_loader to load a FASTA file into the DB. For details, see fasta_loader module. 
+        This method is used for "generic" sequences that do not require a category label. This includes 
+        the general RefSeq FASTA as well as influenza data, where the FASTA headers are used to figure out 
+        which taxonomy node to link to.  
+        For sequences that require a category label (such as RSV A/B), use the load_labelled_fasta method instead.  
 
         Args:
             file_path: str, required
@@ -189,10 +193,13 @@ class KrakenDbBuilder():
                 table, which can be used later to create associations with taxonomy nodes.  
                 This is used for cases where we load a specific FASTA file for a known virus 
                 (type) and we want to save a hint in the DB for the taxonomy association later. 
+                
+            enforce_ncbi_acc: bool, optional, defaults to False
+                If True, an exception is thrown if an NCBI acc ID cannot be found
         """
-        load_fasta(db=self._db, file_path=file_path, category=category)
+        load_fasta(db=self._db, file_path=file_path, category=category, enforce_ncbi_acc= enforce_ncbi_acc)
         self.fasta_files_loaded.append(file_path)
-        
+    
     def filter_unnamed_unsegmented_flu(self):
         """
         Marks all flu records as include=0 where the sequence name indicates flu but the isolate  
@@ -288,6 +295,33 @@ class KrakenDbBuilder():
         logging.info( f'{isolate_removal_count} of {isolate_total_count} flu isolates were identified as incomplete ({isolate_exempt_count} matched exempt list). Marking in database')
         self._db.mark_as_not_included(sequence_ids_to_remove)
         logging.info( f'Completed updating database')
+        return True
+    
+    def filter_flu_a_wo_subtype(self):
+        """
+        Exclude all flu A sequences where the H and N subtypes are not set.  
+        If we don't do this, flu A sequences will become linked to "Influenza A segment 4" 
+        and "Influenza A segment 6" nodes, thus bypassing the "Influenza A Hx segment 4" and 
+        "Influenza A Nx segment 4" level of taxonomy nodes created by create_segmented_flu_taxonomy_nodes.  
+        The main source of flu A genomes in this category are those that have a "mixed" subtype in the 
+        isolate name.   
+        TODO: investigate whether we should create nodes "Infleunza A mixed subtype segment 4" (and 6) 
+        and keep the mixed subtype sequences. They might be be valuable for the analysis but this will 
+        need some research.  
+        
+        Args:
+            none
+            
+        Side effects:
+            Sets sequences.include field for some flu A sequences
+            
+        Returns:
+            True on success
+        """
+        logging.info('starting to filter out flu A genomes without subtype (such as "mixed" subtypes)')
+        sequence_ids_to_remove = self._db.retrieve_ids_flu_a_wo_subtype()
+        self._db.mark_as_not_included(sequence_ids_to_remove)
+        logging.info(f'filtered out {len(sequence_ids_to_remove)} flu A genomes without a subtype')
         return True
     
     def create_segmented_flu_taxonomy_nodes(self, missing_parent_is_exception:bool=False):
@@ -410,13 +444,11 @@ class KrakenDbBuilder():
         last_log_cp = 0
         logging.info(f"retrieved {n_records} flu sequence records from database")
         
-        new_tax_id = self.next_new_tax_id()
         with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id','mod_fasta_header'], buffer_size= 50000) as seq_update_buffer:
-
             with self._db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as nodes_buffer:
                 with self._db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size= 50000) as names_buffer:
                     for flu_sequence in flu_sequences:
-                        new_tax_id+=1
+                        new_tax_id = self.next_new_tax_id()
                         flu_name= flu_sequence['flu_name']
                         flu_type= flu_sequence['flu_type']
                         segment_number= flu_sequence['segment_number']
@@ -494,6 +526,282 @@ class KrakenDbBuilder():
         logging.info("finished setting taxonomy IDs for segmented flu genomes")
         return True
 
+    def create_rsv_taxonomy(self, rsv_size_filter:bool=False):
+        """
+        Builds a custom-made RSV taxonomy based on known RSV A and B isolates. The method relies on sequences 
+        loaded into the sequences table with a category label "RSV A" or "RSV B". These sequences must exist already 
+        in the DB before running this method.  See "load_fasta_file" on how to load FASTA with labels.   
+        In contrast to the custom-built flu taxonomy, this method does not create any new parental taxonomy nodes.  
+        It only creates new nodes for the isolates loaded from the pre-labelled files and links those to the existing 
+        hRSV parental nodes "Human respiratory syncytial virus A" and "Human respiratory syncytial virus B"
+        
+        The method performs the following tasks:
+            - applies a size filter to remove incomplete hRSV sequences (can be skipped)
+            - for all sequences in the DB labelled RSV A/B:
+                - creates a node in the taxonomy for each isolate
+                - links this node to the hRSV A or B parent node according to its label
+        
+        Further details on rationale for this method:
+        RSV sequences in RefSeq are currently not sufficient for our purposes (more details below). For this reason, it was decided 
+        that we would obtain RSV sequences classified as A or B from Nextstrain instead. We obtain these as 
+        separate downloads, which can be loaded into the kraken-flu database with labels "RSV A" and "RSV B" 
+        which are stored in the sequences.category field. The aim of this method is to replace the existing hRSV 
+        taxonomy bny removing all sequences that are linked to the hRSV parent taxonomy node, then replacing them 
+        with the Nextstrain (or other authority) typed sequences based on the category labels in the database.  
+        If we would skip the removal of existing hRSV sequences, we would end up with sequences that are directly 
+        linked to the hRSV parent node, which bypasses our A/B type classification.  
+        
+        NCBI RefSeq (in October 24) contains three hRSV sequences:
+        NC_001781.1: Human orthopneumovirus Subgroup B, tax_id 11250 (Human orthopneumovirus)
+        NC_038235.1: Human orthopneumovirus Subgroup A, tax_id 11250 (Human orthopneumovirus)
+        NC_001803.1: Respiratory syncytial virus, complete genome, tax_id 12814 (Respiratory syncytial virus)
+
+        None of the three RefSeq hRSV sequences is linked to the hRSV A/B type nodes, which are
+        - tax_id 208893 Human respiratory syncytial virus A
+        - tax_id 208895 Human respiratory syncytial virus B 
+        Instead, they are linked to tax_id 11250 (Human orthopneumovirus), the parental node of hRSV A/B or 12814, 
+        which is bovine RSV. Thus, the data from NCBI does not provide the database structure we need, where 
+        hRSV sequences are assigned to nodes Human respiratory syncytial virus A/B.  
+        
+        To complete the RSV taxonomy, we also need to remove any sequences that would otherwise link to higher-level 
+        RSV taxonomy nodes (e.g. from RefSeq). This cannot be done here, because it must be done after the full linkage 
+        of all sequences to the taxonomy. See "filter_out_sequences_linked_to_high_level_rsv_nodes" for details.  
+
+        Args:
+            rsv_size_filter: bool, defaults to False
+                If True, RSV sequences are filtered on size to keep only full-length or nearly 
+                full length genomes.  
+        """
+        logging.info("starting to build custom RSV taxonomy")
+        
+        for t in (['A','B']):
+            label = 'RSV ' + t
+            if not self._db.sequences_category_exists(label):
+                raise ValueError(f'method create_rsv_taxonomy_from_file called but no sequences loaded into DB with label "{label}"')
+        
+        if rsv_size_filter:
+            self._apply_rsv_size_filter(categories=['RSV A','RSV B'])
+        
+        hrsv_nodes_tax_id={}
+        hrsv_nodes_tax_id['RSV A'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus A')
+        if not hrsv_nodes_tax_id['RSV A']:
+            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus A" in database')
+        
+        hrsv_nodes_tax_id['RSV B'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus B')
+        if not hrsv_nodes_tax_id['RSV B']:
+            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus B" in database')
+        
+        # create new nodes for the RSV genomes that were uploaded from files and link to taxonomy
+        # TODO: this block is very similar to the one in "assign_flu_taxonomy_nodes", might be worth factoring out 
+        # into a common method.  There are important differences though so might not be worth it.  
+        with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id'], buffer_size= 50000) as seq_update_buffer:
+
+            with self._db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as nodes_buffer:
+                with self._db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size= 50000) as names_buffer:
+                    for category, parent_tax_id in hrsv_nodes_tax_id.items():
+                        category_sequences = self._db.get_seq_ids_and_fasta_headers_by_category(category, included_only= True)
+                        for sequence in category_sequences:
+                            new_tax_id = self.next_new_tax_id()
+                            id= sequence['id']
+                            fasta_header = sequence['fasta_header']
+                            
+                            # libraries obtained from Nextstrain only contain the NCBI acc in the 
+                            # header which is not ideal. If the header is a single word, we 
+                            # prepend the cateogry value, which is "RSV A/B"
+                            if not ' ' in fasta_header:
+                                fasta_header = category + ' ' + fasta_header
+                            
+                            # create the new node/name records for the sequence and link it to the parent node
+                            n_inserted_nodes = nodes_buffer.add_row(
+                                {
+                                    'tax_id': new_tax_id,
+                                    'parent_tax_id':parent_tax_id,
+                                    'rank': 'no rank',
+                                    'embl_code': None,
+                                    'division_id': 9,                   
+                                    'inherited_div_flag': 1,            
+                                    'genetic_code_id': 1,
+                                    'inherited_GC_flag': 1,
+                                    'mitochondrial_genetic_code_id': 0,
+                                    'inherited_MGC_flag': 1,
+                                    'GenBank_hidden_flag': 0,
+                                    'hidden_subtree_root_flag': 0,
+                                    'comments': 'kraken_flu added node'
+                                }
+                            )
+                            if n_inserted_nodes > 0:
+                                logging.info(f'flushed {n_inserted_nodes} nodes records to DB')
+
+                            n_inserted_names = names_buffer.add_row(
+                                {
+                                    'tax_id': new_tax_id,
+                                    'name': fasta_header,
+                                    'unique_name': fasta_header,
+                                    'name_class': 'scientific name'
+                                }
+                            )
+                            if n_inserted_names > 0:
+                                logging.info(f'flushed {n_inserted_names} names records to DB')
+                                
+                            # link sequence records to the newly inserted taxonomy nodes
+                            n_updated_seqs= seq_update_buffer.add_row(
+                                {
+                                    'id': id,
+                                    'tax_id': new_tax_id
+                                }
+                            )
+                            if n_updated_seqs > 0:
+                                logging.info(f'flushed {n_updated_seqs} sequence record updates to DB')
+        
+        logging.info("finished building custom RSV taxonomy")
+        return True
+        
+    def filter_out_sequences_linked_to_high_level_rsv_nodes(self):
+        """
+        The final RSV taxonomy should only contain sequences linked to hRSV A/B nodes, not to any of the 
+        higher-level nodes from "Orthopneumovirus" down. This custom taxonomy is built by method 
+        create_rsv_taxonomy, at the end of which, we should have custom sequences linked to the hRSV A/B 
+        nodes. 
+        This filter needs to be applied after all sequences have been linked via Genbank IDs, which will 
+        associate RefSeq sequences with higher-level taxonomy nodes such as "Orthopneumovirus hominis". If 
+        we would leave them in the final DB, they would attract reads, bypassing the hRSV A/B classification.
+        The method identifies the high-level node to start the purge from and the nodes that need to be left unchanged.  
+        
+        NOTE: We are starting the purge from "Orthopneumovirus", which means that all non-human RSV sequences are 
+        also removed. This is by design. It should improve our ability to identifiy hRSV, which are the ones we 
+        care about in the viral pipeline.  If non-human "Orthopneumovirus" species should be retained, change the
+        name of the start taxon accordingly.  
+        Check this NCBI taxonomy page for a list of the taxa included in "Orthopneumovirus"
+        https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Tree&id=1868215&lvl=3&keep=1&srchmode=1&unlock
+        
+        Returns:
+            Number of sequences removed
+        
+        Side-effects:
+            sets sequences.include value
+        """
+        start_taxon_name= 'Orthopneumovirus'
+        start_tax_id =  self._db.retrieve_tax_id_by_node_scientific_name(start_taxon_name)
+        if not start_tax_id:
+            raise ValueError(f'could not find taxonomy node for "{start_taxon_name}" in database')
+
+        skip_taxon_names = [
+            'Human respiratory syncytial virus A',
+            'Human respiratory syncytial virus B',
+            ]
+
+        skip_tax_ids= []
+        for name in skip_taxon_names:
+            tax_id = self._db.retrieve_tax_id_by_node_scientific_name(name)
+            if not tax_id:
+                raise ValueError(f'could not find taxonomy node for "{name}" in database')
+            else:
+                skip_tax_ids.append(tax_id)
+            
+        seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= start_tax_id, skip_tax_ids= skip_tax_ids)
+        logging.info(f'removed {len(seq_ids)} sequences from high-level RSV taxonomy nodes (not including hRSV A/B)')
+        return len(seq_ids)
+        
+    def filter_out_sequences_linked_to_taxonomy_sub_tree(self, tax_id:int, skip_tax_ids:list=None):
+        """
+        Filter out (set sequences.include=0) all sequences linked to a taxonomy sub-tree, starting at a
+        parent taxonomy node, identified by a tax_id.  
+        The method traverses the sub-tree recursively and identifies all sequences that have a tax_id linkage 
+        to any of the nodes in the sub-tree. These are filtered by setting the include field.  
+
+        Args:
+            tax_id: int, required
+                The tax_id of the parent node of the sub-tree from which we want to filter out linked 
+                sequences. All sequences linked to this node or any of its children are filtered.  
+                
+            skip_tax_ids: list, optional
+                If a list of tax_ids is provided, matching taxonomy nodes and all their children are skipped 
+                and will not be filtered out. This is used, for example, for the RSV taxonomy tree where we 
+                want to make sure we only retain hRSV A/B linked sequences and remove all other sequences from the 
+                tree from "Orthopneumovirus" down.  
+                
+        Returns:
+            list of sequences.id for the sequences that were removed
+        """
+        if skip_tax_ids is None:
+            skip_tax_ids = []
+        sequence_ids_to_remove = self._db.get_sequence_ids_linked_to_taxon(tax_id= tax_id, include_children= True, skip_tax_ids = skip_tax_ids)
+        self._db.mark_as_not_included(sequence_ids_to_remove)
+        return sequence_ids_to_remove
+            
+    def _apply_rsv_size_filter(self, categories:list=None):
+        """
+        Filter out (mark sequences.includee=0) all RSV genomes that do not meet the minimum length filter.  
+        This currently relies on the sequences.cateogry label being set to 'RSV A' or 'RSV B', ie no filter 
+        will be applied to RSV genomes that have been uploaded without an RSV label. This would include all 
+        sequences from RefSeq. This should not cause any issues because this filter is only run if we are creating 
+        a custom taxonomy for RSV and that means we will not be using any RefSeq or other RSV sequences that 
+        have not been loaded into the DB with an RSV label.  But it would make sense to implement a name-based 
+        filter that would need a regex to recognize RSV genomes (by full name and acronym).  
+
+        Args:
+            categories: list, optional, defaults to ['RSV A','RSV B']
+                A list of category labels of sequences to be filtered
+                
+        Return:
+            True on success
+            
+        Side effects:
+            Sets sequences.include values
+        """
+        # this is here rather than in the method defaults because of this: https://pylint.readthedocs.io/en/latest/user_guide/messages/warning/dangerous-default-value.html
+        if not categories:
+            categories= ['RSV A','RSV B']
+        
+        logging.info( f'starting filter to remove incomplete RSV genomes')
+
+        # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
+        # https://www.nature.com/articles/s41598-023-40760-y
+        # Using a cutoff of 15k
+        rsv_min_len = 15000
+        n_filtered= 0
+        for label in categories:
+            sequence_ids_to_remove  = self._db.get_seq_ids_by_category_and_seq_lt(category= label, seq_len_lt= rsv_min_len)
+            self._db.mark_as_not_included(sequence_ids_to_remove)
+            n_filtered+= len(sequence_ids_to_remove)
+        logging.info( f'filtered out {n_filtered} RSV genomes as incomplete (<{rsv_min_len} bases)')
+        return True
+
+    def link_all_unlinked_sequences_to_taxonomy_nodes(self):
+        """
+        For all sequences that do not yet have a tax_id set, this method attempts to set the tax_id using the 
+        data in the acc2taxids table, if one was created. The information in the acc2taxids table originates in the 
+        NCBI accession-to-taxid file and links GenBank or RefSeq accession IDs to taxonomy IDs.  
+        For a sequence to be linked successfully, it must have an NCBI accession ID that was successfully parsed 
+        from the FASTA header at the sequences import step and that accession must exist in the NCBI acc2taxid file.  
+        Sequences that were obtained from non-NCBI sources may not have an accession assigned and, hence, may not 
+        be linked by this method.  
+        The tax_id identified in the linkage process is written to the sequences.tax_id field and will therefore be 
+        used in the export of sequences to FASTA files.  
+        
+        Returns:
+            True on success
+            
+        Side-effects:
+            Updates sequences.tax_id field for some records
+        """
+        logging.info('Starting to link currently unlinked sequences to taxonomy')
+        n_linked= 0
+        seq2taxid_iterator = self._db.all_seq2taxid_iterator(unlinked_only= True)       
+        with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id'], buffer_size= 50000) as seq_update_buffer:
+            for row in seq2taxid_iterator:
+                n_linked+=1
+                n_updated_seqs= seq_update_buffer.add_row(
+                    {
+                        'id': row['id'],
+                        'tax_id': row['tax_id']
+                    }
+                )
+                if n_updated_seqs > 0:
+                    logging.info(f'flushed {n_updated_seqs} sequence record updates to DB')
+        logging.info(f'Linkage task completed: {n_linked} sequences have been linked to taxonomy nodes' )
+        return True
+
     def create_db_ready_dir( self, path: str, force: bool = True, fasta_file_name:str = 'library.fna' ):
         """
         Create a directory with all files needed to build a new kraken database.
@@ -538,6 +846,16 @@ class KrakenDbBuilder():
         logging.info( 'output files completed')
         return True
 
+    def prune_db(self):
+        """
+        Remove unnecessary data from the DB at the end of the process.  
+        Just delegates to a method of the same name in the Db class. See there for more information.  
+        """
+        logging.info('starting to prune unnecessary data from the DB')
+        self._db.prune_db()
+        logging.info('finished DB prune')
+        return True    
+    
     def find_multiref_paths(self, root_taxid:int = None):
         """Find paths in the kraken_flu taxonomy DB where any non-leaf nodes are associated with reference sequences
 
