@@ -887,4 +887,160 @@ class KrakenDbBuilder():
         logging.info('starting to prune unnecessary data from the DB')
         self._db.prune_db()
         logging.info('finished DB prune')
-        return True
+        return True    
+    
+    def find_multiref_paths(self, root_taxid:int = None):
+        """Find paths in the kraken_flu taxonomy DB where any non-leaf nodes are associated with reference sequences
+
+        Args:
+            root_taxid (int, optional): TaxID of the taxon at which to root the taxonomy
+                                        If using taxon "Viruses" as root, this should be 10239
+            If specified, only paths containing this tax_id will be analysed. Defaults to None.
+
+        Returns:
+            multiref_paths (dict): A dict describing any multiref paths found, where
+                                    Key = leaf node of path
+                                    Value = Dict(
+                                                    Keys = "path", "ref_depth"
+                                                    Values = path(list), ref_depth(int)
+                                                )
+        """
+        # root_taxid = 10239
+        seen = set()
+        multiref_paths = []
+        multiref_data = {}
+        all_paths = self._db.get_all_tax_ids_paths_root_to_leaf()
+
+        for path in all_paths:
+            if root_taxid and not root_taxid in path:
+                continue
+            multiref, ref_depth, seen = self._evaluate_path_for_refs(path, seen)
+            if multiref:
+                multiref_data[path[-1]] = {"path": path, "ref_depth": ref_depth}
+                multiref_paths.append(path)
+
+        for k, v in multiref_data.items():
+            logging.info("Multireference paths found:\n")
+            logging.info(f"{k}: {v}\n")
+
+        return multiref_paths, seen, multiref_data
+
+    def _evaluate_path_for_refs(self, path: list, seen: set):
+        """Analyse a path for being multiref
+
+        Args:
+            path (list): Path represented as a list of tax_ids
+            seen (set): Cache, non-leaf tax_ids already observed to have associated sequences
+
+        Returns:
+            multiref (bool): Whether the input path is a multiref path
+            ref_depth (int): Where in the path the extra reference sequence is.
+                                If subterminal has sequence, ref_depth = 1
+                                Else ref_depth = 2
+        """
+        multiref = False
+        ref_depth = 0
+
+        parent = path[-2]
+        if (parent in seen) or (self._db._is_in_db_sequences(parent)):
+            multiref = True
+            ref_depth = 1
+            seen.add(parent)
+
+            return multiref, ref_depth, seen
+
+        elif any(taxid in seen for taxid in path[:-2]):
+            multiref = True
+            ref_depth = 2
+
+        else:
+            for taxid in path[::-1][2:]:
+                found = self._db._is_in_db_sequences(taxid)
+                if not found:
+                    continue
+                else:
+                    multiref = True
+                    ref_depth = 2
+                    seen.add(taxid)
+                    break
+
+        return multiref, ref_depth, seen
+
+    def repair_multiref_paths(self, paths: list, seen: set = None, which:str = "all"):
+        """Repair multiref paths found in the DB
+
+        Args:
+            paths (list): List of multiref paths to fix
+            seen (set, optional): Set containing non-leaf taxids already known to have a sequence,
+                                    used as cache. Defaults to None.
+            which (str): Which type of multiref paths to fix - only subterminal cases or all cases.
+                            Deafults to "all"
+        """
+        which = which.lower()
+        try:
+            assert which in ["subterminal", "all"]
+        except AssertionError as ae:
+            raise ValueError("Type of multiref path to repair must be either 'subterminal' or 'all'")
+
+        if not seen:
+             seen = set()
+        for path in paths:
+            bool_list = []
+            for tax_id in path[::-1]:
+                if self._db._is_in_db_sequences(tax_id) or tax_id in seen:
+                    bool_list.append(True)
+                    if not tax_id in seen:
+                        seen.add(tax_id)
+                else:
+                    bool_list.append(False)
+
+            if bool_list[2:].count(True) >= 1 or len(path) == 2:
+                bool_list.reverse()
+                logging.info(f"Treating {path} as a case of complex multiref path\n")
+                if which == "all":
+                    self._fix_complex_multiref(path, bool_list)
+                else:
+                    logging.info(f"{path} is a complex multiref path, but not fixed\n")
+
+            else:
+                logging.info(f"Treating {path} as a case of subterminal multiref path\n")
+                self._fix_subterminal_multiref(path)
+
+    def _fix_subterminal_multiref(self, path:list):
+        """Repair cases of multirefrence paths where the extra reference is
+        found at the parent/subterminal level
+
+        Args:
+            path (list): The path to repair/edit
+
+        """
+        try:
+            terminal = path[-1]
+            common_parent = path[-3]
+            self._db._repair_update_parent_taxid(common_parent, terminal)
+        except IndexError as ie:
+            raise IndexError(f"Path {path} has too few nodes.\n")
+
+    def _fix_complex_multiref(self, path:list, bool_list:list):
+        """Repair cases of multirefrence paths where the extra reference(s) is
+        found at a level higher than the parent/subterminal
+
+        Args:
+            path (list): The path to repair
+            bool_list (list): A list of booleans corresponding to the path, where
+                                True = taxid has a reference
+                                False = taxid does not have a reference
+        """
+        if len(path) == 2:
+            problem_taxids = [path[0]]
+        else:
+            problem_taxids = [taxid for idx, taxid in enumerate(path[:-2]) if bool_list[idx] == True]
+
+        for taxid in problem_taxids:
+            logging.info(f"Taxid {taxid} delinked from sequence.")
+            self._db._repair_delink_sequences(taxid)
+
+        ## finally handle subterminal multiref case
+        if bool_list[-2] == True:
+            logging.info(f"Path {path} also contains subterminal multiref case, repairing...")
+            self._fix_subterminal_multiref(path)
