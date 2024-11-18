@@ -85,6 +85,12 @@ def args_parser():
     )
     
     parser.add_argument(
+        '--filter_flu_taxonomy',
+        action = 'store_true',
+        help = 'apply the influenza taxonomy filter: remove sequences that bypass the custom flu taxonomy. Must be used with do_complete_linkage'        
+    )
+    
+    parser.add_argument(
         '--filter_except',
         action= 'append',
         metavar= 'PATTERN',
@@ -174,6 +180,9 @@ def main():
     if (args.rsv_a_sequences and not args.rsv_b_sequences) or (args.rsv_b_sequences and not args.rsv_a_sequences):
         raise ValueError('parameters --rsv_a_sequences and --rsv_b_sequences must be used together')
     
+    if args.filter_flu_taxonomy and not args.do_full_linkage:
+        raise ValueError('option --filter_flu_taxonomy can only be used with --do_full_linkage')
+    
     # TODO: move the rest into a single function in KrakenDbBuilder, perhaps called "build"
     # We need to run some integration tests and this would be difficult in the current setup
     
@@ -218,6 +227,12 @@ def main():
         # to hRSV A/B
         if args.rsv_a_sequences or args.rsv_b_sequences:
             kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
+            
+        # as for RSV: filter out flu sequences that are linked to high-level taxa (not our custom 
+        # taxonomy nodes). These will include sequences that cannot even be recognised as flu from the 
+        # name (don't contain keywords)
+        if args.filter_flu_taxonomy:
+            kdb.filter_out_sequences_linked_to_high_level_flu_nodes()
     
     multiref_paths, seen, multiref_data = kdb.find_multiref_paths(root_taxid = args.multiref_root_tax_id)
     if not args.repair_subterminal_multirefs and not args.repair_all_multirefs:

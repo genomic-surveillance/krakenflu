@@ -577,3 +577,37 @@ def test_repair_multiref_paths(setup_db_with_real_world_fixture):
 
     multiref_paths_now, seen, multiref_data_now = kdb.find_multiref_paths()
     assert len(multiref_paths_now) == 0
+    
+def test_filter_out_sequences_linked_to_high_level_flu_nodes(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    # prepare the DB by creating the custom flu taxonomy
+    # TODO: should create a DB fixture for this case with custom nodes already created
+    kdb.create_segmented_flu_taxonomy_nodes()
+    
+    n_removed = kdb.filter_out_sequences_linked_to_high_level_flu_nodes()
+    assert n_removed == 0, 'no sequences have linkages to any taxa in the fixtures initially, hence nothing is filtered out'
+    
+    # link:
+    # sequence ID1 1 to the custom "Influenza A H1 segment 4" node
+    # sequence ID 2 to "H1N1 subtype"
+    # -> sequence 1 should remain and sequence 2 should be filtered out after running filter
+    inf_a_h1_seg4_tax_id = kdb._db.retrieve_tax_id_by_node_scientific_name("Influenza A H1 segment 4")
+    assert inf_a_h1_seg4_tax_id
+    h1n1_sub_id = kdb._db.retrieve_tax_id_by_node_scientific_name("H1N1 subtype")
+    assert h1n1_sub_id
+    
+    db._cur.execute("UPDATE sequences SET tax_id = ? WHERE id = ?", [inf_a_h1_seg4_tax_id, 1])
+    db._cur.execute("UPDATE sequences SET tax_id = ? WHERE id = ?", [h1n1_sub_id, 2])
+    db._con.commit()
+    
+    n_removed = kdb.filter_out_sequences_linked_to_high_level_flu_nodes()
+    assert n_removed == 1, 'having added two sequences to the taxonomy tree (one to a custom node and one bypassing custom taxonomy), one sequence is now filtered out'
+    
+    row = db._cur.execute("SELECT id, include FROM sequences where id = 1").fetchone()
+    assert row['include'] == 1 ,'a sequence that is linked to a new custom flu tax node is still included after the filter'
+    
+    row = db._cur.execute("SELECT id, include FROM sequences where id = 2").fetchone()
+    assert row['include'] == 0 ,'a sequence that is linked to a tax node outside of the custom flu taxonomy (H1N1 subtype) is filtered out after running the filter'
+    

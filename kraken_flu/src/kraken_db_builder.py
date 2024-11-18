@@ -85,6 +85,7 @@ class KrakenDbBuilder():
         self.db_path = None
         self._next_new_tax_id = None
         self._new_flu_node_ids = None
+        self._first_new_tax_id = None
         
         if db:
             self._db = db
@@ -114,10 +115,20 @@ class KrakenDbBuilder():
         """
         if not self._next_new_tax_id:
             self._next_new_tax_id = self._db.max_tax_id() + 1
+            self._first_new_tax_id = self._next_new_tax_id
         else:
             self._next_new_tax_id+=1
         
         return self._next_new_tax_id
+    
+    def first_new_tax_id(self):
+        """
+        The first new tax ID, ie the lowest ID assigned to any newly created taxon
+        """
+        if self._first_new_tax_id:
+            return self._first_new_tax_id
+        else:
+            return None
         
     def load_taxonomy_files(self, taxonomy_dir:str, no_acc2taxid:bool=False):
         """
@@ -668,7 +679,7 @@ class KrakenDbBuilder():
         The method identifies the high-level node to start the purge from and the nodes that need to be left unchanged.  
         
         NOTE: We are starting the purge from "Orthopneumovirus", which means that all non-human RSV sequences are 
-        also removed. This is by design. It should improve our ability to identifiy hRSV, which are the ones we 
+        also removed. This is by design. It should improve our ability to identify hRSV, which are the ones we 
         care about in the viral pipeline.  If non-human "Orthopneumovirus" species should be retained, change the
         name of the start taxon accordingly.  
         Check this NCBI taxonomy page for a list of the taxa included in "Orthopneumovirus"
@@ -701,6 +712,48 @@ class KrakenDbBuilder():
         seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= start_tax_id, skip_tax_ids= skip_tax_ids)
         logging.info(f'removed {len(seq_ids)} sequences from high-level RSV taxonomy nodes (not including hRSV A/B)')
         return len(seq_ids)
+        
+    def filter_out_sequences_linked_to_high_level_flu_nodes(self):
+        """
+        Filter out (set sequences.include=0) all sequences linked to the taxonomy sub-trees rooted o nodes 
+        "Influenza [A-D]" except for those linked to the custom taxonomy trees created in "create_segmented_flu_taxonomy_nodes".  
+        This step has to be run after "link_all_unlinked_sequences_to_taxonomy_nodes". At this stage, sequences are 
+        linked to taxonomy nodes based on decisions made by the original submitted to NCBI. This can result in genomes 
+        being linked to influenza taxonomy nodes outside of our custom taxonomy. Most such cases will have been filtered out 
+        in the flu filter methods but there can be genomes that have names which cannot even be recognised as flu but 
+        are still linked to flu taxonomy nodes by the submitter. 
+        Example:
+        Taxonomy node 31660 "Equine influenza virus H3N8" has links from sequences such as
+        "Sequence 108 from Patent WO0160849", GenBank ID AX225098.1
+        The sequence cannot be recognised as flu from the name. Consequently, it is not filtered out and not linked 
+        to the custom flu (segmented) taxonomy structure. After the complete linkage based on NCBI-supplied taxon IDs, 
+        this provides a sequences to the path Influenza A virus > H3N8 subtype, thus bypassing the custom flu taxonomy.  
+        Reads that match this sequence as well as sequences within the custom taxonomy tree will become assigned to the 
+        the high level taxon "Influenza A Virus", which is the last common ancestor in this scenario.  
+        
+        Returns:
+            Number of sequences removed
+        
+        Side-effects:
+            sets sequences.include value
+        """
+        # Need to leave all taxonomy nodes untouched, where the node was created by this tool  
+        # This list contains all newly created taxon node IDs. It doesn't matter that some of them 
+        # might be outside the flu taxonomy, as those will simply not be encountered in this filter
+        created_tax_ids = list(range(self.first_new_tax_id(), self.next_new_tax_id()))
+        
+        seq_ids_removed = set()
+        types = ['A','B','C','D']
+        new_node_ids = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+        for type in types:
+            node_name = f"Influenza {type} virus"
+            tax_id = self._db.retrieve_tax_id_by_node_scientific_name(node_name)
+            if not tax_id:
+                continue 
+            seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= tax_id, skip_tax_ids= created_tax_ids)
+            seq_ids_removed.update(seq_ids)
+        logging.info(f'removed {len(seq_ids_removed)} influenza sequences linked to taxonomy nodes outside of the custom flu taxonomy structure')
+        return len(seq_ids_removed)
         
     def filter_out_sequences_linked_to_taxonomy_sub_tree(self, tax_id:int, skip_tax_ids:list=None):
         """
