@@ -695,23 +695,23 @@ class KrakenDbBuilder():
         start_tax_id =  self._db.retrieve_tax_id_by_node_scientific_name(start_taxon_name)
         if not start_tax_id:
             raise ValueError(f'could not find taxonomy node for "{start_taxon_name}" in database')
-
-        skip_taxon_names = [
-            'Human respiratory syncytial virus A',
-            'Human respiratory syncytial virus B',
-            ]
-
-        skip_tax_ids= []
-        for name in skip_taxon_names:
-            tax_id = self._db.retrieve_tax_id_by_node_scientific_name(name)
-            if not tax_id:
-                raise ValueError(f'could not find taxonomy node for "{name}" in database')
-            else:
-                skip_tax_ids.append(tax_id)
             
-        seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= start_tax_id, skip_tax_ids= skip_tax_ids)
+        seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= start_tax_id, skip_tax_ids= self.created_tax_ids())
         logging.info(f'removed {len(seq_ids)} sequences from high-level RSV taxonomy nodes (not including hRSV A/B)')
         return len(seq_ids)
+        
+    def created_tax_ids(self):
+        """
+        Returns a list of taxon IDs that have been created by this tool and were not part of the ingested 
+        NCBI taxonomy. This can be used by filters that need to skip the custom created taxa.  
+        
+        Args:
+            None
+        Returns:
+            List of taxonomy IDs
+        """
+        return list(range(self.first_new_tax_id(), self.next_new_tax_id()))
+
         
     def filter_out_sequences_linked_to_high_level_flu_nodes(self):
         """
@@ -737,11 +737,6 @@ class KrakenDbBuilder():
         Side-effects:
             sets sequences.include value
         """
-        # Need to leave all taxonomy nodes untouched, where the node was created by this tool  
-        # This list contains all newly created taxon node IDs. It doesn't matter that some of them 
-        # might be outside the flu taxonomy, as those will simply not be encountered in this filter
-        created_tax_ids = list(range(self.first_new_tax_id(), self.next_new_tax_id()))
-        
         seq_ids_removed = set()
         types = ['A','B','C','D']
         new_node_ids = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
@@ -750,7 +745,7 @@ class KrakenDbBuilder():
             tax_id = self._db.retrieve_tax_id_by_node_scientific_name(node_name)
             if not tax_id:
                 continue 
-            seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= tax_id, skip_tax_ids= created_tax_ids)
+            seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= tax_id, skip_tax_ids= self.created_tax_ids())
             seq_ids_removed.update(seq_ids)
         logging.info(f'removed {len(seq_ids_removed)} influenza sequences linked to taxonomy nodes outside of the custom flu taxonomy structure')
         return len(seq_ids_removed)
