@@ -35,27 +35,20 @@ INSERT INTO taxonomy_nodes (tax_id,parent_tax_id,rank,embl_code,division_id,inhe
     (12814, 11246,'no rank','',9,1,1,1,0,1,1,0,'code compliant; specified'),
     (11157,2497574,'no rank','',9,1,1,1,0,1,1,0,'code compliant; specified');
 
--- RefSeq RSV sequences, linked directly to the above taxonomy
+-- RefSeq RSV sequences, linked directly to the above taxonomy levels
+-- 'Human orthopneumovirus'
+-- 'Respiratory syncytial virus'
+-- 'Human respiratory syncytial virus A'
+-- all of these should be removed by the RSV filter
 INSERT INTO sequences (id,tax_id,fasta_header,dna_sequence,seq_length,segment_number,ncbi_acc,flu_name,flu_type,flu_a_h_subtype,flu_a_n_subtype,include,is_flu,category,original_tax_id) VALUES
 	(1,11250,'Human orthopneumovirus Subgroup B','ATCGACTGACTGC',15100,NULL,'NC_001781.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
 	(2,11250,'Human orthopneumovirus Subgroup A','ATCGACTGACTGC',15100,NULL,'NC_038235.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
-	(3,12814,'Respiratory syncytial virus, complete genome','ATCGACTGACTGC',15100,NULL,'NC_001803.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL);
+	(3,12814,'Respiratory syncytial virus, complete genome','ATCGACTGACTGC',15100,NULL,'NC_001803.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
+	(8,208893,'some hRSV virus A','ATCGACTGACTGC',15100,NULL,'NC_001803.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL);
 
 -- add some RSV A/B labelled sequences to simulate upload of data e.g. from Nextstrain
--- create taxonomy nodes for each one as a child of hRSV A/B as would be the result of create_rsv_taxonomy
-INSERT INTO taxonomy_names (id,tax_id,name,name_class,unique_name) VALUES
-    (100,3000000,'known RSV A','scientific name',''),
-    (101,3000001,'known RSV A 2','scientific name',''),
-    (102,3000002,'known RSV B','scientific name',''),
-    (103,3000003,'short RSV A','scientific name','');
-INSERT INTO taxonomy_nodes (tax_id,parent_tax_id,rank,embl_code,division_id,inherited_div_flag,genetic_code_id,inherited_GC_flag,mitochondrial_genetic_code_id,inherited_MGC_flag,GenBank_hidden_flag,hidden_subtree_root_flag,comments) VALUES
-	(3000000,208893,'no rank','',9,1,1,1,0,1,1,0,''),
-    (3000001,208893,'no rank','',9,1,1,1,0,1,1,0,''),
-    (3000002,208895,'no rank','',9,1,1,1,0,1,1,0,''),
-    (3000003,208893,'no rank','',9,1,1,1,0,1,1,0,'');
-
 INSERT INTO sequences (id,tax_id,fasta_header,dna_sequence,seq_length,segment_number,ncbi_acc,flu_name,flu_type,flu_a_h_subtype,flu_a_n_subtype,include,is_flu,category,original_tax_id) VALUES
-	(4,3000000,'known RSV A','ATCGACTGACTGC',15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL),
-	(5,3000001,'known RSV A 2','ATCGACTGACTGC',15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL),
-	(6,3000002,'known RSV B','ATCGACTGACTGC',15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV B",NULL),
-	(7,3000003,'short RSV A','ATCGACTGACTGC',14000,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL);
+	(4,NULL,'known RSV A','ATCGACTGACTGC',15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL),
+	(5,NULL,'known RSV A 2','ATCGACTGACTGC',15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL),
+	(6,NULL,'known RSV B','ATCGACTGACTGC',15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV B",NULL),
+	(7,NULL,'short RSV A','ATCGACTGACTGC',14000,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL);

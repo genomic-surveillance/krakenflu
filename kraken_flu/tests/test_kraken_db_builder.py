@@ -449,6 +449,7 @@ def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_f
             'Human orthopneumovirus Subgroup B',
             'Human orthopneumovirus Subgroup A',
             'Respiratory syncytial virus, complete genome',
+            'some hRSV virus A',
             'known RSV A',
             'known RSV A 2',
             'known RSV B',
@@ -456,16 +457,22 @@ def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_f
         )
     """
     rows = db._cur.execute(stmt).fetchall()
-    assert len(rows) == 7, 'there are 7 RSV sequences in total in the fixtures'
-    assert len([x for x in rows if x['include']==1]) ==7 ,'before the filter is run, all are marked as included'
+    assert len(rows) == 8, 'there are 7 RSV sequences in total in the fixtures'
+    assert len([x for x in rows if x['include']==1]) ==8 ,'before the filter is run, all are marked as included'
+
+    # create the new RSV taxonomy nodes
+    # NOTE: this must be done here rather than being in the fixtures as pre-linked sequences
+    # because the creation of new taxonomy nodes is needed to set the range of "artificial" 
+    # node IDs that need to be skipped
+    kdb.create_rsv_taxonomy()
 
     n_removed = kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
     
-    # only the 3 RefSeq sequence should be removed by the filter
-    assert n_removed == 3, 'filter returns correct number of sequences removed'
+    # only the RefSeq sequence should be removed by the filter
+    assert n_removed == 4, 'filter returns correct number of sequences removed'
     
     rows = db._cur.execute(stmt).fetchall()
-    assert len(rows) == 7, 'the filter has not changed the number of RSV sequence records'
+    assert len(rows) == 8, 'the filter has not changed the number of RSV sequence records'
     assert len([x for x in rows if x['include']==1]) ==4 ,'after the filter, only the 4 pre-labelled RSV sequences linked to hRSV A/B remain included'
 
 
