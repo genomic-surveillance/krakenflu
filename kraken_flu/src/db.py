@@ -1030,6 +1030,7 @@ class Db():
                 dna_sequence VARCHAR NOT NULL, 
                 seq_length INTEGER NOT NULL, 
                 segment_number INTEGER, 
+                percent_n FLOAT NOT NULL,
                 ncbi_acc VARCHAR, 
                 flu_name VARCHAR, 
                 flu_type VARCHAR, 
