@@ -31,16 +31,16 @@ INSERT INTO taxonomy_nodes (tax_id,parent_tax_id,rank,embl_code,division_id,inhe
 -- RefSeq sequences without RSV A/B labels
 -- loading with tax_ids to bring the DB into state after full linkage
 -- DNA sequences not real but length set to pass the min RSV size filter (15000)
-INSERT INTO sequences (id,tax_id,fasta_header,dna_sequence,seq_length,segment_number,ncbi_acc,flu_name,flu_type,flu_a_h_subtype,flu_a_n_subtype,include,is_flu,category,original_tax_id) VALUES
-	(1,11250,'Human orthopneumovirus Subgroup B','ATCGACTGACTGC',15100,NULL,'NC_001781.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
-	(2,11250,'Human orthopneumovirus Subgroup A','ATCGACTGACTGC',15100,NULL,'NC_038235.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
-	(3,12814,'Respiratory syncytial virus, complete genome','ATCGACTGACTGC',15100,NULL,'NC_001803.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL);
+INSERT INTO sequences (id,tax_id,fasta_header,dna_sequence,percent_n,seq_length,segment_number,ncbi_acc,flu_name,flu_type,flu_a_h_subtype,flu_a_n_subtype,include,is_flu,category,original_tax_id) VALUES
+	(1,11250,'Human orthopneumovirus Subgroup B','ATCGACTGACTGC',0,15100,NULL,'NC_001781.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
+	(2,11250,'Human orthopneumovirus Subgroup A','ATCGACTGACTGC',0,15100,NULL,'NC_038235.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
+	(3,12814,'Respiratory syncytial virus, complete genome','ATCGACTGACTGC',0,15100,NULL,'NC_001803.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL);
 
 -- add some RSV A/B labelled sequences to simulate upload of data e.g. from Nextstrain
 -- these would not have tax_id set in real data, therefore not set here either
-INSERT INTO sequences (id,tax_id,fasta_header,dna_sequence,seq_length,segment_number,ncbi_acc,flu_name,flu_type,flu_a_h_subtype,flu_a_n_subtype,include,is_flu,category,original_tax_id) VALUES
-	(4,NULL,'known RSV A','ATCGACTGACTGC',15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL),
-	(5,NULL,'known RSV A 2','ATCGACTGACTGC',15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL),
-	(6,NULL,'known RSV B','ATCGACTGACTGC',15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV B",NULL),
+INSERT INTO sequences (id,tax_id,fasta_header,dna_sequence,percent_n,seq_length,segment_number,ncbi_acc,flu_name,flu_type,flu_a_h_subtype,flu_a_n_subtype,include,is_flu,category,original_tax_id) VALUES
+	(4,NULL,'known RSV A','ATCGACTGACTGC',0,15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL),
+	(5,NULL,'known RSV A 2','ATCGACTGACTGC',0,15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL),
+	(6,NULL,'known RSV B','ATCGACTGACTGC',0,15100,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV B",NULL),
 -- add a sequence that is too short and should be filtered out
-	(7,NULL,'short RSV A','ATCGACTGACTGC',14000,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL);
+	(7,NULL,'short RSV A','ATCGACTGACTGC',0,14000,NULL,NULL,NULL,NULL,NULL,NULL,1,0,"RSV A",NULL);

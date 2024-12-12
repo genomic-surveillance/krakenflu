@@ -224,7 +224,7 @@ class Db():
         """
         return BulkUpdateBuffer( db=self, table_name= table_name, id_field= id_field, update_fields= update_fields, buffer_size= buffer_size )
 
-    def add_sequence( self, fasta_header:str,  dna_sequence:str, category:str, flu_type:str, ncbi_acc:str, original_taxid:int, is_flu:bool, isolate_name:str, segment_number:int, h_subtype:int, n_subtype:int ):
+    def add_sequence( self, fasta_header:str,  dna_sequence:str, percent_n:int, category:str, flu_type:str, ncbi_acc:str, original_taxid:int, is_flu:bool, isolate_name:str, segment_number:int, h_subtype:int, n_subtype:int ):
         """
         Add a sequence record to table "sequences" without a link to a taxon node (which will be provided later).  
         NOTE on tax_id: If the FASTA header contains a kraken:taxid tag, we record this in the original_tax_id field.  
@@ -237,6 +237,7 @@ class Db():
                 'fasta_header':fasta_header,
                 'dna_sequence':dna_sequence,
                 'seq_length':len(dna_sequence),
+                'percent_n': percent_n,
                 'ncbi_acc':ncbi_acc,
                 'is_flu':int(is_flu),
                 'flu_name':isolate_name,

@@ -231,6 +231,31 @@ class KrakenDbBuilder():
         logging.info("finished excluding unnamed and/or unsegmented influenza records")
         return True
         
+    def filter_max_percent_n(self, max_percent_n:int):
+        """
+        Filters out (sets sequences.include to False) sequences with more than the maximum allowed 
+        percentage of N bases. This is applied to all sequences across the taxonomy.  
+        
+        Parameters:
+            max_percent_n: int, required
+                The maximum percent (0-100) of bases that are allowed to be "N"
+                
+        Returns: 
+            number of removed genomes
+        
+        Side effects: 
+            modifies the DB, sets field "include" to False for sequences that are filtered out
+
+        """
+        if max_percent_n <0 or max_percent_n > 100:
+            raise ValueError(f'max_percent_n must be between 0 and 100, received {max_percent_n}')
+        
+        logging.info(f"started filtering out sequences with >{max_percent_n}% of N bases")
+        if max_percent_n < 1:
+            logging.info(f"WARNING: max_percent_n set to <1, this will filter out all sequences with >{max_percent_n}% N, which is very strict and will remove many sequences. Was this on purpose?")
+
+        
+        
     def filter_incomplete_flu( self, filter_except_patterns:list = [] ):
         """
         Filter out flu genomes that do not have full-length sequences for all 8 segments.
