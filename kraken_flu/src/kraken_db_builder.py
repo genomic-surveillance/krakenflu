@@ -252,9 +252,13 @@ class KrakenDbBuilder():
         
         logging.info(f"started filtering out sequences with >{max_percent_n}% of N bases")
         if max_percent_n < 1:
-            logging.info(f"WARNING: max_percent_n set to <1, this will filter out all sequences with >{max_percent_n}% N, which is very strict and will remove many sequences. Was this on purpose?")
+            logging.warn(f"max_percent_n set to <1, this will filter out all sequences with >{max_percent_n}% N, which is very strict and will remove many sequences. Was this on purpose?")
 
+        sequence_ids_to_remove = self._db.get_sequence_ids_percent_n_filter(max_percent_n= max_percent_n)
+        self._db.mark_as_not_included(sequence_ids_to_remove)
+        logging.info(f"filtered out {sequence_ids_to_remove} sequences, having >{max_percent_n}% N content")
         
+        return len(sequence_ids_to_remove)
         
     def filter_incomplete_flu( self, filter_except_patterns:list = [] ):
         """

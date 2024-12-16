@@ -618,3 +618,25 @@ def test_filter_out_sequences_linked_to_high_level_flu_nodes(setup_db_with_real_
     row = db._cur.execute("SELECT id, include FROM sequences where id = 2").fetchone()
     assert row['include'] == 0 ,'a sequence that is linked to a tax node outside of the custom flu taxonomy (H1N1 subtype) is filtered out after running the filter'
     
+def test_filter_max_percent_n(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    num_seq_ids_removed = kdb.filter_max_percent_n(10)
+    assert num_seq_ids_removed == 0 ,'there are no sequences in the fixtures with Ns, so none are removed'
+    
+    # Set percent_n to values around the threshold for three new sequences.  
+    # NOTE that the precent_n is not calculated from the sequence here, just provided as values to the INSERT.  
+    # In a real DB, the percent_n value is calculated on ingest by the fasta loader
+    insert_stmt = """
+        INSERT INTO sequences (id,tax_id,fasta_header,dna_sequence,percent_n,seq_length,segment_number,ncbi_acc,flu_name,flu_type,flu_a_h_subtype,flu_a_n_subtype,include,is_flu,category,original_tax_id) VALUES
+            (1000,NULL,'a sequence with 5% Ns','AAA',5,3,2,'NC_002021.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
+            (1001,NULL,'a sequence with 10% Ns','AAA',10,3,2,'NC_002021.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
+            (1002,NULL,'a sequence with 15% Ns','AAA',15,3,2,'NC_002021.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL)
+    """
+    db._cur.executescript(insert_stmt)
+    db._con.commit()
+    
+    num_seq_ids_removed = kdb.filter_max_percent_n(10)
+    assert num_seq_ids_removed == 1 ,'there is now one sequence in the DB with >10% N'
+    

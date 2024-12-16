@@ -982,6 +982,26 @@ class Db():
             HAVING count > 1 
         """
         return self._cur.execute(stmt).fetchall()
+    
+    def get_sequence_ids_percent_n_filter(self, max_percent_n:int):
+        """
+        Retrieve a list of sequences.id where the percent_n is greater than the maximum 
+        provided (as percent 0-100)
+
+        Args:
+            max_percent_n: int, required
+                maximum percent N allowed (0-100)
+
+        Returns:
+            list of sequences.id where percent_n is > max_percent_n
+        """
+        stmt="""
+        SELECT id
+        FROM sequences 
+        WHERE percent_n > ?
+        """
+        rows = self._cur.execute(stmt, [max_percent_n]).fetchall()
+        return [x['id'] for x in rows]
         
     @property        
     def schema(self):

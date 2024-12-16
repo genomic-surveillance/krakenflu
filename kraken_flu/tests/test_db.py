@@ -528,3 +528,23 @@ def test_get_duplicate_sequence_data(setup_db_with_real_world_fixture):
     assert rows[0]['count'] == 2,'first duplicate group has correct count of duplicates in the group'
     assert rows[0]['ids'] == '2,200','first duplicate group has correct list of member ids'
 
+def test_get_sequence_ids_percent_n_filter(setup_db_with_real_world_fixture):
+    db = setup_db_with_real_world_fixture
+    seq_ids = db.get_sequence_ids_percent_n_filter(10)
+    assert seq_ids == [] ,'there are no sequences with >10%N in the fixtures'
+    
+    # Set percent_n to values around the threshold for three new sequences.  
+    # NOTE that the precent_n is not calculated from the sequence here, just provided as values to the INSERT.  
+    # In a real DB, the percent_n value is calculated on ingest by the fasta loader
+    insert_stmt = """
+        INSERT INTO sequences (id,tax_id,fasta_header,dna_sequence,percent_n,seq_length,segment_number,ncbi_acc,flu_name,flu_type,flu_a_h_subtype,flu_a_n_subtype,include,is_flu,category,original_tax_id) VALUES
+            (1000,NULL,'a sequence with 5% Ns','AAA',5,3,2,'NC_002021.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
+            (1001,NULL,'a sequence with 10% Ns','AAA',10,3,2,'NC_002021.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL),
+            (1002,NULL,'a sequence with 15% Ns','AAA',15,3,2,'NC_002021.1',NULL,NULL,NULL,NULL,1,0,NULL,NULL)
+    """
+    db._cur.executescript(insert_stmt)
+    db._con.commit()
+    
+    seq_ids = db.get_sequence_ids_percent_n_filter(10)
+    assert seq_ids == [1002] ,'there is now one sequence in the DB with >10% N and the ID is correct'
+    

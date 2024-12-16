@@ -2,7 +2,7 @@ import pytest
 import os.path
 from importlib_resources import files
 
-from kraken_flu.src.fasta_loader import load_fasta, _parse_header, _get_num_records
+from kraken_flu.src.fasta_loader import load_fasta, _parse_header, _get_num_records, _calculate_percent_n
 from kraken_flu.src.db import Db
 
 FIXTURE_DIR = files('kraken_flu.tests.fixtures')
@@ -111,3 +111,9 @@ def test_load_fasta( setup_db ):
     
 def test__get_num_records():
     assert _get_num_records(SMALL_VIRUS_FILE) == 35, '35 FASTA records in the file'
+    
+def test__calculate_percent_n():
+    assert isinstance(_calculate_percent_n('nnat'), float)
+    assert _calculate_percent_n('nnat') == 50, '50% n detected from lower case sequence string with length calculated on the fly'
+    assert _calculate_percent_n('NNaT') == 50, 'upper and lower case letters both work'
+    assert _calculate_percent_n('NNATNGCN') == 50, 'Ns can be anywhere in the sequence'
