@@ -256,7 +256,7 @@ class KrakenDbBuilder():
 
         sequence_ids_to_remove = self._db.get_sequence_ids_percent_n_filter(max_percent_n= max_percent_n)
         self._db.mark_as_not_included(sequence_ids_to_remove)
-        logging.info(f"filtered out {sequence_ids_to_remove} sequences, having >{max_percent_n}% N content")
+        logging.info(f"filtered out {len(sequence_ids_to_remove)} sequences, having >{max_percent_n}% N content")
         
         return len(sequence_ids_to_remove)
         
