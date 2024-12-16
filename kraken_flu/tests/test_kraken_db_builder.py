@@ -637,6 +637,13 @@ def test_filter_max_percent_n(setup_db_with_real_world_fixture):
     db._cur.executescript(insert_stmt)
     db._con.commit()
     
+    select_stmt = "SELECT id, include include FROM sequences where id = 1002"
+    row = db._cur.execute(select_stmt).fetchone()
+    assert row['include']==1, 'before we apply the filter, seq ID 1002 is included (not filtered out)'
+    
     num_seq_ids_removed = kdb.filter_max_percent_n(10)
+    
     assert num_seq_ids_removed == 1 ,'there is now one sequence in the DB with >10% N'
+    row = db._cur.execute(select_stmt).fetchone()
+    assert row['include']==0, 'after we apply the filter, seq ID 1002 is excluded (filtered out)'
     
