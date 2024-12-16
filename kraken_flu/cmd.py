@@ -139,6 +139,14 @@ def args_parser():
     )
     
     parser.add_argument(
+        '--max_percent_n',
+        action = 'store',
+        required = False,
+        type= float,
+        help = 'cutoff (in percent of bases) for maximum allowed N bases in any sequence'
+    )
+    
+    parser.add_argument(
         '--deduplicate',
         action = 'store_true',
         help = 'de-duplicate sequences and keep only a single record for every group'        
@@ -216,6 +224,9 @@ def main():
     
     if args.deduplicate:
         kdb.deduplicate_sequences()
+        
+    if args.max_percent_n:
+        kdb.filter_max_percent_n(args.max_percent_n)
     
     if args.do_full_linkage:
         kdb.link_all_unlinked_sequences_to_taxonomy_nodes()

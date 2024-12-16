@@ -55,12 +55,16 @@ def load_fasta(db: Db, file_path:str, category:str=None, enforce_ncbi_acc:bool =
                 # For the DB, we just want to store the integer of the H and N subtype
                 h_subtype = h_subtype and h_subtype.replace('H', '')
                 n_subtype = n_subtype and n_subtype.replace('N', '')
+                sequence = str(sequence)
+                seq_len = len(sequence)
+                percent_n_bases = _calculate_percent_n( sequence= sequence)
                 
                 n_inserted = b.add_row(
                     {
                         'fasta_header': header,
-                        'dna_sequence': str(sequence),
-                        'seq_length':len(sequence),
+                        'dna_sequence': sequence,
+                        'seq_length': seq_len,
+                        'percent_n': percent_n_bases,
                         'category': category,
                         'flu_type': flu_type,
                         'ncbi_acc': ncbi_acc,
@@ -78,6 +82,18 @@ def load_fasta(db: Db, file_path:str, category:str=None, enforce_ncbi_acc:bool =
 
     logging.info( f'finished uploading sequence records to DB')
     return True
+
+def _calculate_percent_n(sequence:str):
+    """
+    Calculates the percentage of N bases in a sequence.  
+
+    Args:
+        sequence: str, required
+            The sequence string
+    """
+    sequence_length = len(sequence)
+    n_count = sequence.upper().count('N')
+    return (n_count / sequence_length) * 100
 
 def _parse_header(header:str, enforce_ncbi_acc:bool= False):
     """
