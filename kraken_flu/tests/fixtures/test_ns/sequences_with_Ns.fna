@@ -1,0 +1,10 @@
+>no Ns
+ACGTACG
+>Ns at start
+NNNNNNACTACGACTG
+>Ns at end
+GTACGATCGNNNNNN
+>Ns at start and end
+NNNNNNAAGCTACGATCGACNNNNNNN
+>mixed case Ns
+nNnNnnNGGGGGGnnNnnNN

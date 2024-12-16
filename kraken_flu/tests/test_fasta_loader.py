@@ -2,11 +2,12 @@ import pytest
 import os.path
 from importlib_resources import files
 
-from kraken_flu.src.fasta_loader import load_fasta, _parse_header, _get_num_records, _calculate_percent_n
+from kraken_flu.src.fasta_loader import load_fasta, _parse_header, _get_num_records, _calculate_percent_n, _trim_ns
 from kraken_flu.src.db import Db
 
 FIXTURE_DIR = files('kraken_flu.tests.fixtures')
 SMALL_VIRUS_FILE = FIXTURE_DIR.joinpath(os.path.join('kraken_ncbi_data','library','viral','library.fna'))
+SEQUENCES_WITH_Ns = FIXTURE_DIR.joinpath(os.path.join('test_ns','sequences_with_Ns.fna'))
 
 @pytest.fixture(scope='function')
 def setup_db( tmp_path ):
@@ -109,6 +110,27 @@ def test_load_fasta( setup_db ):
     assert row['flu_a_h_subtype'] == 3, '... correct flu H subtype'
     assert row['flu_a_n_subtype'] == 2, '... correct flu N subtype'
     
+def test_load_fasta_w_ns(setup_db):
+    """Test trimming of N bases"""
+    db = setup_db
+    stmt="""
+    SELECT id, dna_sequence FROM sequences WHERE fasta_header = ?
+    """
+    assert load_fasta(db, SEQUENCES_WITH_Ns, trim_ns= True), 'successfully loaded into DB with trimming Ns'
+
+    row = db._cur.execute(stmt,['Ns at start and end']).fetchone()
+    assert row, 'found sequence loaded into DB'
+    assert row['dna_sequence'] == 'AAGCTACGATCGAC', 'sequence has been trimmed correctly'
+    
+    row = db._cur.execute(stmt,['no Ns']).fetchone()
+    assert row, 'found sequence loaded into DB'
+    assert row['dna_sequence'] == 'ACGTACG', 'sequence that has no Ns is left as-is'
+    
+    row = db._cur.execute(stmt,['mixed case Ns']).fetchone()
+    assert row, 'found sequence loaded into DB'
+    assert row['dna_sequence'] == 'GGGGGG', 'sequence has been trimmed correctly'
+
+
 def test__get_num_records():
     assert _get_num_records(SMALL_VIRUS_FILE) == 35, '35 FASTA records in the file'
     
@@ -117,3 +139,10 @@ def test__calculate_percent_n():
     assert _calculate_percent_n('nnat') == 50, '50% n detected from lower case sequence string with length calculated on the fly'
     assert _calculate_percent_n('NNaT') == 50, 'upper and lower case letters both work'
     assert _calculate_percent_n('NNATNGCN') == 50, 'Ns can be anywhere in the sequence'
+
+def test__trim_ns(setup_db):
+    assert _trim_ns('ACGT') == 'ACGT', 'a sequence without Ns is left unchanged'
+    assert _trim_ns('NNNACGT') == 'ACGT', 'Ns trimmed from start of sequence'
+    assert _trim_ns('ACGTNNNN') == 'ACGT', 'Ns trimmed from end of sequence'
+    assert _trim_ns('NNNNACGTNNNN') == 'ACGT', 'Ns trimmed from start and end of sequence'
+    assert _trim_ns('nNnNACGTnnnn') == 'ACGT', 'upper and lower case both trimmed'
