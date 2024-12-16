@@ -983,13 +983,13 @@ class Db():
         """
         return self._cur.execute(stmt).fetchall()
     
-    def get_sequence_ids_percent_n_filter(self, max_percent_n:int):
+    def get_sequence_ids_percent_n_filter(self, max_percent_n:float):
         """
         Retrieve a list of sequences.id where the percent_n is greater than the maximum 
         provided (as percent 0-100)
 
         Args:
-            max_percent_n: int, required
+            max_percent_n: float, required
                 maximum percent N allowed (0-100)
 
         Returns:

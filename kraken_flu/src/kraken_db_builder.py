@@ -231,13 +231,13 @@ class KrakenDbBuilder():
         logging.info("finished excluding unnamed and/or unsegmented influenza records")
         return True
         
-    def filter_max_percent_n(self, max_percent_n:int):
+    def filter_max_percent_n(self, max_percent_n:float):
         """
         Filters out (sets sequences.include to False) sequences with more than the maximum allowed 
         percentage of N bases. This is applied to all sequences across the taxonomy.  
         
         Parameters:
-            max_percent_n: int, required
+            max_percent_n: float, required
                 The maximum percent (0-100) of bases that are allowed to be "N"
                 
         Returns: 
