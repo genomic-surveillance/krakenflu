@@ -147,6 +147,13 @@ def args_parser():
     )
     
     parser.add_argument(
+        '--trim_ns',
+        action = 'store_true',
+        required = False,
+        help = 'trim any N bases at start and end of every sequence'
+    )
+
+    parser.add_argument(
         '--deduplicate',
         action = 'store_true',
         help = 'de-duplicate sequences and keep only a single record for every group'        
@@ -203,7 +210,7 @@ def main():
     # Load the bulk of the reference genomes from FASTA files.
     # These are loaded into the "sequences" table of the sqlite DB without a category value, 
     for fasta_path in args.fasta_path:
-        kdb.load_fasta_file(file_path= fasta_path,  enforce_ncbi_acc= True)
+        kdb.load_fasta_file(file_path= fasta_path,  enforce_ncbi_acc= True, trim_ns= args.trim_ns)
         
     if args.filter_flu:
         kdb.filter_unnamed_unsegmented_flu()
