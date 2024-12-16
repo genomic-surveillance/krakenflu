@@ -57,7 +57,7 @@ def load_fasta(db: Db, file_path:str, category:str=None, enforce_ncbi_acc:bool =
                 n_subtype = n_subtype and n_subtype.replace('N', '')
                 sequence = str(sequence)
                 seq_len = len(sequence)
-                percent_n_bases = _calculate_percent_n( sequence= sequence, sequence_length= seq_len)
+                percent_n_bases = _calculate_percent_n( sequence= sequence)
                 
                 n_inserted = b.add_row(
                     {
