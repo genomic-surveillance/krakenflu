@@ -114,13 +114,14 @@ def test_load_fasta_w_ns(setup_db):
     """Test trimming of N bases"""
     db = setup_db
     stmt="""
-    SELECT id, dna_sequence FROM sequences WHERE fasta_header = ?
+    SELECT id, dna_sequence, percent_n FROM sequences WHERE fasta_header = ?
     """
     assert load_fasta(db, SEQUENCES_WITH_Ns, trim_ns= True), 'successfully loaded into DB with trimming Ns'
 
     row = db._cur.execute(stmt,['Ns at start and end']).fetchone()
     assert row, 'found sequence loaded into DB'
     assert row['dna_sequence'] == 'AAGCTACGATCGAC', 'sequence has been trimmed correctly'
+    assert row['percent_n'] == 0, 'percent N bases has been calculated AFTER trimming and hence is 0'
     
     row = db._cur.execute(stmt,['no Ns']).fetchone()
     assert row, 'found sequence loaded into DB'
@@ -129,7 +130,13 @@ def test_load_fasta_w_ns(setup_db):
     row = db._cur.execute(stmt,['mixed case Ns']).fetchone()
     assert row, 'found sequence loaded into DB'
     assert row['dna_sequence'] == 'GGGGGG', 'sequence has been trimmed correctly'
-
+    assert row['percent_n'] == 0, 'percent N bases has been calculated AFTER trimming and hence is 0'
+    
+    row = db._cur.execute(stmt,['Ns at start end and middle']).fetchone()
+    assert row, 'found sequence loaded into DB'
+    assert row['dna_sequence'] == 'ACGTNNCG', 'sequence has been trimmed correctly, leaving N in the middle'
+    assert row['percent_n'] == 25, 'percent N bases has been calculated AFTER trimming and hence is 25%'
+    
 
 def test__get_num_records():
     assert _get_num_records(SMALL_VIRUS_FILE) == 35, '35 FASTA records in the file'
