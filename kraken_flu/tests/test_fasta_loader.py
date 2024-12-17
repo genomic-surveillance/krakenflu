@@ -114,7 +114,7 @@ def test_load_fasta_w_ns(setup_db):
     """Test trimming of N bases"""
     db = setup_db
     stmt="""
-    SELECT id, dna_sequence, percent_n FROM sequences WHERE fasta_header = ?
+    SELECT id, dna_sequence, percent_n, seq_length FROM sequences WHERE fasta_header = ?
     """
     assert load_fasta(db, SEQUENCES_WITH_Ns, trim_ns= True), 'successfully loaded into DB with trimming Ns'
 
@@ -122,6 +122,7 @@ def test_load_fasta_w_ns(setup_db):
     assert row, 'found sequence loaded into DB'
     assert row['dna_sequence'] == 'AAGCTACGATCGAC', 'sequence has been trimmed correctly'
     assert row['percent_n'] == 0, 'percent N bases has been calculated AFTER trimming and hence is 0'
+    assert row['seq_length'] == 14, 'sequence length has been calculated AFTER trimming and hence is 14'
     
     row = db._cur.execute(stmt,['no Ns']).fetchone()
     assert row, 'found sequence loaded into DB'
