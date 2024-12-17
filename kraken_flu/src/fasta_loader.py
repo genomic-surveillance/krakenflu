@@ -13,7 +13,7 @@ from kraken_flu.src.db import Db
 This module contains the functionality for loading sequence data from FASTA into the sqlite database    
 """
 
-def load_fasta(db: Db, file_path:str, category:str=None, enforce_ncbi_acc:bool = False):
+def load_fasta(db: Db, file_path:str, category:str=None, enforce_ncbi_acc:bool = False, trim_ns:bool = False):
     """
     Main function. Orchestrates the loading of a FASTA sequence file into the database.
 
@@ -32,6 +32,10 @@ def load_fasta(db: Db, file_path:str, category:str=None, enforce_ncbi_acc:bool =
             
         enforce_ncbi_acc: bool, optional, defaults to False
             If True, an exception is thrown if an NCBI acc ID cannot be found
+            
+        trim_ns: bool, optional, defaults to False
+            If True, N bases at start and end of every sequence are trimmed off before storing
+            the sequence in the DB
             
     Returns:
         True on success
@@ -56,6 +60,8 @@ def load_fasta(db: Db, file_path:str, category:str=None, enforce_ncbi_acc:bool =
                 h_subtype = h_subtype and h_subtype.replace('H', '')
                 n_subtype = n_subtype and n_subtype.replace('N', '')
                 sequence = str(sequence)
+                if trim_ns:
+                    sequence = _trim_ns(sequence)
                 seq_len = len(sequence)
                 percent_n_bases = _calculate_percent_n( sequence= sequence)
                 
@@ -148,3 +154,13 @@ def _get_num_records(file_path):
         return int(p.stdout)
     else:
         raise Exception("failed to runcommand to count FASTA records in file")
+    
+def _trim_ns(sequence):
+    """
+    Remove all N bases from start and end of the sequence (case insensitive) and return the 
+    remaining sequence
+
+    Args:
+        sequence: str, required
+    """
+    return sequence.strip('Nn')
