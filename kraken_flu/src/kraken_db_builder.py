@@ -817,6 +817,7 @@ class KrakenDbBuilder():
     def _apply_size_filter_to_labelled_sequences(self, categories, min_seq_len:int ):
         """
         Filter out (mark sequences.includee=0) genomes that do not meet the minimum length filter.  
+        This method can be used for any sequence records that were uploaded with a category label.  
 
         Args:
             categories: str or list, required
