@@ -624,7 +624,11 @@ class KrakenDbBuilder():
                 raise ValueError(f'method create_rsv_taxonomy_from_file called but no sequences loaded into DB with label "{label}"')
         
         if rsv_size_filter:
-            self._apply_rsv_size_filter(categories=['RSV A','RSV B'])
+            # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
+            # https://www.nature.com/articles/s41598-023-40760-y
+            # Using a cutoff of 15k
+            n_size_filtered = self._apply_size_filter_to_labelled_sequences(categories= ['RSV A','RSV B'], min_seq_len= 15000)
+
         
         hrsv_nodes_tax_id={}
         hrsv_nodes_tax_id['RSV A'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus A')
@@ -809,45 +813,41 @@ class KrakenDbBuilder():
         sequence_ids_to_remove = self._db.get_sequence_ids_linked_to_taxon(tax_id= tax_id, include_children= True, skip_tax_ids = skip_tax_ids)
         self._db.mark_as_not_included(sequence_ids_to_remove)
         return sequence_ids_to_remove
-            
-    def _apply_rsv_size_filter(self, categories:list=None):
+
+    def _apply_size_filter_to_labelled_sequences(self, categories, min_seq_len:int ):
         """
-        Filter out (mark sequences.includee=0) all RSV genomes that do not meet the minimum length filter.  
-        This currently relies on the sequences.cateogry label being set to 'RSV A' or 'RSV B', ie no filter 
-        will be applied to RSV genomes that have been uploaded without an RSV label. This would include all 
-        sequences from RefSeq. This should not cause any issues because this filter is only run if we are creating 
-        a custom taxonomy for RSV and that means we will not be using any RefSeq or other RSV sequences that 
-        have not been loaded into the DB with an RSV label.  But it would make sense to implement a name-based 
-        filter that would need a regex to recognize RSV genomes (by full name and acronym).  
+        Filter out (mark sequences.includee=0) genomes that do not meet the minimum length filter.  
 
         Args:
-            categories: list, optional, defaults to ['RSV A','RSV B']
-                A list of category labels of sequences to be filtered
+            categories: str or list, required
+                A single string or a list of strings of category labels of sequences to be filtered.  
+                These must match exactly the content of the sequences.category field of the records that 
+                should be size filtered, which are set up on loading FASTA files with labels.  
+                
+            min_seq_len: int, required
+                The minimum length of the sequence required for a record to be kept. 
                 
         Return:
-            True on success
+            Number of records filtered out
             
         Side effects:
             Sets sequences.include values
         """
-        # this is here rather than in the method defaults because of this: https://pylint.readthedocs.io/en/latest/user_guide/messages/warning/dangerous-default-value.html
-        if not categories:
-            categories= ['RSV A','RSV B']
-        
-        logging.info( f'starting filter to remove incomplete RSV genomes')
+        if isinstance(categories, str):
+            categories = [categories]
+        elif not isinstance(categories, list):
+            raise ValueError(f"labels must be string or list, not '{type(categories).__name__}'")
+        categories = list(map(str, categories))
+        logging.info( f"starting filter to remove incomplete genomes with labels: {', '.join(categories)} ")
 
-        # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
-        # https://www.nature.com/articles/s41598-023-40760-y
-        # Using a cutoff of 15k
-        rsv_min_len = 15000
         n_filtered= 0
-        for label in categories:
-            sequence_ids_to_remove  = self._db.get_seq_ids_by_category_and_seq_lt(category= label, seq_len_lt= rsv_min_len)
+        for category in categories:
+            sequence_ids_to_remove  = self._db.get_seq_ids_by_category_and_seq_lt(category= category, seq_len_lt= min_seq_len)
             self._db.mark_as_not_included(sequence_ids_to_remove)
             n_filtered+= len(sequence_ids_to_remove)
-        logging.info( f'filtered out {n_filtered} RSV genomes as incomplete (<{rsv_min_len} bases)')
-        return True
-
+        logging.info( f"filtered out {n_filtered} genomes with labels: {', '.join(categories)} as incomplete (<{min_seq_len} bases)")
+        return n_filtered
+    
     def link_all_unlinked_sequences_to_taxonomy_nodes(self):
         """
         For all sequences that do not yet have a tax_id set, this method attempts to set the tax_id using the 
