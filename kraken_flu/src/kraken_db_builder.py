@@ -742,14 +742,8 @@ class KrakenDbBuilder():
         
     def filter_out_sequences_linked_to_high_level_rsv_nodes(self):
         """
-        The final RSV taxonomy should only contain sequences linked to hRSV A/B nodes, not to any of the 
-        higher-level nodes from "Orthopneumovirus" down. This custom taxonomy is built by method 
-        create_rsv_taxonomy, at the end of which, we should have custom sequences linked to the hRSV A/B 
-        nodes. 
-        This filter needs to be applied after all sequences have been linked via Genbank IDs, which will 
-        associate RefSeq sequences with higher-level taxonomy nodes such as "Orthopneumovirus hominis". If 
-        we would leave them in the final DB, they would attract reads, bypassing the hRSV A/B classification.
-        The method identifies the high-level node to start the purge from and the nodes that need to be left unchanged.  
+        Uses filter_out_sequences_linked_to_subtree to remove the NCBI refseq sequences from the sub-tree starting 
+        at "Orthopneumovirus"
         
         NOTE: We are starting the purge from "Orthopneumovirus", which means that all non-human RSV sequences are 
         also removed. This is by design. It should improve our ability to identify hRSV, which are the ones we 
@@ -764,7 +758,38 @@ class KrakenDbBuilder():
         Side-effects:
             sets sequences.include value
         """
-        start_taxon_name= 'Orthopneumovirus'
+        return self.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Orthopneumovirus')
+    
+    def filter_out_sequences_linked_to_subtree(self, start_taxon_name: str, skip_created_nodes:bool=True):
+        """
+        Filters out sequence records that are linked to a taxonomy node (by name) and all of its children, 
+        i.e. from the entire sub-tree starting at the named node.  Usually, all newly created nodes, i.e. those 
+        created by this tool and not imported from the NCBI taxonomy, are exempt and not filtered out.  
+        
+        It can be used to ensure that a sub-tree of the taxonomy is based entirely on sequences linked with 
+        the purpose-built methods in this tool and that these sequences replace the original, default, NCBI 
+        taxonomy and reference sequences.  
+        
+        This filter needs to be applied after all sequences have been linked via Genbank IDs, which will 
+        associate RefSeq sequences with higher-level taxonomy nodes such as "Orthopneumovirus hominis". If 
+        we would leave them in the final DB, they would attract reads, bypassing the hRSV A/B classification.
+        The method identifies the high-level node to start the purge from and the nodes that need to be left unchanged.  
+        
+        
+        
+        NOTE: We are starting the purge from "Orthopneumovirus", which means that all non-human RSV sequences are 
+        also removed. This is by design. It should improve our ability to identify hRSV, which are the ones we 
+        care about in the viral pipeline.  If non-human "Orthopneumovirus" species should be retained, change the
+        name of the start taxon accordingly.  
+        Check this NCBI taxonomy page for a list of the taxa included in "Orthopneumovirus"
+        https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Tree&id=1868215&lvl=3&keep=1&srchmode=1&unlock
+        
+        Returns:
+            Number of sequences removed
+        
+        Side-effects:
+            sets sequences.include value
+        """
         start_tax_id =  self._db.retrieve_tax_id_by_node_scientific_name(start_taxon_name)
         if not start_tax_id:
             raise ValueError(f'could not find taxonomy node for "{start_taxon_name}" in database')
