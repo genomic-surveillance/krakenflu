@@ -572,20 +572,69 @@ class KrakenDbBuilder():
 
     def create_rsv_taxonomy(self, rsv_size_filter:bool=False):
         """
-        Builds a custom-made RSV taxonomy based on known RSV A and B isolates. The method relies on sequences 
-        loaded into the sequences table with a category label "RSV A" or "RSV B". These sequences must exist already 
-        in the DB before running this method.  See "load_fasta_file" on how to load FASTA with labels.   
-        In contrast to the custom-built flu taxonomy, this method does not create any new parental taxonomy nodes.  
-        It only creates new nodes for the isolates loaded from the pre-labelled files and links those to the existing 
-        hRSV parental nodes "Human respiratory syncytial virus A" and "Human respiratory syncytial virus B"
+        Orchestrates running of create_subtree_by_sequence_category and _apply_size_filter_to_labelled_sequences 
+        for RSV.  
         
-        The method performs the following tasks:
-            - applies a size filter to remove incomplete hRSV sequences (can be skipped)
-            - for all sequences in the DB labelled RSV A/B:
-                - creates a node in the taxonomy for each isolate
-                - links this node to the hRSV A or B parent node according to its label
+        NOTE: this method is no longer doing the actual work of creating the sub-taxonomy, it only retrieves 
+        the parent tax_ids and runs the relevant methods (see above). The plan is to remove this method entirely 
+        and replace it with a configurable generic method.   
+        
+        Args:
+            rsv_size_filter: bool, defaults to False
+                If True, RSV sequences are filtered on size to keep only full-length or nearly 
+                full length genomes.  
+        """
+        logging.info("starting to build custom RSV taxonomy")
+        
+        if rsv_size_filter:
+            # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
+            # https://www.nature.com/articles/s41598-023-40760-y
+            # Using a cutoff of 15k
+            n_size_filtered = self._apply_size_filter_to_labelled_sequences(categories= ['RSV A','RSV B'], min_seq_len= 15000)
+
+        hrsv_nodes_tax_id={}
+        hrsv_nodes_tax_id['RSV A'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus A')
+        if not hrsv_nodes_tax_id['RSV A']:
+            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus A" in database')
+        
+        hrsv_nodes_tax_id['RSV B'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus B')
+        if not hrsv_nodes_tax_id['RSV B']:
+            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus B" in database')
+        
+        for category, parent_tax_id in hrsv_nodes_tax_id.items():
+            self.create_subtree_by_sequence_category( category= category, parent_tax_id= parent_tax_id)
+        
+        logging.info("finished building custom RSV taxonomy")
+        return True
+
+    def create_subtree_by_sequence_category(self, category:str, parent_tax_id:int):
+        """
+        Creates a subtree of the taxonomy using a set of sequence records that were loaded with category labels 
+        such as "RSV A" etc.  
+        
+        It takes a parent_tax_id, which must be a node that already exists. All sequence records found in the database 
+        that match the category label (sequences.category field) will be linked to the parent node via a new child node in 
+        the taxonomy for the sequence record.  
+        
+        For example, if the parent node is "RSV A" and the database contains sequences for "RSV A Isolate X" and 
+        "RSV A Isolate Y" and both have a label "RSV A" in the sequences.category field, the resulting subtree will 
+        look like this:
+
+        ┌───────┐                
+        │ RSV A │                
+        └─┬─────┘                
+            │   ┌───────────────┐  
+            ├──►│RSV A Isolate X│  
+            │   └───────────────┘  
+            │   ┌───────────────┐  
+            └──►│RSV A Isolate X│  
+                └───────────────┘  
+
+        The category labels must already exist in the DB at this point. They are usually provided by loading a FASTA file 
+        with a label via fasta_loader.load_fasta, but could also be provided in different ways. 
         
         Further details on rationale for this method:
+        The method was originally developed for the RSV taxonomy but is now being expanded to other viruses for the same purpose.  
         RSV sequences in RefSeq are currently not sufficient for our purposes (more details below). For this reason, it was decided 
         that we would obtain RSV sequences classified as A or B from Nextstrain instead. We obtain these as 
         separate downloads, which can be loaded into the kraken-flu database with labels "RSV A" and "RSV B" 
@@ -612,96 +661,83 @@ class KrakenDbBuilder():
         of all sequences to the taxonomy. See "filter_out_sequences_linked_to_high_level_rsv_nodes" for details.  
 
         Args:
-            rsv_size_filter: bool, defaults to False
-                If True, RSV sequences are filtered on size to keep only full-length or nearly 
-                full length genomes.  
+            category: str, required
+                The category label (sequences.category) of the sequence records to link to the parent taxon.  
+                An exception is thrown if no sequences exist in the DB with this category label.  
+                
+            parent_tax_id: int, required
+                tax_id of the node that serves as the parent for the sequence records in this category.  
+                The node must exist already.  
+                
         """
-        logging.info("starting to build custom RSV taxonomy")
+        logging.info(f"starting to build custom taxonomy for {category} with node {parent_tax_id} as the parent")
         
-        for t in (['A','B']):
-            label = 'RSV ' + t
-            if not self._db.sequences_category_exists(label):
-                raise ValueError(f'method create_rsv_taxonomy_from_file called but no sequences loaded into DB with label "{label}"')
+        if not self._db.sequences_category_exists(category):
+            raise ValueError(f'no sequences loaded into DB with label "{category}" - cannot build subtree')
         
-        if rsv_size_filter:
-            # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
-            # https://www.nature.com/articles/s41598-023-40760-y
-            # Using a cutoff of 15k
-            n_size_filtered = self._apply_size_filter_to_labelled_sequences(categories= ['RSV A','RSV B'], min_seq_len= 15000)
-
-        
-        hrsv_nodes_tax_id={}
-        hrsv_nodes_tax_id['RSV A'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus A')
-        if not hrsv_nodes_tax_id['RSV A']:
-            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus A" in database')
-        
-        hrsv_nodes_tax_id['RSV B'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus B')
-        if not hrsv_nodes_tax_id['RSV B']:
-            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus B" in database')
-        
-        # create new nodes for the RSV genomes that were uploaded from files and link to taxonomy
+        # create new nodes for the genomes that were uploaded from files and link to taxonomy
         # TODO: this block is very similar to the one in "assign_flu_taxonomy_nodes", might be worth factoring out 
         # into a common method.  There are important differences though so might not be worth it.  
         with self._db.bulk_update_buffer(table_name='sequences', id_field='id', update_fields= ['tax_id'], buffer_size= 50000) as seq_update_buffer:
 
             with self._db.bulk_insert_buffer(table_name='taxonomy_nodes', buffer_size= 50000) as nodes_buffer:
                 with self._db.bulk_insert_buffer(table_name='taxonomy_names', buffer_size= 50000) as names_buffer:
-                    for category, parent_tax_id in hrsv_nodes_tax_id.items():
-                        category_sequences = self._db.get_seq_ids_and_fasta_headers_by_category(category, included_only= True)
-                        for sequence in category_sequences:
-                            new_tax_id = self.next_new_tax_id()
-                            id= sequence['id']
-                            fasta_header = sequence['fasta_header']
-                            
-                            # libraries obtained from Nextstrain only contain the NCBI acc in the 
-                            # header which is not ideal. If the header is a single word, we 
-                            # prepend the cateogry value, which is "RSV A/B"
-                            if not ' ' in fasta_header:
-                                fasta_header = category + ' ' + fasta_header
-                            
-                            # create the new node/name records for the sequence and link it to the parent node
-                            n_inserted_nodes = nodes_buffer.add_row(
-                                {
-                                    'tax_id': new_tax_id,
-                                    'parent_tax_id':parent_tax_id,
-                                    'rank': 'no rank',
-                                    'embl_code': None,
-                                    'division_id': 9,                   
-                                    'inherited_div_flag': 1,            
-                                    'genetic_code_id': 1,
-                                    'inherited_GC_flag': 1,
-                                    'mitochondrial_genetic_code_id': 0,
-                                    'inherited_MGC_flag': 1,
-                                    'GenBank_hidden_flag': 0,
-                                    'hidden_subtree_root_flag': 0,
-                                    'comments': 'kraken_flu added node'
-                                }
-                            )
-                            if n_inserted_nodes > 0:
-                                logging.info(f'flushed {n_inserted_nodes} nodes records to DB')
+                    category_sequences = self._db.get_seq_ids_and_fasta_headers_by_category(category, included_only= True)
+                    for sequence in category_sequences:
+                        new_tax_id = self.next_new_tax_id()
+                        id= sequence['id']
+                        fasta_header = sequence['fasta_header']
+                        
+                        # libraries obtained from Nextstrain only contain the NCBI acc in the 
+                        # header which is not ideal. If the header is a single word, we 
+                        # prepend the cateogry label so that the FASTA header is more descriptive
+                        if not ' ' in fasta_header:
+                            fasta_header = category + ' ' + fasta_header
+                        
+                        # create the new node/name records for the sequence and link it to the parent node
+                        n_inserted_nodes = nodes_buffer.add_row(
+                            {
+                                'tax_id': new_tax_id,
+                                'parent_tax_id':parent_tax_id,
+                                'rank': 'no rank',
+                                'embl_code': None,
+                                'division_id': 9,                   
+                                'inherited_div_flag': 1,            
+                                'genetic_code_id': 1,
+                                'inherited_GC_flag': 1,
+                                'mitochondrial_genetic_code_id': 0,
+                                'inherited_MGC_flag': 1,
+                                'GenBank_hidden_flag': 0,
+                                'hidden_subtree_root_flag': 0,
+                                'comments': 'kraken_flu added node'
+                            }
+                        )
+                        if n_inserted_nodes > 0:
+                            logging.info(f'flushed {n_inserted_nodes} nodes records to DB')
 
-                            n_inserted_names = names_buffer.add_row(
-                                {
-                                    'tax_id': new_tax_id,
-                                    'name': fasta_header,
-                                    'unique_name': fasta_header,
-                                    'name_class': 'scientific name'
-                                }
-                            )
-                            if n_inserted_names > 0:
-                                logging.info(f'flushed {n_inserted_names} names records to DB')
-                                
-                            # link sequence records to the newly inserted taxonomy nodes
-                            n_updated_seqs= seq_update_buffer.add_row(
-                                {
-                                    'id': id,
-                                    'tax_id': new_tax_id
-                                }
-                            )
-                            if n_updated_seqs > 0:
-                                logging.info(f'flushed {n_updated_seqs} sequence record updates to DB')
+                        n_inserted_names = names_buffer.add_row(
+                            {
+                                'tax_id': new_tax_id,
+                                'name': fasta_header,
+                                'unique_name': fasta_header,
+                                'name_class': 'scientific name'
+                            }
+                        )
+                        if n_inserted_names > 0:
+                            logging.info(f'flushed {n_inserted_names} names records to DB')
+                            
+                        # link sequence records to the newly inserted taxonomy nodes
+                        n_updated_seqs= seq_update_buffer.add_row(
+                            {
+                                'id': id,
+                                'tax_id': new_tax_id
+                            }
+                        )
+                        if n_updated_seqs > 0:
+                            logging.info(f'flushed {n_updated_seqs} sequence record updates to DB')
         
-        logging.info("finished building custom RSV taxonomy")
+        logging.info(f"sfinished building custom taxonomy for {category}")
+
         return True
         
     def filter_out_sequences_linked_to_high_level_rsv_nodes(self):

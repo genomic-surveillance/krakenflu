@@ -405,6 +405,32 @@ def test_filter_out_sequences_linked_to_taxonomy_sub_tree(setup_db_with_real_wor
     
 
 
+def test_create_subtree_by_sequence_category(setup_db_with_rsv_fixture):
+    db = setup_db_with_rsv_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    # Testing with sequences labelled 'RSV A' and the 'Human respiratory syncytial virus A' parent taxon 
+    # but any taxonomy node could be used here
+    parent_tax_id = 11250
+    stmt1 = """
+        SELECT
+            fasta_header,
+            parent_tax_id,
+            parent_tax_names.name AS parent_taxon_name
+        FROM sequences
+        INNER JOIN taxonomy_nodes ON(taxonomy_nodes.tax_id = sequences.tax_id)
+        INNER JOIN taxonomy_names AS parent_tax_names ON(parent_tax_names.tax_id = taxonomy_nodes.parent_tax_id)
+        WHERE parent_tax_id = ?
+    """
+    rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
+    assert not rows, f'before we start, no sequences are linked to parent node with tax_id {parent_tax_id}'
+    
+    # run the RSV subtree creation
+    assert kdb.create_subtree_by_sequence_category(category= 'RSV A', parent_tax_id= parent_tax_id ), 'method returns True'
+    
+    rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
+    assert  len(rows) == 3, f'having built the subtree, there are now 3 sequences linked to parent node with tax_id {parent_tax_id}'
+
 def test_create_rsv_taxonomy(setup_db_with_rsv_fixture):
     db = setup_db_with_rsv_fixture
     kdb = KrakenDbBuilder(db=db)
@@ -430,12 +456,12 @@ def test_create_rsv_taxonomy(setup_db_with_rsv_fixture):
     # run the RSV creation
     assert kdb.create_rsv_taxonomy(rsv_size_filter=True), 'method returns True'
     
+    # 1 RSV A labelled sequence is filtered out due to seq length, 2 are left to link
     rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus A']).fetchall()
     assert  len(rows) == 2, 'having built the RSV taxonomy, there are now 2 sequences linked to hRSV A'
     
     rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus B']).fetchall()
     assert len(rows) == 1, 'having built the RSV taxonomy, there is now 1 sequence linked to hRSV B'
-
 
 def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_fixture_for_filter):
     db = setup_db_with_rsv_fixture_for_filter
