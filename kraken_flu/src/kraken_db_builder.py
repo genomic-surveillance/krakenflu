@@ -1101,7 +1101,7 @@ class KrakenDbBuilder():
             raise ValueError("Type of multiref path to repair must be either 'subterminal' or 'all'")
 
         if not seen:
-             seen = set()
+            seen = set()
         for path in paths:
             bool_list = []
             for tax_id in path[::-1]:
