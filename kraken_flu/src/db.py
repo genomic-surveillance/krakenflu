@@ -822,6 +822,28 @@ class Db():
         data= self._cur.execute(f"SELECT * FROM {table_name} LIMIT 1")
         return [c[0] for c in data.description]
 
+    def tax_id_exists(self, tax_id:int):
+        """
+        Returns True if the given tax_id exists in the DB
+        Args:
+            tax_id: int, required
+                The taxon ID to confirm
+
+        Returns:
+            True if the given tax_id exists in the DB, False otherwise
+        """
+        stmt="""
+        SELECT tax_id
+        FROM taxonomy_nodes
+        WHERE tax_id = ?
+        LIMIT 1
+        """
+        rows = self._cur.execute(stmt,[tax_id]).fetchall()
+        if rows:
+            return True
+        else:
+            return False
+        
     def sequences_category_exists(self, label):
         """
         Returns True if at least one sequences record exists with a category that matches the search term exactly
@@ -964,7 +986,7 @@ class Db():
         
     def get_duplicate_sequence_data(self):
         """
-        Returns a resultset of sequences grouped by the dba_sequence value with three columns: 
+        Returns a resultset of sequences grouped by the dna_sequence value with three columns: 
             - count: number of identical sequences in this group
             - min_id: lowest sequences.id in the group
             - ids: list of all ids in the group, comma delimited string
