@@ -405,7 +405,8 @@ def test_filter_out_sequences_linked_to_taxonomy_sub_tree(setup_db_with_real_wor
     
 
 
-def test_create_subtree_by_sequence_category(setup_db_with_rsv_fixture):
+def test_create_subtree_by_sequence_category_with_taxid(setup_db_with_rsv_fixture):
+    """ test create_subtree_by_sequence_category with a parent_tax_id provided directly"""
     db = setup_db_with_rsv_fixture
     kdb = KrakenDbBuilder(db=db)
     
@@ -430,6 +431,33 @@ def test_create_subtree_by_sequence_category(setup_db_with_rsv_fixture):
     
     rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
     assert  len(rows) == 3, f'having built the subtree, there are now 3 sequences linked to parent node with tax_id {parent_tax_id}'
+
+def test_create_subtree_by_sequence_category_with_name(setup_db_with_rsv_fixture):
+    """ test create_subtree_by_sequence_category with a parent taxon name provided, which needs to be translated to tax_id"""
+    db = setup_db_with_rsv_fixture
+    kdb = KrakenDbBuilder(db=db)
+    
+    parent_taxon_name = 'Human orthopneumovirus'
+    parent_tax_id = 11250
+    stmt1 = """
+        SELECT
+            fasta_header,
+            parent_tax_id,
+            parent_tax_names.name AS parent_taxon_name
+        FROM sequences
+        INNER JOIN taxonomy_nodes ON(taxonomy_nodes.tax_id = sequences.tax_id)
+        INNER JOIN taxonomy_names AS parent_tax_names ON(parent_tax_names.tax_id = taxonomy_nodes.parent_tax_id)
+        WHERE parent_tax_id = ?
+    """
+    rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
+    assert not rows, f'before we start, no sequences are linked to parent node with taxon {parent_taxon_name}'
+    
+    # run the RSV subtree creation
+    assert kdb.create_subtree_by_sequence_category(category= 'RSV A', parent_taxon_name= parent_taxon_name ), 'method returns True'
+    
+    rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
+    assert  len(rows) == 3, f'having built the subtree, there are now 3 sequences linked to parent node with tax_id {parent_tax_id}'
+
 
 def test_filter_out_sequences_linked_to_subtree(setup_db_with_rsv_fixture_for_filter):
     db = setup_db_with_rsv_fixture_for_filter

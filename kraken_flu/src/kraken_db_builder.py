@@ -645,7 +645,7 @@ class KrakenDbBuilder():
             if not self._db.tax_id_exists(parent_tax_id):
                 raise ValueError(f"tax_id {parent_tax_id} does not exist in the DB")
         elif parent_taxon_name:
-            parent_tax_id = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus B')
+            parent_tax_id = self._db.retrieve_tax_id_by_node_scientific_name(parent_taxon_name)
             if not parent_tax_id:
                 raise ValueError(f"no node exists in DB with name '{parent_taxon_name}'")
         else:
