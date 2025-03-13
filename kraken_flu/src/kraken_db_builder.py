@@ -607,12 +607,12 @@ class KrakenDbBuilder():
         logging.info("finished building custom RSV taxonomy")
         return True
 
-    def create_subtree_by_sequence_category(self, category:str, parent_tax_id:int):
+    def create_subtree_by_sequence_category(self, category:str, parent_tax_id:int=None, parent_taxon_name:str=None):
         """
         Creates a subtree of the taxonomy using a set of sequence records that were loaded with category labels 
         such as "RSV A" etc.  
         
-        It takes a parent_tax_id, which must be a node that already exists. All sequence records found in the database 
+        It takes a parent_tax_id or a taxon name, which must be a node that already exists. All sequence records found in the database 
         that match the category label (sequences.category field) will be linked to the parent node via a new child node in 
         the taxonomy for the sequence record.  
         
@@ -665,15 +665,28 @@ class KrakenDbBuilder():
                 The category label (sequences.category) of the sequence records to link to the parent taxon.  
                 An exception is thrown if no sequences exist in the DB with this category label.  
                 
-            parent_tax_id: int, required
+            parent_tax_id: int, optional but must provide one of parent_tax_id or parent_taxon_name
                 tax_id of the node that serves as the parent for the sequence records in this category.  
                 The node must exist already.  
+                
+            parent_taxon_name: str, optional but must provide one of parent_tax_id or parent_taxon_name
+                is used to look up the parent_tax_id by name. Must exist in the DB already.  
                 
         """
         logging.info(f"starting to build custom taxonomy for {category} with node {parent_tax_id} as the parent")
         
         if not self._db.sequences_category_exists(category):
             raise ValueError(f'no sequences loaded into DB with label "{category}" - cannot build subtree')
+        
+        if parent_tax_id:
+            if not self._db.tax_id_exists(parent_tax_id):
+                raise ValueError(f"tax_id {parent_tax_id} does not exist in the DB")
+        elif parent_taxon_name:
+            parent_tax_id = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus B')
+            if not parent_tax_id:
+                raise ValueError(f"no node exists in DB with name '{parent_taxon_name}'")
+        else:
+            raise ValueError("need a value for either parent_tax_id or parent_taxon_name")
         
         # create new nodes for the genomes that were uploaded from files and link to taxonomy
         # TODO: this block is very similar to the one in "assign_flu_taxonomy_nodes", might be worth factoring out 
@@ -736,7 +749,7 @@ class KrakenDbBuilder():
                         if n_updated_seqs > 0:
                             logging.info(f'flushed {n_updated_seqs} sequence record updates to DB')
         
-        logging.info(f"sfinished building custom taxonomy for {category}")
+        logging.info(f"finished building custom taxonomy for {category}")
 
         return True
         
