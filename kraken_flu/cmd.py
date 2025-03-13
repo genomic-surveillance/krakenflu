@@ -249,8 +249,14 @@ def main():
         # and the taxonomy assigned to the sequence on NCBI.  
         # THis call will remove all RSV sequences linked to higher-order RSV taxa except for those linked 
         # to hRSV A/B
+        # We are starting the purge from "Orthopneumovirus", which means that all non-human RSV sequences are 
+        # also removed. This is by design. It should improve our ability to identify hRSV, which are the ones we 
+        # care about in the viral pipeline.  If non-human "Orthopneumovirus" species should be retained, change the
+        # name of the start taxon accordingly.  
+        # Check this NCBI taxonomy page for a list of the taxa included in "Orthopneumovirus"
+        # https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Tree&id=1868215&lvl=3&keep=1&srchmode=1&unlock
         if args.rsv_a_sequences or args.rsv_b_sequences:
-            kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
+            kdb.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Orthopneumovirus')
             
         # as for RSV: filter out flu sequences that are linked to high-level taxa (not our custom 
         # taxonomy nodes). These will include sequences that cannot even be recognised as flu from the 

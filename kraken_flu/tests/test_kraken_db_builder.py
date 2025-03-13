@@ -431,7 +431,7 @@ def test_create_subtree_by_sequence_category(setup_db_with_rsv_fixture):
     rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
     assert  len(rows) == 3, f'having built the subtree, there are now 3 sequences linked to parent node with tax_id {parent_tax_id}'
 
-def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_fixture_for_filter):
+def test_filter_out_sequences_linked_to_subtree(setup_db_with_rsv_fixture_for_filter):
     db = setup_db_with_rsv_fixture_for_filter
     kdb = KrakenDbBuilder(db=db)
     
@@ -462,7 +462,7 @@ def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_f
     kdb.create_subtree_by_sequence_category( category= 'RSV A', parent_taxon_name= 'Human respiratory syncytial virus A')
     kdb.create_subtree_by_sequence_category( category= 'RSV B', parent_taxon_name= 'Human respiratory syncytial virus B')
     
-    n_removed = kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
+    n_removed = kdb.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Orthopneumovirus')
     
     # only the RefSeq sequence should be removed by the filter
     assert n_removed == 4, 'filter returns correct number of sequences removed'

@@ -715,26 +715,6 @@ class KrakenDbBuilder():
         logging.info(f"finished building custom taxonomy for {category}")
 
         return True
-        
-    def filter_out_sequences_linked_to_high_level_rsv_nodes(self):
-        """
-        Uses filter_out_sequences_linked_to_subtree to remove the NCBI refseq sequences from the sub-tree starting 
-        at "Orthopneumovirus"
-        
-        NOTE: We are starting the purge from "Orthopneumovirus", which means that all non-human RSV sequences are 
-        also removed. This is by design. It should improve our ability to identify hRSV, which are the ones we 
-        care about in the viral pipeline.  If non-human "Orthopneumovirus" species should be retained, change the
-        name of the start taxon accordingly.  
-        Check this NCBI taxonomy page for a list of the taxa included in "Orthopneumovirus"
-        https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Tree&id=1868215&lvl=3&keep=1&srchmode=1&unlock
-        
-        Returns:
-            Number of sequences removed
-        
-        Side-effects:
-            sets sequences.include value
-        """
-        return self.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Orthopneumovirus')
     
     def filter_out_sequences_linked_to_subtree(self, start_taxon_name: str, skip_created_nodes:bool=True):
         """
