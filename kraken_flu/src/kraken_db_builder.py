@@ -572,7 +572,7 @@ class KrakenDbBuilder():
 
     def create_rsv_taxonomy(self, rsv_size_filter:bool=False):
         """
-        Orchestrates running of create_subtree_by_sequence_category and _apply_size_filter_to_labelled_sequences 
+        Orchestrates running of create_subtree_by_sequence_category and apply_size_filter_to_labelled_sequences 
         for RSV.  
         
         NOTE: this method is no longer doing the actual work of creating the sub-taxonomy, it only retrieves 
@@ -590,7 +590,7 @@ class KrakenDbBuilder():
             # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
             # https://www.nature.com/articles/s41598-023-40760-y
             # Using a cutoff of 15k
-            n_size_filtered = self._apply_size_filter_to_labelled_sequences(categories= ['RSV A','RSV B'], min_seq_len= 15000)
+            n_size_filtered = self.apply_size_filter_to_labelled_sequences(categories= ['RSV A','RSV B'], min_seq_len= 15000)
 
         hrsv_nodes_tax_id={}
         hrsv_nodes_tax_id['RSV A'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus A')
@@ -875,7 +875,7 @@ class KrakenDbBuilder():
         self._db.mark_as_not_included(sequence_ids_to_remove)
         return sequence_ids_to_remove
 
-    def _apply_size_filter_to_labelled_sequences(self, categories, min_seq_len:int ):
+    def apply_size_filter_to_labelled_sequences(self, categories, min_seq_len:int ):
         """
         Filter out (mark sequences.includee=0) genomes that do not meet the minimum length filter.  
         This method can be used for any sequence records that were uploaded with a category label.  
