@@ -227,7 +227,13 @@ def main():
     if args.rsv_a_sequences and args.rsv_b_sequences:
         kdb.load_fasta_file(file_path= args.rsv_a_sequences, category= 'RSV A', enforce_ncbi_acc= False)
         kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B', enforce_ncbi_acc= False)
-        kdb.create_rsv_taxonomy( rsv_size_filter= args.rsv_size_filter )
+        if  args.rsv_size_filter:
+            # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
+            # https://www.nature.com/articles/s41598-023-40760-y. Using a cutoff of 15k
+            kdb.apply_size_filter_to_labelled_sequences(categories= ['RSV A','RSV B'], min_seq_len= 15000)
+            
+        kdb.create_subtree_by_sequence_category( category= 'RSV A', parent_taxon_name= 'Human respiratory syncytial virus A')
+        kdb.create_subtree_by_sequence_category( category= 'RSV B', parent_taxon_name= 'Human respiratory syncytial virus B')
     
     if args.deduplicate:
         kdb.deduplicate_sequences()

@@ -570,43 +570,6 @@ class KrakenDbBuilder():
         logging.info("finished setting taxonomy IDs for segmented flu genomes")
         return True
 
-    def create_rsv_taxonomy(self, rsv_size_filter:bool=False):
-        """
-        Orchestrates running of create_subtree_by_sequence_category and apply_size_filter_to_labelled_sequences 
-        for RSV.  
-        
-        NOTE: this method is no longer doing the actual work of creating the sub-taxonomy, it only retrieves 
-        the parent tax_ids and runs the relevant methods (see above). The plan is to remove this method entirely 
-        and replace it with a configurable generic method.   
-        
-        Args:
-            rsv_size_filter: bool, defaults to False
-                If True, RSV sequences are filtered on size to keep only full-length or nearly 
-                full length genomes.  
-        """
-        logging.info("starting to build custom RSV taxonomy")
-        
-        if rsv_size_filter:
-            # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
-            # https://www.nature.com/articles/s41598-023-40760-y
-            # Using a cutoff of 15k
-            n_size_filtered = self.apply_size_filter_to_labelled_sequences(categories= ['RSV A','RSV B'], min_seq_len= 15000)
-
-        hrsv_nodes_tax_id={}
-        hrsv_nodes_tax_id['RSV A'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus A')
-        if not hrsv_nodes_tax_id['RSV A']:
-            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus A" in database')
-        
-        hrsv_nodes_tax_id['RSV B'] = self._db.retrieve_tax_id_by_node_scientific_name('Human respiratory syncytial virus B')
-        if not hrsv_nodes_tax_id['RSV B']:
-            raise ValueError('could not find taxonomy node for "Human respiratory syncytial virus B" in database')
-        
-        for category, parent_tax_id in hrsv_nodes_tax_id.items():
-            self.create_subtree_by_sequence_category( category= category, parent_tax_id= parent_tax_id)
-        
-        logging.info("finished building custom RSV taxonomy")
-        return True
-
     def create_subtree_by_sequence_category(self, category:str, parent_tax_id:int=None, parent_taxon_name:str=None):
         """
         Creates a subtree of the taxonomy using a set of sequence records that were loaded with category labels 
