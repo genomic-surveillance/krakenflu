@@ -716,7 +716,7 @@ class KrakenDbBuilder():
 
         return True
     
-    def filter_out_sequences_linked_to_subtree(self, start_taxon_name: str, skip_created_nodes:bool=True):
+    def filter_out_sequences_linked_to_subtree(self, start_tax_id:id=None, start_taxon_name:str=None, skip_created_nodes:bool=True):
         """
         Filters out sequence records that are linked to a taxonomy node (by name) and all of its children, 
         i.e. from the entire sub-tree starting at the named node.  Usually, all newly created nodes, i.e. those 
@@ -731,14 +731,26 @@ class KrakenDbBuilder():
         we would leave them in the final DB, they would attract reads, bypassing the hRSV A/B classification.
         The method identifies the high-level node to start the purge from and the nodes that need to be left unchanged.  
         
-        
-        
         NOTE: We are starting the purge from "Orthopneumovirus", which means that all non-human RSV sequences are 
         also removed. This is by design. It should improve our ability to identify hRSV, which are the ones we 
         care about in the viral pipeline.  If non-human "Orthopneumovirus" species should be retained, change the
         name of the start taxon accordingly.  
         Check this NCBI taxonomy page for a list of the taxa included in "Orthopneumovirus"
         https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Tree&id=1868215&lvl=3&keep=1&srchmode=1&unlock
+        
+        Args:
+            start_tax_id: int, optional but must provide one of start_tax_id or start_taxon_name
+                tax_id of the node that is the origin of the subtree to process, i.e. from where to start 
+                traversing the txonomy. The node must exist already.  
+                
+            start_taxon_name: str, optional but must provide one of start_tax_id or start_taxon_name
+                Name of the node that is the origin of the subtree to process, i.e. from where to start 
+                traversing the txonomy. The node must exist already.
+        
+            skip_created_nodes: bool, optional, defaults to True
+                If True, nodes that were created by KrakenDbBuilder (i.e. not imported from NCBI taxonomy) are 
+                exempt from the filter. This is usually the intended behaviour because the method would otherwise 
+                filter out custom-built sub-taxonomy nodes.  
         
         Returns:
             Number of sequences removed
@@ -749,6 +761,16 @@ class KrakenDbBuilder():
         start_tax_id =  self._db.retrieve_tax_id_by_node_scientific_name(start_taxon_name)
         if not start_tax_id:
             raise ValueError(f'could not find taxonomy node for "{start_taxon_name}" in database')
+            
+        if start_tax_id:
+            if not self._db.tax_id_exists(start_tax_id):
+                raise ValueError(f"tax_id {start_tax_id} does not exist in the DB")
+        elif start_taxon_name:
+            start_tax_id = self._db.retrieve_tax_id_by_node_scientific_name(start_taxon_name)
+            if not start_tax_id:
+                raise ValueError(f"no node exists in DB with name '{start_taxon_name}'")
+        else:
+            raise ValueError("need a value for either start_tax_id or start_taxon_name")    
             
         seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= start_tax_id, skip_tax_ids= self.created_tax_ids())
         logging.info(f'removed {len(seq_ids)} sequences from high-level RSV taxonomy nodes (not including hRSV A/B)')
