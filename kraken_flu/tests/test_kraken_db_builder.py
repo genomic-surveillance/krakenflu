@@ -339,13 +339,14 @@ def test_filter_flu_a_wo_subtype(setup_db_with_real_world_fixture, tmp_path):
     rows = db._cur.execute("SELECT id, include FROM sequences WHERE ncbi_acc = 'NC_002023.1'").fetchall()
     assert rows[0]['include'] == 0, 'having set H subtype to NULL, this sequence is now filtered out by filter_flu_a_wo_subtype'
     
-def test__apply_rsv_size_filter(setup_db_with_real_world_fixture, tmp_path):
+def test_apply_size_filter_to_labelled_sequences(setup_db_with_real_world_fixture, tmp_path):
     db = setup_db_with_real_world_fixture
     kdb = KrakenDbBuilder(db=db)
     
     # run the filter - it should not filter out any sequences because there are no
     # sequences labelled as RSV A in the fixtures
-    kdb._apply_rsv_size_filter(categories=['RSV A'])
+    rsv_min_seq_len= 15000
+    kdb.apply_size_filter_to_labelled_sequences(categories=['RSV A'], min_seq_len= rsv_min_seq_len)
     
     update_ids=[3,5,7]
     stmt1="SELECT id, include from sequences WHERE id IN (?,?,?)"
@@ -361,7 +362,7 @@ def test__apply_rsv_size_filter(setup_db_with_real_world_fixture, tmp_path):
     db._con.commit()
     
     # apply the filter again - the three sequences should now be filtered out
-    kdb._apply_rsv_size_filter(categories=['RSV A'])
+    kdb.apply_size_filter_to_labelled_sequences(categories=['RSV A'], min_seq_len= rsv_min_seq_len)
     rows = db._cur.execute(stmt1,update_ids).fetchall()
     excluded_ids = [x['id'] for x in rows if x['include']==0]
     assert sorted(excluded_ids) == sorted(update_ids), 'having set the RSV A label and sequence length below cutoff for three randomly chosen sequences, these are now marked as excluded'
@@ -404,12 +405,14 @@ def test_filter_out_sequences_linked_to_taxonomy_sub_tree(setup_db_with_real_wor
     
 
 
-def test_create_rsv_taxonomy(setup_db_with_rsv_fixture):
+def test_create_subtree_by_sequence_category_with_taxid(setup_db_with_rsv_fixture):
+    """ test create_subtree_by_sequence_category with a parent_tax_id provided directly"""
     db = setup_db_with_rsv_fixture
     kdb = KrakenDbBuilder(db=db)
     
-    # assert that the data, before we apply the RSV taxonomy modifications, is in a state similar to what 
-    # we would have from a default NCBI RefSeq data build 
+    # Testing with sequences labelled 'RSV A' and the 'Human respiratory syncytial virus A' parent taxon 
+    # but any taxonomy node could be used here
+    parent_tax_id = 11250
     stmt1 = """
         SELECT
             fasta_header,
@@ -418,25 +421,45 @@ def test_create_rsv_taxonomy(setup_db_with_rsv_fixture):
         FROM sequences
         INNER JOIN taxonomy_nodes ON(taxonomy_nodes.tax_id = sequences.tax_id)
         INNER JOIN taxonomy_names AS parent_tax_names ON(parent_tax_names.tax_id = taxonomy_nodes.parent_tax_id)
-        WHERE parent_tax_names.name = ?
+        WHERE parent_tax_id = ?
     """
-    rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus A']).fetchall()
-    assert not rows, 'before we start, no sequences are linked to hRSV A'
+    rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
+    assert not rows, f'before we start, no sequences are linked to parent node with tax_id {parent_tax_id}'
     
-    rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus B']).fetchall()
-    assert not rows, 'before we start, no sequences are linked to hRSV B'
+    # run the RSV subtree creation
+    assert kdb.create_subtree_by_sequence_category(category= 'RSV A', parent_tax_id= parent_tax_id ), 'method returns True'
     
-    # run the RSV creation
-    assert kdb.create_rsv_taxonomy(rsv_size_filter=True), 'method returns True'
+    rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
+    assert  len(rows) == 3, f'having built the subtree, there are now 3 sequences linked to parent node with tax_id {parent_tax_id}'
+
+def test_create_subtree_by_sequence_category_with_name(setup_db_with_rsv_fixture):
+    """ test create_subtree_by_sequence_category with a parent taxon name provided, which needs to be translated to tax_id"""
+    db = setup_db_with_rsv_fixture
+    kdb = KrakenDbBuilder(db=db)
     
-    rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus A']).fetchall()
-    assert  len(rows) == 2, 'having built the RSV taxonomy, there are now 2 sequences linked to hRSV A'
+    parent_taxon_name = 'Human orthopneumovirus'
+    parent_tax_id = 11250
+    stmt1 = """
+        SELECT
+            fasta_header,
+            parent_tax_id,
+            parent_tax_names.name AS parent_taxon_name
+        FROM sequences
+        INNER JOIN taxonomy_nodes ON(taxonomy_nodes.tax_id = sequences.tax_id)
+        INNER JOIN taxonomy_names AS parent_tax_names ON(parent_tax_names.tax_id = taxonomy_nodes.parent_tax_id)
+        WHERE parent_tax_id = ?
+    """
+    rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
+    assert not rows, f'before we start, no sequences are linked to parent node with taxon {parent_taxon_name}'
     
-    rows = db._cur.execute(stmt1, ['Human respiratory syncytial virus B']).fetchall()
-    assert len(rows) == 1, 'having built the RSV taxonomy, there is now 1 sequence linked to hRSV B'
+    # run the RSV subtree creation
+    assert kdb.create_subtree_by_sequence_category(category= 'RSV A', parent_taxon_name= parent_taxon_name ), 'method returns True'
+    
+    rows = db._cur.execute(stmt1, [parent_tax_id]).fetchall()
+    assert  len(rows) == 3, f'having built the subtree, there are now 3 sequences linked to parent node with tax_id {parent_tax_id}'
 
 
-def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_fixture_for_filter):
+def test_filter_out_sequences_linked_to_subtree(setup_db_with_rsv_fixture_for_filter):
     db = setup_db_with_rsv_fixture_for_filter
     kdb = KrakenDbBuilder(db=db)
     
@@ -464,9 +487,10 @@ def test_filter_out_sequences_linked_to_high_level_rsv_nodes(setup_db_with_rsv_f
     # NOTE: this must be done here rather than being in the fixtures as pre-linked sequences
     # because the creation of new taxonomy nodes is needed to set the range of "artificial" 
     # node IDs that need to be skipped
-    kdb.create_rsv_taxonomy()
-
-    n_removed = kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
+    kdb.create_subtree_by_sequence_category( category= 'RSV A', parent_taxon_name= 'Human respiratory syncytial virus A')
+    kdb.create_subtree_by_sequence_category( category= 'RSV B', parent_taxon_name= 'Human respiratory syncytial virus B')
+    
+    n_removed = kdb.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Orthopneumovirus')
     
     # only the RefSeq sequence should be removed by the filter
     assert n_removed == 4, 'filter returns correct number of sequences removed'

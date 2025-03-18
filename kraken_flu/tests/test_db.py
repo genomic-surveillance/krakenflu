@@ -548,3 +548,7 @@ def test_get_sequence_ids_percent_n_filter(setup_db_with_real_world_fixture):
     seq_ids = db.get_sequence_ids_percent_n_filter(10)
     assert seq_ids == [1002] ,'there is now one sequence in the DB with >10% N and the ID is correct'
     
+def test_tax_id_exists(setup_db_with_fixture):
+    db = setup_db_with_fixture
+    assert db.tax_id_exists(1), 'tax_id 1 exists in the DB'
+    assert not db.tax_id_exists(1000000), 'tax_id 1000000 does not exist in the DB'

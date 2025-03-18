@@ -227,7 +227,13 @@ def main():
     if args.rsv_a_sequences and args.rsv_b_sequences:
         kdb.load_fasta_file(file_path= args.rsv_a_sequences, category= 'RSV A', enforce_ncbi_acc= False)
         kdb.load_fasta_file(file_path= args.rsv_b_sequences, category= 'RSV B', enforce_ncbi_acc= False)
-        kdb.create_rsv_taxonomy( rsv_size_filter= args.rsv_size_filter )
+        if  args.rsv_size_filter:
+            # The RSV genome is a single-stranded, non-segmented molecule that is 15,191–15,226 nucleotides long 
+            # https://www.nature.com/articles/s41598-023-40760-y. Using a cutoff of 15k
+            kdb.apply_size_filter_to_labelled_sequences(categories= ['RSV A','RSV B'], min_seq_len= 15000)
+            
+        kdb.create_subtree_by_sequence_category( category= 'RSV A', parent_taxon_name= 'Human respiratory syncytial virus A')
+        kdb.create_subtree_by_sequence_category( category= 'RSV B', parent_taxon_name= 'Human respiratory syncytial virus B')
     
     if args.deduplicate:
         kdb.deduplicate_sequences()
@@ -243,8 +249,14 @@ def main():
         # and the taxonomy assigned to the sequence on NCBI.  
         # THis call will remove all RSV sequences linked to higher-order RSV taxa except for those linked 
         # to hRSV A/B
+        # We are starting the purge from "Orthopneumovirus", which means that all non-human RSV sequences are 
+        # also removed. This is by design. It should improve our ability to identify hRSV, which are the ones we 
+        # care about in the viral pipeline.  If non-human "Orthopneumovirus" species should be retained, change the
+        # name of the start taxon accordingly.  
+        # Check this NCBI taxonomy page for a list of the taxa included in "Orthopneumovirus"
+        # https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Tree&id=1868215&lvl=3&keep=1&srchmode=1&unlock
         if args.rsv_a_sequences or args.rsv_b_sequences:
-            kdb.filter_out_sequences_linked_to_high_level_rsv_nodes()
+            kdb.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Orthopneumovirus')
             
         # as for RSV: filter out flu sequences that are linked to high-level taxa (not our custom 
         # taxonomy nodes). These will include sequences that cannot even be recognised as flu from the 
