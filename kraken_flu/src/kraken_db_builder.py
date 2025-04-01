@@ -773,7 +773,7 @@ class KrakenDbBuilder():
             raise ValueError("need a value for either start_tax_id or start_taxon_name")    
             
         seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= start_tax_id, skip_tax_ids= self.created_tax_ids())
-        logging.info(f'removed {len(seq_ids)} sequences linked to node "{start_taxon_name}" and its children, excluding nodes created by this tool.)
+        logging.info(f'removed {len(seq_ids)} sequences linked to node "{start_taxon_name}" and its children, excluding nodes created by this tool.')
         return len(seq_ids)
         
     def created_tax_ids(self):
