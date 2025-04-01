@@ -308,15 +308,17 @@ def main():
         if args.filter_flu_taxonomy:
             kdb.filter_out_sequences_linked_to_high_level_flu_nodes()
     
-    multiref_paths, seen, multiref_data = kdb.find_multiref_paths(root_taxid = args.multiref_root_tax_id)
     if not args.repair_subterminal_multirefs and not args.repair_all_multirefs:
-        logging.info("Paths with sequences attached to non-leaf nodes will not be fixed.")
-    if args.repair_subterminal_multirefs and not args.repair_all_multirefs:
-        logging.info("Repairing only subterminal multiref cases.")
-        kdb.repair_multiref_paths(multiref_paths, seen, "subterminal")
-    if args.repair_all_multirefs:
-        logging.info("Repairing all multiref cases.")
-        kdb.repair_multiref_paths(multiref_paths, seen, "all")
+        logging.info("multiref repair options not used: paths with sequences attached to non-leaf nodes will not be fixed.")
+    else:
+        multiref_paths, seen, multiref_data = kdb.find_multiref_paths(root_taxid = args.multiref_root_tax_id)
+
+        if args.repair_subterminal_multirefs and not args.repair_all_multirefs:
+            logging.info("Repairing only subterminal multiref cases.")
+            kdb.repair_multiref_paths(multiref_paths, seen, "subterminal")
+        if args.repair_all_multirefs:
+            logging.info("Repairing all multiref cases.")
+            kdb.repair_multiref_paths(multiref_paths, seen, "all")
 
     kdb.create_db_ready_dir(path = args.out_dir)
     
