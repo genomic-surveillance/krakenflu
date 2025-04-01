@@ -139,6 +139,36 @@ def args_parser():
     )
     
     parser.add_argument(
+        '--rhinovirus_a_sequences',
+        action = 'store',
+        required = False,
+        metavar= 'FILE',
+        type= str,
+        help = 'file of known rhinovirus species A sequences. Must be used together with --rhinovirus_b_sequences and --rhinovirus_c_sequences',
+'
+    )
+    
+    parser.add_argument(
+        '--rhinovirus_b_sequences',
+        action = 'store',
+        required = False,
+        metavar= 'FILE',
+        type= str,
+        help = 'file of known rhinovirus species A sequences. Must be used together with --rhinovirus_a_sequences and --rhinovirus_c_sequences',
+'
+    )
+    
+    parser.add_argument(
+        '--rhinovirus_c_sequences',
+        action = 'store',
+        required = False,
+        metavar= 'FILE',
+        type= str,
+        help = 'file of known rhinovirus species A sequences. Must be used together with --rhinovirus_a_sequences and --rhinovirus_b_sequences',
+'
+    )
+    
+    parser.add_argument(
         '--max_percent_n',
         action = 'store',
         required = False,
@@ -235,6 +265,17 @@ def main():
         kdb.create_subtree_by_sequence_category( category= 'RSV A', parent_taxon_name= 'Human respiratory syncytial virus A')
         kdb.create_subtree_by_sequence_category( category= 'RSV B', parent_taxon_name= 'Human respiratory syncytial virus B')
     
+    if any([args.rhinovirus_a_sequences, args.rhinovirus_b_sequences, args.rhinovirus_c_sequences]):
+        if not all([args.rhinovirus_a_sequences, args.rhinovirus_b_sequences, args.rhinovirus_c_sequences]):
+            raise ValueError('when one of the options --rhinovirus_a_sequences, --rhinovirus_b_sequences, --rhinovirus_c_sequences is used, the two others must be used as well')
+        kdb.load_fasta_file(file_path= args.rhinovirus_a_sequences, category= 'rhinovirus A', enforce_ncbi_acc= False)
+        kdb.load_fasta_file(file_path= args.rhinovirus_b_sequences, category= 'rhinovirus B', enforce_ncbi_acc= False)
+        kdb.load_fasta_file(file_path= args.rhinovirus_c_sequences, category= 'rhinovirus C', enforce_ncbi_acc= False)
+
+        kdb.create_subtree_by_sequence_category( category= 'rhinovirus A', parent_taxon_name= 'Rhinovirus A')
+        kdb.create_subtree_by_sequence_category( category= 'rhinovirus B', parent_taxon_name= 'Rhinovirus B')
+        kdb.create_subtree_by_sequence_category( category= 'rhinovirus C', parent_taxon_name= 'Rhinovirus C')
+
     if args.deduplicate:
         kdb.deduplicate_sequences()
         
@@ -245,9 +286,9 @@ def main():
         kdb.link_all_unlinked_sequences_to_taxonomy_nodes()
         
         # If we are creating a custom RSV tree and doing the full linkage, we can end up with 
-        # RefSeq sequences being linked again to high-level RSV taxonomy nodes via the Genabk acc lookup
-        # and the taxonomy assigned to the sequence on NCBI.  
-        # THis call will remove all RSV sequences linked to higher-order RSV taxa except for those linked 
+        # RefSeq sequences being linked again to high-level RSV taxonomy nodes via the Genbank accession 
+        # lookup and the taxonomy assigned to the sequence on NCBI.  
+        # This call will remove all RSV sequences linked to higher-order RSV taxa except for those linked 
         # to hRSV A/B
         # We are starting the purge from "Orthopneumovirus", which means that all non-human RSV sequences are 
         # also removed. This is by design. It should improve our ability to identify hRSV, which are the ones we 
@@ -256,7 +297,13 @@ def main():
         # Check this NCBI taxonomy page for a list of the taxa included in "Orthopneumovirus"
         # https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Tree&id=1868215&lvl=3&keep=1&srchmode=1&unlock
         if args.rsv_a_sequences or args.rsv_b_sequences:
-            kdb.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Orthopneumovirus')
+            kdb.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Orthopneumovirus', skip_created_nodes= True)
+            
+        # same for rhinovirus
+        if any([args.rhinovirus_a_sequences, args.rhinovirus_b_sequences, args.rhinovirus_c_sequences]):
+            kdb.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Rhinovirus A', skip_created_nodes= True)
+            kdb.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Rhinovirus B', skip_created_nodes= True)
+            kdb.filter_out_sequences_linked_to_subtree(start_taxon_name= 'Rhinovirus C', skip_created_nodes= True)
             
         # as for RSV: filter out flu sequences that are linked to high-level taxa (not our custom 
         # taxonomy nodes). These will include sequences that cannot even be recognised as flu from the 
