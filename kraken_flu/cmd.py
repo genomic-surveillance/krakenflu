@@ -153,8 +153,7 @@ def args_parser():
         required = False,
         metavar= 'FILE',
         type= str,
-        help = 'file of known rhinovirus species A sequences. Must be used together with --rhinovirus_a_sequences and --rhinovirus_c_sequences',
-'
+        help = 'file of known rhinovirus species A sequences. Must be used together with --rhinovirus_a_sequences and --rhinovirus_c_sequences'
     )
     
     parser.add_argument(
@@ -163,8 +162,7 @@ def args_parser():
         required = False,
         metavar= 'FILE',
         type= str,
-        help = 'file of known rhinovirus species A sequences. Must be used together with --rhinovirus_a_sequences and --rhinovirus_b_sequences',
-'
+        help = 'file of known rhinovirus species A sequences. Must be used together with --rhinovirus_a_sequences and --rhinovirus_b_sequences'
     )
     
     parser.add_argument(
