@@ -635,9 +635,7 @@ class KrakenDbBuilder():
             parent_taxon_name: str, optional but must provide one of parent_tax_id or parent_taxon_name
                 is used to look up the parent_tax_id by name. Must exist in the DB already.  
                 
-        """
-        logging.info(f"starting to build custom taxonomy for {category} with node {parent_tax_id} as the parent")
-        
+        """        
         if not self._db.sequences_category_exists(category):
             raise ValueError(f'no sequences loaded into DB with label "{category}" - cannot build subtree')
         
@@ -650,6 +648,8 @@ class KrakenDbBuilder():
                 raise ValueError(f"no node exists in DB with name '{parent_taxon_name}'")
         else:
             raise ValueError("need a value for either parent_tax_id or parent_taxon_name")
+        
+        logging.info(f"starting to build custom taxonomy for {category} with node {parent_tax_id} as the parent")
         
         # create new nodes for the genomes that were uploaded from files and link to taxonomy
         # TODO: this block is very similar to the one in "assign_flu_taxonomy_nodes", might be worth factoring out 
@@ -773,7 +773,7 @@ class KrakenDbBuilder():
             raise ValueError("need a value for either start_tax_id or start_taxon_name")    
             
         seq_ids = self.filter_out_sequences_linked_to_taxonomy_sub_tree(tax_id= start_tax_id, skip_tax_ids= self.created_tax_ids())
-        logging.info(f'removed {len(seq_ids)} sequences from high-level RSV taxonomy nodes (not including hRSV A/B)')
+        logging.info(f'removed {len(seq_ids)} sequences linked to node "{start_taxon_name}" and its children, excluding nodes created by this tool.')
         return len(seq_ids)
         
     def created_tax_ids(self):
